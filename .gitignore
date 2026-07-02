@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*$py.class
+*.egg-info/
+build/
+dist/
+*.spec
+# Курируемый spec сборки — под контролем версий
+!TG_Cloud_Cache_Manager.spec
+
+# Virtualenv
+.venv/
+venv/
+env/
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+
+# App data / secrets — cache_dir, tg_session_path and их подкаталоги
+# (data/, cache/, logs/, .batch_blob_cache/, .share_cache/, .thumb_cache/, .thumb_fetch/)
+.env
+config.json
+var/
+*.sqlite3
+*.session
+*.session-journal
+
+# Logs
+*.log

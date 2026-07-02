@@ -1,0 +1,10 @@
+-r requirements.txt
+
+# Test / build tooling (matches pyproject [project.optional-dependencies].dev).
+pytest==8.4.2
+pytest-asyncio==0.26.0
+pyinstaller==6.21.0
+
+# Linters / type checker used during development.
+flake8==7.3.0
+mypy==1.20.1
