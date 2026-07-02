@@ -201,6 +201,7 @@ class ExplorerPanelMixin:
             ExplorerFileItem,
             ExplorerFolderItem,
             is_image_name,
+            is_pdf_name,
             is_text_editable_name,
             is_video_name,
         )
@@ -230,8 +231,10 @@ class ExplorerPanelMixin:
                     return
                 open_stream_act = None
                 edit_act = None
-                if is_image_name(item.entry.orig_name) or is_video_name(
-                    item.entry.orig_name
+                if (
+                    is_image_name(item.entry.orig_name)
+                    or is_video_name(item.entry.orig_name)
+                    or is_pdf_name(item.entry.orig_name)
                 ):
                     open_stream_act = menu.addAction("Открыть без скачивания")
                     menu.addSeparator()
@@ -747,9 +750,7 @@ class ExplorerPanelMixin:
             out_path = edit_dir / name
             out_path.write_bytes(data)
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(
-                self, "Редактор", f"Не удалось сохранить файл:\n{exc}"
-            )
+            QMessageBox.critical(self, "Редактор", f"Не удалось сохранить файл:\n{exc}")
             return
         self._enqueue_job(
             JobType.UPLOAD.value,

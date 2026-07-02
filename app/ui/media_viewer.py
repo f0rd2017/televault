@@ -595,6 +595,7 @@ class PdfViewerWindow(QWidget):
 
         self._doc = QPdfDocument(self)
         self._buffer = None
+        self._data = None
 
         self._nam = QNetworkAccessManager(self)
         self._reply = self._nam.get(QNetworkRequest(QUrl(url)))
@@ -623,10 +624,18 @@ class PdfViewerWindow(QWidget):
             return
 
         from PySide6.QtCore import QBuffer, QByteArray, QIODevice
+        from PySide6.QtPdf import QPdfDocument
 
-        self._buffer = QBuffer(QByteArray(raw), self)
+        # Ссылку на QByteArray ДЕРЖИМ в self: QBuffer не владеет данными, и с
+        # временным массивом документ молча грузился в Status.Error (пустое окно).
+        self._data = QByteArray(raw)
+        self._buffer = QBuffer(self._data, self)
         self._buffer.open(QIODevice.OpenModeFlag.ReadOnly)
         self._doc.load(self._buffer)
+
+        if self._doc.status() == QPdfDocument.Status.Error:
+            self._status.setText("Не удалось открыть PDF (файл повреждён?)")
+            return
 
         self._view.setDocument(self._doc)
         self._status.hide()
