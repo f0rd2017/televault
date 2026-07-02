@@ -4,6 +4,8 @@ import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+from app.core.paths import app_base_dir
+
 
 def setup_logging(
     debug: bool = False,
@@ -26,10 +28,12 @@ def setup_logging(
     console.setFormatter(fmt)
     root.addHandler(console)
 
+    # Не cwd: frozen-приложение запускают из произвольной директории — логи
+    # должны лежать рядом с приложением (app_base_dir), а не где попало.
     log_path = (
         Path(log_file)
         if log_file is not None
-        else (Path.cwd() / "var" / "logs" / "tgccm.log")
+        else (app_base_dir() / "var" / "logs" / "tgccm.log")
     )
     log_path.parent.mkdir(parents=True, exist_ok=True)
     file_handler = RotatingFileHandler(

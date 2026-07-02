@@ -13,6 +13,7 @@ from app.api import ApiServer
 from app.config.config import (
     ConfigError,
     config_exists,
+    default_config_path,
     load_app_config,
     load_public_config,
     save_public_config,
@@ -82,7 +83,9 @@ def run() -> int:
     icon_path = _resolve_app_icon_path()
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
-    config_path = Path("config.json")
+    # Не cwd: frozen-приложение запускают из произвольной директории —
+    # config.json ищем рядом с exe / в корне проекта (default_config_path).
+    config_path = default_config_path()
 
     if not config_exists(config_path):
         setup_dialog = SetupDialog(initial=load_public_config(config_path))

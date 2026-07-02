@@ -175,7 +175,12 @@ def test_blank_download_dir_falls_back_to_cache(monkeypatch, tmp_path) -> None:
     payload["download_dir"] = "   "  # только пробелы → считаем пустым
     path = _write_config(tmp_path, payload)
     cfg = load_app_config(config_path=path, dotenv_path=tmp_path / "missing.env")
-    assert cfg.download_root == "./mycache"
+    # Относительные пути конфига резолвятся от app_base_dir (переносимость
+    # frozen-сборки), поэтому сравниваем резолвленные значения.
+    from app.core.paths import resolve_app_path
+
+    assert cfg.download_root == cfg.cache_dir
+    assert cfg.cache_dir == str(resolve_app_path("./mycache"))
 
 
 def test_load_app_config_invalid_limits(monkeypatch, tmp_path) -> None:

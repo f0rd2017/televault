@@ -9,6 +9,7 @@ from typing import Any
 from dotenv import load_dotenv
 
 from app.config.defaults import DEFAULT_CONFIG
+from app.core.paths import app_base_dir, resolve_app_path
 from app.core.types import ApiConfig, AppConfig, CryptoConfig, RetryConfig
 from app.core.utils import (
     ensure_parent_dir,
@@ -23,7 +24,8 @@ class ConfigError(RuntimeError):
 
 
 def default_config_path(base_dir: str | Path | None = None) -> Path:
-    root = Path(base_dir) if base_dir else Path.cwd()
+    # Не cwd: frozen-приложение запускают из произвольной директории.
+    root = Path(base_dir) if base_dir else app_base_dir()
     return root / "config.json"
 
 
@@ -262,16 +264,24 @@ def _build_config(merged: dict[str, Any]) -> AppConfig:
         except ValueError as exc:
             raise ConfigError(f"Invalid tg_proxy: {exc}") from exc
 
+    # В config.json пути могут быть относительными (./var/…) — файл остаётся
+    # переносимым. В AppConfig кладём абсолютные: относительные считаются от
+    # app_base_dir() (рядом с exe / корень проекта), а не от произвольной cwd.
+    download_dir_raw = str(merged.get("download_dir", "")).strip()
     return AppConfig(
         tg_api_id=api_id,
         tg_api_hash=api_hash,
         tg_session_path=str(
-            merged.get("tg_session_path", "./var/data/session.session")
+            resolve_app_path(
+                merged.get("tg_session_path", "./var/data/session.session")
+            )
         ),
         main_channel_index=main_channel_index,
         channel_sharding_mode=channel_sharding_mode,
-        cache_dir=str(merged.get("cache_dir", "./var/cache")),
-        download_dir=str(merged.get("download_dir", "")).strip(),
+        cache_dir=str(resolve_app_path(merged.get("cache_dir", "./var/cache"))),
+        download_dir=(
+            str(resolve_app_path(download_dir_raw)) if download_dir_raw else ""
+        ),
         show_thumbnails=bool(merged.get("show_thumbnails", True)),
         fetch_thumbnails=fetch_thumbnails,
         ui_icon_size=ui_icon_size,
@@ -359,7 +369,9 @@ def load_app_config(
     config_path: str | Path | None = None,
     dotenv_path: str | Path | None = None,
 ) -> AppConfig:
-    load_dotenv(dotenv_path=dotenv_path)
+    # Явный путь к .env: дефолтный поиск load_dotenv идёт от cwd и во frozen-
+    # сборке файл рядом с exe не находит.
+    load_dotenv(dotenv_path=dotenv_path or (app_base_dir() / ".env"))
 
     path = Path(config_path) if config_path else default_config_path()
     raw: dict[str, Any] = {}
