@@ -707,6 +707,19 @@ class ExplorerPanelMixin:
 
         from PySide6.QtWidgets import QMessageBox
 
+        from app.ui.text_editor import _MAX_EDIT_BYTES
+
+        # Отсекаем гиганта ДО запуска скачивания: размер известен из индекса.
+        total_size = int(getattr(entry, "total_size", 0) or 0)
+        if total_size > _MAX_EDIT_BYTES:
+            QMessageBox.warning(
+                self,
+                "Редактор",
+                f"Файл слишком большой для редактора: {total_size // (1024 * 1024)} МБ "
+                f"(лимит {_MAX_EDIT_BYTES // (1024 * 1024)} МБ).",
+            )
+            return
+
         server = getattr(self, "api_server", None)
         info = server.ensure_media_server() if server is not None else None
         if not info:

@@ -1,11 +1,14 @@
 """Многовкладочный IDE-редактор текстовых и кодовых файлов прямо из облака.
 
 Поддерживает:
-- Удобную работу со множеством файлов в одном окне (вкладки, Ctrl+W, Ctrl+Tab).
+- Удобную работу со множеством файлов в одном окне (вкладки, Ctrl+W, Ctrl+Tab/Ctrl+Shift+Tab).
 - Сохранение масштаба шрифта между сессиями (QSettings).
 - Подсветку синтаксиса (Python, JS/TS, HTML/XML, CSS, JSON, SQL, Markdown, YAML/TOML, Shell/Bash, C/C++).
-- Продвинутый поиск и замену (Ctrl+F / Ctrl+H) с регистрами, целыми словами и Regex.
-- Горячие клавиши IDE: комментарий (Ctrl+/), дублирование строки (Ctrl+D), перемещение строк (Alt+↑/↓), удаление строки (Ctrl+Shift+K), индент (Tab/Shift+Tab).
+- Продвинутый поиск и замену (Ctrl+F / Ctrl+H) с регистрами, целыми словами и Regex
+  (в замене работают группы $1/\\1; «Заменить всё» идёт строго вперёд — не зацикливается).
+- Горячие клавиши IDE: комментарий (Ctrl+/), дублирование строки (Ctrl+D), перемещение
+  строк (Alt+↑/↓), удаление строки (Ctrl+Shift+K), индент/дедент (Tab/Shift+Tab),
+  автоотступ на Enter, переход к строке (Ctrl+G).
 - Автоформатирование кода (JSON / Trim whitespace).
 """
 
@@ -15,7 +18,7 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 
-from PySide6.QtCore import QRect, QSettings, QSize, Qt, QUrl
+from PySide6.QtCore import QRect, QRegularExpression, QSettings, QSize, Qt, QUrl
 from PySide6.QtGui import (
     QColor,
     QFont,
@@ -89,6 +92,27 @@ def _save_font_size(size: int) -> None:
     settings.setValue("fontSize", int(size))
 
 
+def _expand_regex_groups(template: str, match) -> str:
+    """Подстановка групп в замену regex-режима: ``$1``/``\\1`` (и ``$0`` — всё
+    совпадение). Несуществующие группы остаются как есть."""
+    out: list[str] = []
+    i = 0
+    while i < len(template):
+        ch = template[i]
+        if ch in ("$", "\\") and i + 1 < len(template) and template[i + 1].isdigit():
+            j = i + 1
+            while j < len(template) and template[j].isdigit():
+                j += 1
+            idx = int(template[i + 1 : j])
+            if idx <= match.lastCapturedIndex():
+                out.append(match.captured(idx))
+                i = j
+                continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def _human_size(n: int) -> str:
     size = float(max(0, int(n)))
     for unit in ("B", "KB", "MB", "GB"):
@@ -117,6 +141,8 @@ class _LineNumberArea(QWidget):
 
 
 class CodeEditor(QPlainTextEdit):
+    _INDENT = "    "
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._gutter = _LineNumberArea(self)
@@ -126,6 +152,30 @@ class CodeEditor(QPlainTextEdit):
         self._update_gutter_width()
         self._highlight_current_line()
         self._comment_prefix = "# "
+
+    def keyPressEvent(self, event) -> None:  # noqa: N802
+        key = event.key()
+        if key in (Qt.Key.Key_Tab, Qt.Key.Key_Backtab):
+            if key == Qt.Key.Key_Backtab or (
+                event.modifiers() & Qt.KeyboardModifier.ShiftModifier
+            ):
+                self.dedent_selection()
+            elif self.textCursor().hasSelection():
+                self.indent_selection()
+            else:
+                self.textCursor().insertText(self._INDENT)
+            return
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            # Автоотступ: новая строка наследует ведущие пробелы/табы текущей
+            # (до позиции курсора — Enter в середине отступа не дублирует его).
+            cursor = self.textCursor()
+            before = cursor.block().text()[: cursor.positionInBlock()]
+            indent = before[: len(before) - len(before.lstrip())]
+            super().keyPressEvent(event)
+            if indent:
+                self.textCursor().insertText(indent)
+            return
+        super().keyPressEvent(event)
 
     def set_comment_prefix(self, prefix: str) -> None:
         self._comment_prefix = prefix
@@ -246,9 +296,17 @@ class CodeEditor(QPlainTextEdit):
                 idx = block.text().find(prefix.strip())
                 if idx != -1:
                     c.setPosition(block.position() + idx)
-                    c.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor, len(prefix.strip()))
+                    c.movePosition(
+                        QTextCursor.MoveOperation.Right,
+                        QTextCursor.MoveMode.KeepAnchor,
+                        len(prefix.strip()),
+                    )
                     if c.selectedText().endswith(" "):
-                        c.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor, 1)
+                        c.movePosition(
+                            QTextCursor.MoveOperation.Right,
+                            QTextCursor.MoveMode.KeepAnchor,
+                            1,
+                        )
                     c.removeSelectedText()
             else:
                 c.movePosition(QTextCursor.MoveOperation.StartOfBlock)
@@ -259,6 +317,53 @@ class CodeEditor(QPlainTextEdit):
 
         cursor.endEditBlock()
 
+    def _selected_block_range(self) -> tuple[int, int]:
+        """Номера первого и последнего блока, затронутых выделением/курсором."""
+        cursor = self.textCursor()
+        doc = self.document()
+        start = cursor.selectionStart()
+        end = cursor.selectionEnd()
+        first = doc.findBlock(start).blockNumber()
+        last = doc.findBlock(end - 1 if end > start else end).blockNumber()
+        return first, last
+
+    def indent_selection(self) -> None:
+        first, last = self._selected_block_range()
+        doc = self.document()
+        cursor = self.textCursor()
+        cursor.beginEditBlock()
+        for n in range(first, last + 1):
+            block = doc.findBlockByNumber(n)
+            c = QTextCursor(block)
+            c.movePosition(QTextCursor.MoveOperation.StartOfBlock)
+            c.insertText(self._INDENT)
+        cursor.endEditBlock()
+
+    def dedent_selection(self) -> None:
+        first, last = self._selected_block_range()
+        doc = self.document()
+        cursor = self.textCursor()
+        cursor.beginEditBlock()
+        for n in range(first, last + 1):
+            block = doc.findBlockByNumber(n)
+            text = block.text()
+            remove = 0
+            if text.startswith("\t"):
+                remove = 1
+            else:
+                while remove < len(self._INDENT) and text[remove : remove + 1] == " ":
+                    remove += 1
+            if remove:
+                c = QTextCursor(block)
+                c.movePosition(QTextCursor.MoveOperation.StartOfBlock)
+                c.movePosition(
+                    QTextCursor.MoveOperation.Right,
+                    QTextCursor.MoveMode.KeepAnchor,
+                    remove,
+                )
+                c.removeSelectedText()
+        cursor.endEditBlock()
+
     def duplicate_line(self) -> None:
         cursor = self.textCursor()
         cursor.beginEditBlock()
@@ -267,39 +372,54 @@ class CodeEditor(QPlainTextEdit):
             cursor.insertText(text + text)
         else:
             cursor.movePosition(QTextCursor.MoveOperation.StartOfBlock)
-            cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
+            cursor.movePosition(
+                QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor
+            )
             line = cursor.selectedText()
             cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock)
             cursor.insertText("\n" + line)
         cursor.endEditBlock()
 
     def move_line(self, up: bool) -> None:
+        # Меняем ТЕКСТЫ двух соседних строк местами, не трогая переводы строк —
+        # прежняя реализация (вырезать+вставить с '\n') добавляла лишнюю пустую
+        # строку при перемещении последней строки файла.
         cursor = self.textCursor()
         block = cursor.block()
-        target_block = block.previous() if up else block.next()
-        if not target_block.isValid():
+        other = block.previous() if up else block.next()
+        if not other.isValid():
             return
-        cursor.beginEditBlock()
-        cursor.movePosition(QTextCursor.MoveOperation.StartOfBlock)
-        cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
-        text = cursor.selectedText()
-        cursor.removeSelectedText()
-        cursor.deleteChar()
+        column = cursor.positionInBlock()
+        text_cur = block.text()
+        text_other = other.text()
+        n_cur = block.blockNumber()
+        n_other = other.blockNumber()
+        doc = self.document()
 
-        cursor.setPosition(target_block.position())
-        if not up:
-            cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock)
-            cursor.insertText("\n")
-        cursor.insertText(text)
-        if up:
-            cursor.insertText("\n")
+        cursor.beginEditBlock()
+        for number, new_text in ((n_other, text_cur), (n_cur, text_other)):
+            b = doc.findBlockByNumber(number)
+            c = QTextCursor(b)
+            c.movePosition(QTextCursor.MoveOperation.StartOfBlock)
+            c.movePosition(
+                QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor
+            )
+            c.insertText(new_text)
         cursor.endEditBlock()
+
+        # Курсор следует за перемещённой строкой (та же колонка).
+        target = doc.findBlockByNumber(n_other)
+        follow = self.textCursor()
+        follow.setPosition(target.position() + min(column, len(text_cur)))
+        self.setTextCursor(follow)
 
     def delete_line(self) -> None:
         cursor = self.textCursor()
         cursor.beginEditBlock()
         cursor.movePosition(QTextCursor.MoveOperation.StartOfBlock)
-        cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor)
+        cursor.movePosition(
+            QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor
+        )
         cursor.removeSelectedText()
         cursor.deleteChar()
         cursor.endEditBlock()
@@ -349,12 +469,38 @@ class TextEditorTab(QWidget):
         layout.addWidget(self.editor)
 
         self.nam = QNetworkAccessManager(self)
+        self._too_big = False
         self.reply: QNetworkReply | None = self.nam.get(QNetworkRequest(QUrl(url)))
         if self.reply is not None:
             self.reply.finished.connect(self._on_loaded)
+            self.reply.downloadProgress.connect(self._on_download_progress)
+
+    def _on_download_progress(self, received: int, _total: int) -> None:
+        # Обрываем скачивание гиганта СРАЗУ, а не после полной загрузки в RAM:
+        # раньше 2-ГБ файл целиком приезжал в память и только потом отклонялся.
+        if received > _MAX_EDIT_BYTES and self.reply is not None and not self._too_big:
+            self._too_big = True
+            self.reply.abort()
+
+    def _show_load_error(self, message: str) -> None:
+        """Ошибка видна в САМОЙ вкладке (не только в строке статуса — она общая
+        на всё окно и затирается активностью других вкладок)."""
+        self.editor.setPlaceholderText(f"⚠ {message}")
+        if _MAIN_EDITOR_WINDOW:
+            _MAIN_EDITOR_WINDOW.update_active_status(message)
 
     def _setup_comment_prefix(self) -> None:
-        if self.lang in ("python", "py", "yaml", "yml", "toml", "ini", "shell", "bash", "sh"):
+        if self.lang in (
+            "python",
+            "py",
+            "yaml",
+            "yml",
+            "toml",
+            "ini",
+            "shell",
+            "bash",
+            "sh",
+        ):
             self.editor.set_comment_prefix("# ")
         elif self.lang in ("html", "xml"):
             self.editor.set_comment_prefix("<!-- ")
@@ -367,19 +513,24 @@ class TextEditorTab(QWidget):
         if reply is None:
             return
         try:
+            if self._too_big:
+                self._show_load_error(
+                    "Слишком большой файл для редактора "
+                    f"(лимит {_MAX_EDIT_BYTES // (1024 * 1024)} МБ)."
+                )
+                return
             if reply.error() != QNetworkReply.NetworkError.NoError:
-                if _MAIN_EDITOR_WINDOW:
-                    _MAIN_EDITOR_WINDOW.update_active_status(f"Ошибка загрузки: {reply.errorString()}")
+                self._show_load_error(f"Ошибка загрузки: {reply.errorString()}")
                 return
             raw = bytes(reply.readAll().data())
         finally:
             reply.deleteLater()
 
         if len(raw) > _MAX_EDIT_BYTES:
-            if _MAIN_EDITOR_WINDOW:
-                _MAIN_EDITOR_WINDOW.update_active_status(
-                    f"Слишком большой файл: {len(raw) // (1024 * 1024)} МБ (лимит {_MAX_EDIT_BYTES // (1024 * 1024)} МБ)"
-                )
+            self._show_load_error(
+                f"Слишком большой файл: {len(raw) // (1024 * 1024)} МБ "
+                f"(лимит {_MAX_EDIT_BYTES // (1024 * 1024)} МБ)."
+            )
             return
 
         text = None
@@ -391,8 +542,7 @@ class TextEditorTab(QWidget):
             except UnicodeDecodeError:
                 continue
         if text is None:
-            if _MAIN_EDITOR_WINDOW:
-                _MAIN_EDITOR_WINDOW.update_active_status("Не удалось прочитать как текст (бинарный файл?).")
+            self._show_load_error("Не удалось прочитать как текст (бинарный файл?).")
             return
 
         self.size_bytes = len(raw)
@@ -406,7 +556,11 @@ class TextEditorTab(QWidget):
         # та же операция, что выполняет зум, который «оживлял» отрисовку.
         # Без этого после асинхронной загрузки текст иногда не виден,
         # пока вручную не изменишь размер шрифта.
-        font_size = _MAIN_EDITOR_WINDOW._current_font_size if _MAIN_EDITOR_WINDOW else self.editor.font().pointSize()
+        font_size = (
+            _MAIN_EDITOR_WINDOW._current_font_size
+            if _MAIN_EDITOR_WINDOW
+            else self.editor.font().pointSize()
+        )
         self.editor.apply_font_size(font_size)
         self.editor.viewport().update()
         self.loaded = True
@@ -456,7 +610,9 @@ class TextEditorWindow(QWidget):
         self._replace_btn = self._tool_button("Замена", "Поиск и замена (Ctrl+H)")
         self._replace_btn.setCheckable(True)
 
-        self._format_btn = self._tool_button("Форматировать", "Автоформатирование / Очистка пробелов")
+        self._format_btn = self._tool_button(
+            "Форматировать", "Автоформатирование / Очистка пробелов"
+        )
         self._wrap_chk = QCheckBox("Перенос строк", self)
         self._wrap_chk.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
@@ -504,8 +660,12 @@ class TextEditorWindow(QWidget):
 
         self._find_prev_btn = self._tool_button("↑", "Назад (Shift+Enter)")
         self._find_next_btn = self._tool_button("↓", "Вперёд (Enter)")
-        self._do_replace_btn = self._tool_button("Заменить", "Заменить текущее совпадение")
-        self._replace_all_btn = self._tool_button("Заменить всё", "Заменить все совпадения")
+        self._do_replace_btn = self._tool_button(
+            "Заменить", "Заменить текущее совпадение"
+        )
+        self._replace_all_btn = self._tool_button(
+            "Заменить всё", "Заменить все совпадения"
+        )
         self._find_close_btn = self._tool_button("✕", "Закрыть (Esc)")
         self._find_info = QLabel("", self)
         self._find_info.setObjectName("statusLbl")
@@ -564,10 +724,18 @@ class TextEditorWindow(QWidget):
         self._wrap_chk.toggled.connect(self._on_wrap_toggled)
 
         self._find_edit.returnPressed.connect(lambda: self._find(forward=True))
-        self._find_edit.textChanged.connect(lambda _=None: self._find(forward=True, incremental=True))
-        self._case_chk.toggled.connect(lambda _=None: self._find(forward=True, incremental=True))
-        self._words_chk.toggled.connect(lambda _=None: self._find(forward=True, incremental=True))
-        self._regex_chk.toggled.connect(lambda _=None: self._find(forward=True, incremental=True))
+        self._find_edit.textChanged.connect(
+            lambda _=None: self._find(forward=True, incremental=True)
+        )
+        self._case_chk.toggled.connect(
+            lambda _=None: self._find(forward=True, incremental=True)
+        )
+        self._words_chk.toggled.connect(
+            lambda _=None: self._find(forward=True, incremental=True)
+        )
+        self._regex_chk.toggled.connect(
+            lambda _=None: self._find(forward=True, incremental=True)
+        )
         self._find_next_btn.clicked.connect(lambda: self._find(forward=True))
         self._find_prev_btn.clicked.connect(lambda: self._find(forward=False))
         self._do_replace_btn.clicked.connect(self._replace_one)
@@ -579,25 +747,49 @@ class TextEditorWindow(QWidget):
         self._add_shortcut(QKeySequence("Ctrl+Shift+S"), self._save_all)
         self._add_shortcut(QKeySequence.StandardKey.Close, self.close_active_tab)
         self._add_shortcut(QKeySequence("Ctrl+W"), self.close_active_tab)
-        self._add_shortcut(QKeySequence.StandardKey.ZoomIn, lambda: self.change_global_font_size(1))
-        self._add_shortcut(QKeySequence.StandardKey.ZoomOut, lambda: self.change_global_font_size(-1))
-        self._add_shortcut(QKeySequence("Ctrl++"), lambda: self.change_global_font_size(1))
-        self._add_shortcut(QKeySequence("Ctrl+="), lambda: self.change_global_font_size(1))
-        self._add_shortcut(QKeySequence("Ctrl+0"), lambda: self.reset_global_font_size())
-        self._add_shortcut(QKeySequence.StandardKey.Find, lambda: self._find_btn.setChecked(True))
-        self._add_shortcut(QKeySequence("Ctrl+H"), lambda: self._replace_btn.setChecked(True))
+        self._add_shortcut(
+            QKeySequence.StandardKey.ZoomIn, lambda: self.change_global_font_size(1)
+        )
+        self._add_shortcut(
+            QKeySequence.StandardKey.ZoomOut, lambda: self.change_global_font_size(-1)
+        )
+        self._add_shortcut(
+            QKeySequence("Ctrl++"), lambda: self.change_global_font_size(1)
+        )
+        self._add_shortcut(
+            QKeySequence("Ctrl+="), lambda: self.change_global_font_size(1)
+        )
+        self._add_shortcut(
+            QKeySequence("Ctrl+0"), lambda: self.reset_global_font_size()
+        )
+        self._add_shortcut(
+            QKeySequence.StandardKey.Find, lambda: self._find_btn.setChecked(True)
+        )
+        self._add_shortcut(
+            QKeySequence("Ctrl+H"), lambda: self._replace_btn.setChecked(True)
+        )
         self._add_shortcut(QKeySequence("Ctrl+/"), self._active_toggle_comment)
         self._add_shortcut(QKeySequence("Ctrl+D"), self._active_duplicate_line)
-        self._add_shortcut(QKeySequence("Alt+Up"), lambda: self._active_move_line(up=True))
-        self._add_shortcut(QKeySequence("Alt+Down"), lambda: self._active_move_line(up=False))
+        self._add_shortcut(
+            QKeySequence("Alt+Up"), lambda: self._active_move_line(up=True)
+        )
+        self._add_shortcut(
+            QKeySequence("Alt+Down"), lambda: self._active_move_line(up=False)
+        )
         self._add_shortcut(QKeySequence("Ctrl+Shift+K"), self._active_delete_line)
+        self._add_shortcut(QKeySequence("Ctrl+Y"), self._redo_active)
+        self._add_shortcut(QKeySequence("Ctrl+G"), self._goto_line)
+        self._add_shortcut(QKeySequence("Ctrl+Tab"), lambda: self._cycle_tab(1))
+        self._add_shortcut(QKeySequence("Ctrl+Shift+Tab"), lambda: self._cycle_tab(-1))
         self._add_shortcut(QKeySequence(Qt.Key.Key_Escape), self._on_escape)
 
     def active_tab(self) -> TextEditorTab | None:
         widget = self._tabs.currentWidget()
         return widget if isinstance(widget, TextEditorTab) else None
 
-    def open_file_tab(self, url: str, title: str, on_save: Callable[[bytes], None]) -> None:
+    def open_file_tab(
+        self, url: str, title: str, on_save: Callable[[bytes], None]
+    ) -> None:
         # Если такой файл уже открыт, переключаемся на него
         for i in range(self._tabs.count()):
             tab = self._tabs.widget(i)
@@ -608,7 +800,9 @@ class TextEditorWindow(QWidget):
         tab = TextEditorTab(url, title, on_save, self)
         tab.editor.apply_font_size(self._current_font_size)
         tab.editor.textChanged.connect(lambda t=tab: self._on_tab_text_changed(t))
-        tab.editor.cursorPositionChanged.connect(lambda t=tab: self._on_tab_cursor_changed(t))
+        tab.editor.cursorPositionChanged.connect(
+            lambda t=tab: self._on_tab_cursor_changed(t)
+        )
 
         idx = self._tabs.addTab(tab, title)
         self._tabs.setCurrentIndex(idx)
@@ -638,8 +832,39 @@ class TextEditorWindow(QWidget):
         if idx >= 0:
             self.close_tab(idx)
 
+    def _cycle_tab(self, step: int) -> None:
+        count = self._tabs.count()
+        if count > 1:
+            self._tabs.setCurrentIndex((self._tabs.currentIndex() + step) % count)
+
+    def _goto_line(self) -> None:
+        tab = self.active_tab()
+        if not tab or not tab.loaded:
+            return
+        from PySide6.QtWidgets import QInputDialog
+
+        total = tab.editor.blockCount()
+        line, ok = QInputDialog.getInt(
+            self,
+            "Перейти к строке",
+            f"Строка (1–{total}):",
+            tab.editor.textCursor().blockNumber() + 1,
+            1,
+            total,
+        )
+        if not ok:
+            return
+        block = tab.editor.document().findBlockByNumber(line - 1)
+        cursor = tab.editor.textCursor()
+        cursor.setPosition(block.position())
+        tab.editor.setTextCursor(cursor)
+        tab.editor.centerCursor()
+        tab.editor.setFocus()
+
     def change_global_font_size(self, step: int) -> None:
-        self._current_font_size = max(_MIN_FONT_PT, min(_MAX_FONT_PT, self._current_font_size + step))
+        self._current_font_size = max(
+            _MIN_FONT_PT, min(_MAX_FONT_PT, self._current_font_size + step)
+        )
         _save_font_size(self._current_font_size)
         self._zoom_label.setText(f"{self._current_font_size} pt")
         for i in range(self._tabs.count()):
@@ -689,7 +914,9 @@ class TextEditorWindow(QWidget):
         self._save_btn.setEnabled(tab.dirty)
         self._undo_btn.setEnabled(tab.editor.document().isUndoAvailable())
         self._redo_btn.setEnabled(tab.editor.document().isRedoAvailable())
-        self._wrap_chk.setChecked(tab.editor.lineWrapMode() == QPlainTextEdit.LineWrapMode.WidgetWidth)
+        self._wrap_chk.setChecked(
+            tab.editor.lineWrapMode() == QPlainTextEdit.LineWrapMode.WidgetWidth
+        )
         self._update_tab_status(tab)
 
     def update_active_status(self, msg: str) -> None:
@@ -703,7 +930,9 @@ class TextEditorWindow(QWidget):
         line = cursor.blockNumber() + 1
         col = cursor.positionInBlock() + 1
         lines = tab.editor.blockCount()
-        chars = len(tab.editor.toPlainText())
+        # НЕ toPlainText(): это полная копия текста на КАЖДОЕ движение курсора —
+        # на большом файле статус-бар превращал навигацию в тормоза. O(1):
+        chars = max(0, tab.editor.document().characterCount() - 1)
         dot = "● " if tab.dirty else ""
 
         sel_info = ""
@@ -729,7 +958,9 @@ class TextEditorWindow(QWidget):
         try:
             tab.on_save(data)
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Редактор", f"Не удалось сохранить '{tab.base_title}':\n{exc}")
+            QMessageBox.critical(
+                self, "Редактор", f"Не удалось сохранить '{tab.base_title}':\n{exc}"
+            )
             return
         tab.dirty = False
         tab.size_bytes = len(data)
@@ -739,7 +970,8 @@ class TextEditorWindow(QWidget):
             self._tabs.setTabText(idx, tab.base_title)
         if tab == self.active_tab():
             self._save_btn.setEnabled(False)
-            self._status.setText("Отправлено в облако ⬆")
+            # Честно: on_save лишь СТАВИТ джобу загрузки, а не ждёт её финала.
+            self._status.setText("Поставлено в очередь загрузки в облако ⬆")
 
     def _save_active(self) -> None:
         tab = self.active_tab()
@@ -803,7 +1035,9 @@ class TextEditorWindow(QWidget):
                 obj = json.loads(text)
                 formatted = json.dumps(obj, ensure_ascii=False, indent=2)
             except Exception as exc:
-                QMessageBox.warning(self, "Форматирование JSON", f"Ошибка синтаксиса JSON:\n{exc}")
+                QMessageBox.warning(
+                    self, "Форматирование JSON", f"Ошибка синтаксиса JSON:\n{exc}"
+                )
                 return
         else:
             lines = [line.rstrip() for line in text.splitlines()]
@@ -883,36 +1117,58 @@ class TextEditorWindow(QWidget):
             cursor.setPosition(min(cursor.selectionStart(), cursor.position()))
             tab.editor.setTextCursor(cursor)
 
-        found = False
+        rx: QRegularExpression | None = None
         if self._regex_chk.isChecked():
-            from PySide6.QtCore import QRegularExpression
-            rx_opts = QRegularExpression.PatternOption.NoPatternOption
-            if not self._case_chk.isChecked():
-                rx_opts |= QRegularExpression.PatternOption.CaseInsensitiveOption
-            rx = QRegularExpression(needle, rx_opts)
-            if not rx.isValid():
+            rx = self._build_regex()
+            if rx is None:
                 self._find_info.setText("Некорректный Regex")
                 return False
-            found = tab.editor.find(rx, flags)
-        else:
-            found = tab.editor.find(needle, flags)
+
+        found = (
+            tab.editor.find(rx, flags)
+            if rx is not None
+            else tab.editor.find(needle, flags)
+        )
 
         if not found:
+            # Заворачиваем поиск на другой конец документа (только интерактивный
+            # поиск; _replace_all этим НЕ пользуется — там строгий проход вперёд).
             tc = tab.editor.textCursor()
-            tc.movePosition(QTextCursor.MoveOperation.Start if forward else QTextCursor.MoveOperation.End)
+            tc.movePosition(
+                QTextCursor.MoveOperation.Start
+                if forward
+                else QTextCursor.MoveOperation.End
+            )
             tab.editor.setTextCursor(tc)
-            if self._regex_chk.isChecked():
-                from PySide6.QtCore import QRegularExpression
-                rx_opts = QRegularExpression.PatternOption.NoPatternOption
-                if not self._case_chk.isChecked():
-                    rx_opts |= QRegularExpression.PatternOption.CaseInsensitiveOption
-                rx = QRegularExpression(needle, rx_opts)
-                found = tab.editor.find(rx, flags)
-            else:
-                found = tab.editor.find(needle, flags)
+            found = (
+                tab.editor.find(rx, flags)
+                if rx is not None
+                else tab.editor.find(needle, flags)
+            )
 
         self._find_info.setText("" if found else "нет совпадений")
         return found
+
+    def _build_regex(self) -> QRegularExpression | None:
+        """QRegularExpression по текущим настройкам поиска (None = невалидный)."""
+        rx_opts = QRegularExpression.PatternOption.NoPatternOption
+        if not self._case_chk.isChecked():
+            rx_opts |= QRegularExpression.PatternOption.CaseInsensitiveOption
+        rx = QRegularExpression(self._find_edit.text(), rx_opts)
+        return rx if rx.isValid() else None
+
+    def _expand_replacement(self, selected_text: str) -> str:
+        """Замена с учётом regex-групп ($1/\\1), если включён regex-режим."""
+        replacement = self._replace_edit.text()
+        if not self._regex_chk.isChecked():
+            return replacement
+        rx = self._build_regex()
+        if rx is None:
+            return replacement
+        match = rx.match(selected_text)
+        if not match.hasMatch():
+            return replacement
+        return _expand_regex_groups(replacement, match)
 
     def _replace_one(self) -> None:
         tab = self.active_tab()
@@ -920,32 +1176,54 @@ class TextEditorWindow(QWidget):
             return
         cursor = tab.editor.textCursor()
         if cursor.hasSelection():
-            replacement = self._replace_edit.text()
-            cursor.insertText(replacement)
+            cursor.insertText(self._expand_replacement(cursor.selectedText()))
             self._on_tab_text_changed(tab)
         self._find(forward=True)
 
     def _replace_all(self) -> None:
+        # НЕ через self._find: тот заворачивает поиск на начало документа, и
+        # замена, содержащая искомое («a» → «aa»), зацикливалась навсегда —
+        # после конца документа поиск снова находил только что вставленное.
         tab = self.active_tab()
         if not tab or not tab.loaded:
             return
         needle = self._find_edit.text()
-        replacement = self._replace_edit.text()
         if not needle:
             return
 
-        cursor = tab.editor.textCursor()
-        cursor.beginEditBlock()
-        cursor.movePosition(QTextCursor.MoveOperation.Start)
-        tab.editor.setTextCursor(cursor)
+        doc = tab.editor.document()
+        use_regex = self._regex_chk.isChecked()
+        rx = self._build_regex() if use_regex else None
+        if use_regex and rx is None:
+            self._find_info.setText("Некорректный Regex")
+            return
+        flags = QTextDocument.FindFlag(0)
+        if self._case_chk.isChecked():
+            flags |= QTextDocument.FindFlag.FindCaseSensitively
+        if self._words_chk.isChecked():
+            flags |= QTextDocument.FindFlag.FindWholeWords
 
+        edit_cursor = QTextCursor(doc)
+        edit_cursor.beginEditBlock()
+        position = 0
         count = 0
-        while self._find(forward=True):
-            tc = tab.editor.textCursor()
-            tc.insertText(replacement)
+        while True:
+            found = (
+                doc.find(rx, position, flags)
+                if use_regex
+                else doc.find(needle, position, flags)
+            )
+            if found.isNull():
+                break
+            if found.selectionStart() == found.selectionEnd():
+                # Пустое совпадение (regex вроде «x*») — шагаем вперёд, иначе цикл.
+                position = found.selectionEnd() + 1
+                continue
+            found.insertText(self._expand_replacement(found.selectedText()))
+            position = found.position()  # строго вперёд — без повторного прохода
             count += 1
+        edit_cursor.endEditBlock()
 
-        cursor.endEditBlock()
         self._find_info.setText(f"Заменено: {count}")
         if count > 0:
             self._on_tab_text_changed(tab)
@@ -972,8 +1250,12 @@ class TextEditorWindow(QWidget):
         line.setFixedWidth(8)
         return line
 
-    def _add_shortcut(self, seq: QKeySequence | str | QKeySequence.StandardKey, slot) -> None:
-        sc = QShortcut(QKeySequence(seq) if isinstance(seq, str) else QKeySequence(seq), self)
+    def _add_shortcut(
+        self, seq: QKeySequence | str | QKeySequence.StandardKey, slot
+    ) -> None:
+        sc = QShortcut(
+            QKeySequence(seq) if isinstance(seq, str) else QKeySequence(seq), self
+        )
         sc.activated.connect(slot)
 
     def _apply_dark_theme(self) -> None:
