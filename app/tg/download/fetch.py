@@ -265,6 +265,11 @@ class _DownloadFetchMixin:
                             "flood_wait_live_recorded": bool(flood_wait_live_recorded),
                             "used_stride_streams": int(used_streams),
                         }
+            except (ConnectionError, TimeoutError) as exc:
+                # Все ретраи исчерпаны ошибкой соединения — возможно, умер
+                # прокси. Пробуем следующий уровень цепочки (backup→direct).
+                await self._on_persistent_connection_failure(client, exc)
+                raise
             except FileReferenceExpiredError:
                 if effective_msg_id <= 0:
                     raise
@@ -384,6 +389,9 @@ class _DownloadFetchMixin:
                             str(target_path),
                         )
                         return written
+            except (ConnectionError, TimeoutError) as exc:
+                await self._on_persistent_connection_failure(client, exc)
+                raise
             except FloodWaitError as exc:
                 wait_seconds = float(max(0, int(getattr(exc, "seconds", 0))))
                 self._get_file_limiter.record_flood_wait(wait_seconds)

@@ -22,6 +22,7 @@ from app.tg.download.analytics import _DownloadAnalyticsMixin
 from app.tg.download.batch import _DownloadBatchMixin
 from app.tg.download.fetch import _DownloadFetchMixin
 from app.tg.download.merge import _DownloadMergeMixin
+from app.tg.proxy_escalation import ProxyEscalationMixin
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ class TgDownloader(
     _DownloadMergeMixin,
     _DownloadBatchMixin,
     _DownloadAnalyticsMixin,
+    ProxyEscalationMixin,
 ):
     _MAX_REQUEST_SIZE = 524288
     _MERGE_BUFFER_SIZE = 2 * 1024 * 1024

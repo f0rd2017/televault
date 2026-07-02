@@ -387,6 +387,11 @@ class _ParallelUploadMixin:
                             part_count,
                         )
                         return
+            except (ConnectionError, TimeoutError) as exc:
+                # Все ретраи исчерпаны ошибкой соединения — возможно, умер
+                # прокси. Пробуем следующий уровень цепочки (backup→direct).
+                await self._on_persistent_connection_failure(effective_client, exc)
+                raise
             except FloodWaitError as exc:
                 wait_seconds = float(max(0, int(exc.seconds)))
                 if stats is not None:

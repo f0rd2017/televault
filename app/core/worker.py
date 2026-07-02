@@ -318,6 +318,13 @@ class TelegramWorker(QThread):
             download_endpoints=download_endpoints,
         )
 
+        # Авто-эскалация прокси посреди сессии: если все ретраи передачи
+        # исчерпаны ошибкой соединения, клиент переводится на следующий уровень
+        # цепочки primary→backup→direct (см. app.tg.proxy_escalation).
+        if account_manager is not None:
+            uploader.proxy_escalator = account_manager.escalate_proxy
+            downloader.proxy_escalator = account_manager.escalate_proxy
+
         # Delete/реконсиляция через user accounts или основной аккаунт
         if upload_accounts:
             from app.tg.client import TgClientEndpoint

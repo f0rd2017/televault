@@ -43,6 +43,7 @@ from app.tg.upload.resume import (
     source_signature,
     write_resume_file,
 )
+from app.tg.proxy_escalation import ProxyEscalationMixin
 from app.tg.upload.send import _UploadSendMixin
 from app.tg.upload.single import _SinglePartUploadMixin
 
@@ -56,6 +57,7 @@ class TgUploader(
     _SinglePartUploadMixin,
     _SmallBatchMixin,
     _UploadAnalyticsMixin,
+    ProxyEscalationMixin,
 ):
     _TG_REQUEST_SIZE = 524288
     _PREHASH_CHUNK_SIZE = 16 * 1024 * 1024

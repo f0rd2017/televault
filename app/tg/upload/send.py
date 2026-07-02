@@ -67,6 +67,11 @@ class _UploadSendMixin:
                         )
                         self._send_media_limiter.record_success()
                         return message
+            except (ConnectionError, TimeoutError) as exc:
+                # Все ретраи исчерпаны ошибкой соединения — возможно, умер
+                # прокси. Пробуем следующий уровень цепочки (backup→direct).
+                await self._on_persistent_connection_failure(effective_client, exc)
+                raise
             except FloodWaitError as exc:
                 self._send_media_limiter.record_flood_wait(
                     float(max(0, int(exc.seconds)))
@@ -145,6 +150,9 @@ class _UploadSendMixin:
                         )
                         self._send_media_limiter.record_success()
                         return message
+            except (ConnectionError, TimeoutError) as exc:
+                await self._on_persistent_connection_failure(effective_client, exc)
+                raise
             except FloodWaitError as exc:
                 self._send_media_limiter.record_flood_wait(
                     float(max(0, int(exc.seconds)))
@@ -247,6 +255,9 @@ class _UploadSendMixin:
                         )
                         self._send_media_limiter.record_success()
                         return message
+            except (ConnectionError, TimeoutError) as exc:
+                await self._on_persistent_connection_failure(effective_client, exc)
+                raise
             except FilePartsInvalidError:
                 if payload_fallback_attempted:
                     raise
