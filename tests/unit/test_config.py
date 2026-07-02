@@ -122,6 +122,36 @@ def test_throttle_mbps_loaded_and_validated(monkeypatch, tmp_path) -> None:
         load_app_config(config_path=path, dotenv_path=tmp_path / "missing.env")
 
 
+def test_api_creds_fallback_from_config(monkeypatch, tmp_path) -> None:
+    # env пуст → креды берутся из config.json (заполняются в GUI на новом ПК).
+    monkeypatch.delenv("TG_API_ID", raising=False)
+    monkeypatch.delenv("TG_API_HASH", raising=False)
+
+    payload = _base_public_config()
+    payload["tg_api_id"] = 54321
+    payload["tg_api_hash"] = "b" * 32
+    path = _write_config(tmp_path, payload)
+    cfg = load_app_config(config_path=path, dotenv_path=tmp_path / "missing.env")
+    assert cfg.tg_api_id == 54321
+    assert cfg.tg_api_hash == "b" * 32
+
+    # env задан → приоритет у env, config-значения игнорируются.
+    monkeypatch.setenv("TG_API_ID", "12345")
+    monkeypatch.setenv("TG_API_HASH", "a" * 32)
+    cfg = load_app_config(config_path=path, dotenv_path=tmp_path / "missing.env")
+    assert cfg.tg_api_id == 12345
+    assert cfg.tg_api_hash == "a" * 32
+
+    # Нет ни env, ни config → ConfigError.
+    monkeypatch.delenv("TG_API_ID")
+    monkeypatch.delenv("TG_API_HASH")
+    payload["tg_api_id"] = 0
+    payload["tg_api_hash"] = ""
+    path = _write_config(tmp_path, payload)
+    with pytest.raises(ConfigError, match="TG_API_ID"):
+        load_app_config(config_path=path, dotenv_path=tmp_path / "missing.env")
+
+
 def test_stream_cache_max_mb_loaded_and_validated(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("TG_API_ID", "12345")
     monkeypatch.setenv("TG_API_HASH", "a" * 32)

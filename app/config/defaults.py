@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 DEFAULT_CONFIG: dict[str, object] = {
+    # API-креды my.telegram.org/apps. Приоритет у переменных окружения
+    # TG_API_ID/TG_API_HASH (.env); эти поля — фолбэк, чтобы приложение
+    # настраивалось целиком из GUI на любом ПК без ручного .env.
+    "tg_api_id": 0,
+    "tg_api_hash": "",
     "tg_session_path": "./var/data/session.session",
     "main_channel_index": 0,
     "channel_sharding_mode": "",

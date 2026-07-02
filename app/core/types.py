@@ -124,6 +124,10 @@ class AppConfig:
 
     def as_public_dict(self) -> dict[str, Any]:
         return {
+            # Локальный дамп для диалога настроек; без него сохранение настроек
+            # затирало бы креды в config.json (save_public_config не мержит).
+            "tg_api_id": int(self.tg_api_id),
+            "tg_api_hash": self.tg_api_hash,
             "tg_session_path": self.tg_session_path,
             "main_channel_index": int(self.main_channel_index),
             "channel_sharding_mode": self.channel_sharding_mode,

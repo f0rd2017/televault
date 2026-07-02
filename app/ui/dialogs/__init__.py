@@ -91,6 +91,20 @@ class SetupDialog(QDialog):
         initial_main_channel_index = max(0, int(initial.get("main_channel_index", 0)))
 
         # ── Visible widgets ────────────────────────────────────────────────
+        initial_api_id = int(initial.get("tg_api_id", 0) or 0)
+        self.api_id_edit = QLineEdit(str(initial_api_id) if initial_api_id > 0 else "")
+        self.api_id_edit.setPlaceholderText("число с my.telegram.org/apps")
+        self.api_id_edit.setToolTip(
+            "API ID приложения Telegram (my.telegram.org/apps).\n"
+            "Если задан в .env (TG_API_ID) — приоритет у .env."
+        )
+        self.api_hash_edit = QLineEdit(str(initial.get("tg_api_hash", "") or ""))
+        self.api_hash_edit.setPlaceholderText("32 hex-символа с my.telegram.org/apps")
+        self.api_hash_edit.setToolTip(
+            "API Hash приложения Telegram (my.telegram.org/apps).\n"
+            "Если задан в .env (TG_API_HASH) — приоритет у .env."
+        )
+
         self.session_edit = QLineEdit(
             str(initial.get("tg_session_path", "./var/data/session.session"))
         )
@@ -399,6 +413,8 @@ class SetupDialog(QDialog):
         # Вкладка «Основные» — то, что нужно настроить большинству.
         basic_form = self._new_form()
         basic_form.addRow(self._section("TELEGRAM"))
+        basic_form.addRow("API ID", self.api_id_edit)
+        basic_form.addRow("API Hash", self.api_hash_edit)
         basic_form.addRow("Файл сессии", session_row)
         basic_form.addRow("Каналы", self.channels_label)
         basic_form.addRow("Основной канал №", self.main_route_spin)
@@ -521,7 +537,13 @@ class SetupDialog(QDialog):
         part_size = int(self.part_size_spin.value())
         max_jobs = int(self.max_jobs_spin.value())
         small_parallel = min(self._small_upload_parallel_jobs, max_jobs)
+        try:
+            api_id_value = int(self.api_id_edit.text().strip() or 0)
+        except ValueError:
+            api_id_value = 0
         return {
+            "tg_api_id": api_id_value,
+            "tg_api_hash": self.api_hash_edit.text().strip(),
             "tg_session_path": self.session_edit.text().strip(),
             "main_channel_index": main_channel_index,
             "channel_sharding_mode": "",

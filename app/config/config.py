@@ -40,10 +40,20 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
 
 
 def _build_config(merged: dict[str, Any]) -> AppConfig:
+    # Приоритет: переменные окружения (.env), фолбэк — config.json
+    # (заполняется в GUI при первом запуске — работает без ручного .env).
     api_id_raw = os.getenv("TG_API_ID", "").strip()
     api_hash = os.getenv("TG_API_HASH", "").strip()
+    if not api_id_raw:
+        cfg_id = str(merged.get("tg_api_id", "") or "").strip()
+        api_id_raw = "" if cfg_id == "0" else cfg_id
+    if not api_hash:
+        api_hash = str(merged.get("tg_api_hash", "") or "").strip()
     if not api_id_raw or not api_hash:
-        raise ConfigError("TG_API_ID and TG_API_HASH must be set in .env")
+        raise ConfigError(
+            "TG_API_ID and TG_API_HASH must be set in .env "
+            "(или заполните «API ID»/«API Hash» в настройках — my.telegram.org/apps)"
+        )
 
     try:
         api_id = int(api_id_raw)
