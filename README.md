@@ -51,11 +51,31 @@ python run.py
 TGCCM_DEBUG=1 python run.py
 ```
 
+## Сборка (переносимое приложение, любой ПК)
+
+Собранное приложение не требует Python на целевой машине. Все данные
+(`config.json`, `var/` — БД, кэш, логи) создаются **рядом с исполняемым
+файлом** — папку `dist/TG_Cloud_Cache_Manager/` можно перенести куда угодно.
+
+```bash
+# Linux (собирает под Linux)
+./scripts/build.sh
+```
+
+```bat
+:: Windows (собирает под Windows; нужен Python 3.11+ и venv в .venv)
+scripts\build.bat
+```
+
+PyInstaller собирает только под ту ОС, на которой запущен: Windows-сборка
+делается на Windows, Linux-сборка — на Linux. API ID/Hash можно задать прямо
+в диалоге первого запуска — ручной `.env` не обязателен.
+
 ## Настройка
 
-1. Создай `.env` на основе `.env.example`
-2. Укажи `TG_API_ID` и `TG_API_HASH`
-3. Добавь аккаунты через:
+1. Укажи `TG_API_ID` и `TG_API_HASH` — в диалоге первого запуска **или** в
+   `.env` на основе `.env.example` (`.env` имеет приоритет)
+2. Добавь аккаунты через:
 
 ```bash
 python scripts/manage_accounts.py
