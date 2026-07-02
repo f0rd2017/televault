@@ -18,8 +18,14 @@ from app.api.common import (
     ApiError,
     FileResponse,
     StreamResponse,
+    TranscodeResponse,
     _first,
 )
+
+
+def _transcode_requested(query: dict[str, list[str]]) -> bool:
+    return _first(query, "transcode").strip().lower() in {"1", "true", "yes", "on"}
+
 
 logger = logging.getLogger(__name__)
 
@@ -190,12 +196,22 @@ def _build_stream_layout(ctx: ApiContext, share: dict[str, Any]):
 
 def _handle_serve_share(
     ctx: ApiContext, token: str, query: dict[str, list[str]]
-) -> FileResponse | StreamResponse:
+) -> FileResponse | StreamResponse | TranscodeResponse:
     password = _first(query, "pw") or _first(query, "password")
     share = _resolve_share(ctx, token, password)
     content_type = (
         mimetypes.guess_type(str(share["orig_name"]))[0] or "application/octet-stream"
     )
+
+    # ?transcode=1 — пересобрать в fragmented MP4 на лету (не-нативный формат).
+    # ffmpeg читает исходник с этого же сервера по обычному пути раздачи.
+    if _transcode_requested(query):
+        input_query = {"pw": password} if password else {}
+        return TranscodeResponse(
+            input_path=f"/share/{token}",
+            input_query=input_query,
+            filename=str(share["orig_name"]),
+        )
 
     # Путь A — настоящий стрим: качаем только нужные части по Range.
     layout = _build_stream_layout(ctx, share)
@@ -299,16 +315,28 @@ def _is_non_streamable_container(
 
 def _handle_local_media(
     ctx: ApiContext, query: dict[str, list[str]]
-) -> FileResponse | StreamResponse:
+) -> FileResponse | StreamResponse | TranscodeResponse:
     """Локальный просмотр объекта без полного скачивания (для GUI). Требует
     api-токен. Стримит по Range только нужные части; для batch-member/неполных
-    объектов откатывается на полную сборку."""
+    объектов откатывается на полную сборку. ``transcode=1`` — пересобрать в
+    fragmented MP4 на лету (для форматов, которые плеер не берёт нативно)."""
     folder = _first(query, "folder")
     file_key = _first(query, "file_key")
     if not folder or not file_key:
         raise ApiError(400, "folder and file_key are required")
     if ctx.repo is None:
         raise ApiError(503, "repository unavailable")
+
+    if _transcode_requested(query):
+        obj = _lookup_object(ctx, folder, file_key)
+        input_query = {"folder": folder, "file_key": file_key}
+        if ctx.token:
+            input_query["token"] = ctx.token
+        return TranscodeResponse(
+            input_path="/api/media",
+            input_query=input_query,
+            filename=str(getattr(obj, "orig_name", "") or "file"),
+        )
     parts = ctx.repo.get_parts_for_object(folder_path=folder, file_key=file_key)
     if not parts:
         # Мелкие файлы хранятся как batch-member (в общем blob, без частей в

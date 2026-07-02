@@ -38,6 +38,7 @@ from app.api.common import (
     FileResponse,
     MAX_BODY_BYTES,
     StreamResponse,
+    TranscodeResponse,
     _first,
     _parse_json_body,
     _require_token,
@@ -273,6 +274,9 @@ class _Handler(BaseHTTPRequestHandler):
         except Exception:  # noqa: BLE001
             logger.exception("Unhandled API error for %s %s", method, self.path)
             self._write_json(500, {"error": "internal server error"})
+            return
+        if isinstance(result, TranscodeResponse):
+            self._serve_transcode(result)
             return
         if isinstance(result, StreamResponse):
             self._serve_stream(result)
@@ -522,6 +526,88 @@ class _Handler(BaseHTTPRequestHandler):
                     inflight.discard(key)
 
         threading.Thread(target=_warm, daemon=True).start()
+
+    def _serve_transcode(self, tr: TranscodeResponse) -> None:
+        """Отдать исходник, пересобранный ffmpeg'ом в fragmented MP4 на лету.
+
+        Вход ffmpeg — этот же сервер (обычная раздача с Range: ffmpeg сам
+        сикает по индексу контейнера); выход — поток неизвестной длины,
+        поэтому без Content-Length и без Range: играется с первого байта,
+        перемотки в v1 нет. См. app.core.transcode."""
+        import subprocess
+        from urllib.parse import urlencode
+
+        from app.core.transcode import (
+            build_ffmpeg_args,
+            plan_from_probe,
+            probe_media,
+            transcode_available,
+        )
+
+        if not transcode_available():
+            self._write_json(501, {"error": "ffmpeg/ffprobe not available on server"})
+            return
+
+        host, port = self.server.server_address[:2]
+        if host in {"0.0.0.0", "::"}:
+            host = "127.0.0.1"
+        query = urlencode(tr.input_query)
+        input_url = f"http://{host}:{int(port)}{tr.input_path}" + (
+            f"?{query}" if query else ""
+        )
+
+        probe = probe_media(input_url)
+        if probe is None:
+            self._write_json(502, {"error": "source is not readable as media"})
+            return
+        plan = plan_from_probe(probe)
+        if plan.video_codec is None and plan.audio_codec is None:
+            self._write_json(415, {"error": "no audio/video streams in source"})
+            return
+        logger.info(
+            "Transcode start: %s → fMP4 (%s)",
+            tr.filename,
+            "remux" if plan.is_remux_only else "transcode",
+        )
+
+        try:
+            proc = subprocess.Popen(  # noqa: S603 — фиксированный бинарь из PATH
+                build_ffmpeg_args(input_url, plan),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+            )
+        except OSError as exc:
+            self._write_json(500, {"error": f"failed to start ffmpeg: {exc}"})
+            return
+
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "video/mp4")
+            self.send_header("Cache-Control", "no-store")
+            # Длина неизвестна (живой пайп) — конец потока = закрытие соединения.
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.close_connection = True
+            if self.command == "HEAD":
+                return
+            assert proc.stdout is not None
+            while True:
+                chunk = proc.stdout.read(256 * 1024)
+                if not chunk:
+                    break
+                try:
+                    self.wfile.write(chunk)
+                except (BrokenPipeError, ConnectionResetError):
+                    break  # плеер закрыл соединение — ffmpeg гасится в finally
+        finally:
+            try:
+                proc.kill()
+            except OSError:
+                pass
+            try:
+                proc.wait(timeout=5)
+            except Exception:  # noqa: BLE001
+                logger.debug("ffmpeg did not exit cleanly after kill")
 
     def do_GET(self) -> None:  # noqa: N802
         self._dispatch("GET")

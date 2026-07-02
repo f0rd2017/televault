@@ -457,6 +457,7 @@ class VideoViewerWindow(QWidget):
         self._url = url
         self._title = title
         self._buffering = False
+        self._transcode_attempted = False
         self._time_label.setText("Загрузка…")
         self._player.setSource(QUrl(self._url))
         self._player.play()
@@ -557,8 +558,30 @@ class VideoViewerWindow(QWidget):
         if error == QMediaPlayer.Error.NoError:
             return
         logger.warning("Video playback error for %s: %s", self._title, error_string)
+        if self._try_transcode_fallback():
+            return
         self._time_label.setText(f"Ошибка: {error_string}")
         self._fallback_btn.show()
+
+    def _try_transcode_fallback(self) -> bool:
+        """Не-нативный формат/кодек: один раз перезапускаем воспроизведение
+        через серверный транскод (``?transcode=1`` — ffmpeg пересобирает в
+        fragmented MP4 на лету, см. app.core.transcode). True = перезапущено."""
+        if self._transcode_attempted or "transcode=" in self._url:
+            return False
+        if "/api/media" not in self._url:
+            return False  # не наш локальный стрим-сервер — фолбэк не про него
+        from app.core.transcode import transcode_available
+
+        if not transcode_available():
+            return False
+        self._transcode_attempted = True
+        self._url = f"{self._url}&transcode=1"
+        self._time_label.setText("Формат не поддерживается — транскодирую…")
+        logger.info("Retrying playback via server-side transcode: %s", self._title)
+        self._player.setSource(QUrl(self._url))
+        self._player.play()
+        return True
 
     def closeEvent(self, event) -> None:  # noqa: N802 (Qt override)
         try:

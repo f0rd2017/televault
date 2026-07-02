@@ -57,6 +57,20 @@ class StreamResponse:
     cache_dir: str
 
 
+@dataclass
+class TranscodeResponse:
+    """Ответ-транскод: ffmpeg на лету пересобирает исходник в fragmented MP4.
+
+    ``input_path``/``input_query`` — путь и query СВОЕГО ЖЕ сервера, откуда
+    ffmpeg читает исходник (обычная раздача с Range); полный URL собирает
+    обработчик — только он знает фактический порт. Выход — chunked-поток без
+    Range/перемотки (см. app.core.transcode)."""
+
+    input_path: str
+    input_query: dict[str, str]
+    filename: str
+
+
 class ApiError(Exception):
     """HTTP-ошибка с кодом и сообщением (сериализуется в ``{"error": ...}``)."""
 
@@ -107,5 +121,3 @@ def _str_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [str(v).strip() for v in value if str(v or "").strip()]
-
-
