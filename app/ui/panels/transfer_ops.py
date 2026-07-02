@@ -24,6 +24,11 @@ class TransferOpsMixin:
     _ETA_MIN_SPAN_SEC = 0.25
     # Лёгкая EMA поверх оконной скорости — сглаживает скачки на краю окна.
     _ETA_SMOOTH_ALPHA = 0.35
+    # Свыше стольких джоб скачивания — спрашиваем подтверждение: тысячи джоб
+    # (папка из тысяч обычных, не-batch файлов) заливают UI событиями и
+    # выглядят как зависание. Batch-члены уже сгруппированы по blob'ам и в
+    # лимит обычно не упираются.
+    _MASS_DOWNLOAD_CONFIRM_THRESHOLD = 200
 
     def _on_download(
         self, entry: ObjectEntry | None = None, fast: bool = False
@@ -137,11 +142,13 @@ class TransferOpsMixin:
         self._enqueue_job(JobType.DOWNLOAD.value, payload)
 
     def _enqueue_download_group(
-        self, queue_targets, *, fast: bool, allow_incomplete: bool
+        self, queue_targets, *, fast: bool, allow_incomplete: bool, confirm: bool = True
     ) -> int:
         """Enqueue downloads efficiently: regular files = one job each; batch
         members are grouped by their blob so one job pulls a blob and extracts
         all its requested members (avoids 1 job per file → UI flood/freeze).
+        ``confirm=False`` пропускает подтверждение массового скачивания
+        (фоновый автосинк — пользователя может не быть за экраном).
         Returns the number of jobs enqueued."""
         regular: list = []
         member_groups: dict[str, list] = {}
@@ -154,6 +161,20 @@ class TransferOpsMixin:
                 regular.append(target)
 
         job_count = len(regular) + len(member_groups)
+        if confirm and job_count >= self._MASS_DOWNLOAD_CONFIRM_THRESHOLD:
+            reply = QMessageBox.question(
+                self,
+                "Массовое скачивание",
+                (
+                    f"Будет создано {job_count} задач скачивания "
+                    f"(файлов: {len(queue_targets)}).\n"
+                    "Это может надолго занять очередь и интерфейс.\n\nПродолжить?"
+                ),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return 0
         batch_id = None
         if job_count > 1:
             batch_id = self._start_batch_tracking(JobType.DOWNLOAD.value, job_count)
@@ -227,8 +248,10 @@ class TransferOpsMixin:
                     f"Синхронизация '{normalized}': всё актуально"
                 )
             return 0
+        # quiet-автосинк идёт фоном (worker ready) — там подтверждение
+        # показывать некому; ручной запуск («Синхронизировать») спрашивает.
         job_count = self._enqueue_download_group(
-            needs, fast=False, allow_incomplete=False
+            needs, fast=False, allow_incomplete=False, confirm=not quiet
         )
         self.progress_widget.append_log(
             f"Синхронизация '{normalized}': {len(needs)} файл(ов) к загрузке "

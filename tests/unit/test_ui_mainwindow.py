@@ -1445,6 +1445,77 @@ def test_folder_download_groups_batch_members_by_blob(tmp_path, monkeypatch) -> 
         window.close()
 
 
+def test_mass_download_asks_confirmation(tmp_path, monkeypatch) -> None:
+    """Тысячи джоб (папка из тысяч обычных файлов) — спрашиваем подтверждение;
+    отказ не ставит ни одной джобы. Тихий автосинк не спрашивает."""
+    QApplication.instance() or QApplication([])
+    window = _build_window(tmp_path, monkeypatch)
+    try:
+        captured: list[tuple[str, dict]] = []
+        monkeypatch.setattr(
+            window, "_enqueue_job", lambda jt, payload: captured.append((jt, payload))
+        )
+        monkeypatch.setattr(window, "_start_batch_tracking", lambda *a, **k: "batch1")
+
+        def _regular(i: int) -> ObjectEntry:
+            return ObjectEntry(
+                file_key=f"key{i:09d}",
+                folder_path="Anime/Cache",
+                orig_name=f"f{i}.bin",
+                parts_total=1,
+                have_parts=1,
+                status="complete",
+                total_size=10,
+                last_seen_ts=1,
+                storage_kind="regular",
+            )
+
+        many = [_regular(i) for i in range(window._MASS_DOWNLOAD_CONFIRM_THRESHOLD)]
+
+        questions: list[str] = []
+
+        def _fake_question(parent, title, text, *a, **k):
+            questions.append(text)
+            return QMessageBox.StandardButton.No
+
+        import app.ui.panels.transfer_ops as transfer_ops_mod
+
+        monkeypatch.setattr(
+            transfer_ops_mod.QMessageBox, "question", staticmethod(_fake_question)
+        )
+
+        # Отказ → 0 джоб.
+        job_count = window._enqueue_download_group(
+            many, fast=False, allow_incomplete=False
+        )
+        assert job_count == 0
+        assert captured == []
+        assert len(questions) == 1
+
+        # confirm=False (тихий автосинк) → без вопроса, всё в очереди.
+        job_count = window._enqueue_download_group(
+            many, fast=False, allow_incomplete=False, confirm=False
+        )
+        assert job_count == len(many)
+        assert len(captured) == len(many)
+        assert len(questions) == 1  # вопрос не задавался повторно
+
+        # Согласие → джобы ставятся.
+        captured.clear()
+        monkeypatch.setattr(
+            transfer_ops_mod.QMessageBox,
+            "question",
+            staticmethod(lambda *a, **k: QMessageBox.StandardButton.Yes),
+        )
+        job_count = window._enqueue_download_group(
+            many, fast=False, allow_incomplete=False
+        )
+        assert job_count == len(many)
+        assert len(captured) == len(many)
+    finally:
+        window.close()
+
+
 def test_double_click_file_does_not_download(tmp_path, monkeypatch) -> None:
     app = QApplication.instance() or QApplication([])
     window = _build_window(tmp_path, monkeypatch)
