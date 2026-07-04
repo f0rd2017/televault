@@ -1,22 +1,24 @@
-"""Локальный REST API поверх ядра (инкремент 5 roadmap).
+"""Local REST API on top of the core (roadmap increment 5).
 
-Тонкая обёртка на stdlib ``http.server`` (без новых зависимостей): чтение — через
-``DbRepo`` (SQLite в WAL допускает конкурентных читателей), запись — через
-``worker.submit_job`` (уходит в asyncio-loop воркера, тот же путь, что и из GUI).
-Сервер крутится в демон-потоке; выключен по умолчанию (см. ``ApiConfig``).
+A thin wrapper around the stdlib ``http.server`` (no new dependencies): reads go
+through ``DbRepo`` (SQLite in WAL mode allows concurrent readers), writes go
+through ``worker.submit_job`` (which is picked up by the worker's asyncio loop,
+the same path used from the GUI). The server runs in a daemon thread; disabled
+by default (see ``ApiConfig``).
 
-Маршрутизация вынесена в чистую функцию :func:`dispatch` — её можно дёргать в
-тестах без сокетов. HTTP-обработчик лишь читает тело/заголовки и зовёт dispatch.
+Routing is factored out into the pure function :func:`dispatch` so it can be
+called directly in tests without sockets. The HTTP handler only reads the
+body/headers and calls dispatch.
 
-Эндпоинты:
-  GET  /api/health                        — живость (без авторизации)
-  GET  /api/folders                       — список папок
-  GET  /api/files?folder=&search=&recursive=&status=  — список объектов
-  GET  /api/jobs?limit=                   — последние джобы
-  GET  /api/jobs/{id}                     — одна джоба (для опроса прогресса)
-  POST /api/upload    {paths:[...], folder:"..."}  — поставить загрузку
-  POST /api/download  {folder, file_key, allow_incomplete?}  — поставить скачивание
-  POST /api/delete    {folder, file_key}  — поставить удаление из облака
+Endpoints:
+  GET  /api/health                        — liveness check (no auth)
+  GET  /api/folders                       — list folders
+  GET  /api/files?folder=&search=&recursive=&status=  — list objects
+  GET  /api/jobs?limit=                   — recent jobs
+  GET  /api/jobs/{id}                     — a single job (for polling progress)
+  POST /api/upload    {paths:[...], folder:"..."}  — enqueue an upload
+  POST /api/download  {folder, file_key, allow_incomplete?}  — enqueue a download
+  POST /api/delete    {folder, file_key}  — enqueue a delete from cloud storage
 """
 
 from __future__ import annotations
@@ -54,7 +56,7 @@ from app.api.shares import (
 logger = logging.getLogger(__name__)
 
 
-# ── Обработчики маршрутов ────────────────────────────────────────────────────
+# ── Route handlers ───────────────────────────────────────────────────────────
 
 
 def _handle_folders(ctx: ApiContext) -> dict[str, Any]:
@@ -98,8 +100,8 @@ def _submit(ctx: ApiContext, job_type: str, payload: dict[str, Any]) -> dict[str
     accepted = bool(ctx.worker.submit_job(job_type, payload))
     if not accepted:
         raise ApiError(503, "Worker is not ready to accept jobs")
-    # submit_job — fire-and-forget через loop воркера; id присваивается позже при
-    # insert_job. Клиент опрашивает прогресс через GET /api/jobs.
+    # submit_job is fire-and-forget via the worker's loop; the id is assigned later
+    # at insert_job time. The client polls progress via GET /api/jobs.
     return {"accepted": True, "job_type": job_type}
 
 
@@ -151,11 +153,11 @@ def dispatch(
     headers: dict[str, str],
     body: bytes | None,
 ) -> tuple[int, dict[str, Any]] | FileResponse | StreamResponse:
-    """Чистая маршрутизация: метод+путь → (HTTP-код, JSON) или :class:`FileResponse`.
+    """Pure routing: method+path → (HTTP code, JSON) or :class:`FileResponse`.
 
-    Не трогает сокеты — поэтому тестируется напрямую. :class:`ApiError`
-    превращается здесь же в ответ ``{"error": ...}`` с её кодом, так что функция
-    никогда не бросает на ожидаемых ошибках (только возвращает).
+    Doesn't touch sockets, so it can be tested directly. An :class:`ApiError`
+    is converted here into an ``{"error": ...}`` response with its status code,
+    so the function never raises on expected errors — it only returns.
     """
     try:
         return _route(ctx, method, path, query, headers, body)
@@ -173,11 +175,11 @@ def _route(
 ) -> tuple[int, dict[str, Any]] | FileResponse | StreamResponse:
     path = path.rstrip("/") or "/"
 
-    # Живость — без авторизации.
+    # Liveness check — no auth required.
     if method == "GET" and path == "/api/health":
         return 200, {"status": "ok", "service": "tg_bd"}
 
-    # Публичная раздача шар-ссылок (без API-токена — секрет это сам token).
+    # Public serving of share links (no API token — the token itself is the secret).
     if method == "GET" and path.startswith("/share/"):
         token = path[len("/share/") :].strip("/")
         if not token:
@@ -231,16 +233,17 @@ def _route(
     raise ApiError(405, f"Method {method} not allowed")
 
 
-# ── HTTP-обвязка ─────────────────────────────────────────────────────────────
+# ── HTTP glue ────────────────────────────────────────────────────────────────
 
 
 class _Handler(BaseHTTPRequestHandler):
     server_version = "TGBD-API/1"
     protocol_version = "HTTP/1.1"
-    # За один Range-ответ отдаём не больше этого объёма — иначе открытый
-    # `Range: bytes=0-` от плеера разворачивается в `0..size-1` и тянет
-    # огромную (иногда весь файл) часть разом. Плеер до-запросит следующие
-    # окна по мере проигрывания. См. _serve_stream/_prefetch_next.
+    # Never serve more than this amount of data in a single Range response —
+    # otherwise an open-ended `Range: bytes=0-` from the player expands to
+    # `0..size-1` and pulls a huge (sometimes the entire) chunk at once. The
+    # player will request the next windows as playback progresses. See
+    # _serve_stream/_prefetch_next.
     _STREAM_WINDOW_BYTES = 12 * 1024 * 1024
 
     def log_message(self, fmt: str, *args: Any) -> None:  # noqa: A002
@@ -296,22 +299,22 @@ class _Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(data)
         except (BrokenPipeError, ConnectionResetError):
-            # Клиент (FFmpeg/QMediaPlayer) уже закрыл соединение, например при
-            # перемотке или закрытии плеера. Это не ошибка — просто выходим.
+            # The client (FFmpeg/QMediaPlayer) already closed the connection, e.g.
+            # while seeking or closing the player. Not an error — just return.
             return
 
     def _resolve_range(self, size: int) -> tuple[int, int, bool] | None:
-        """Разобрать заголовок ``Range`` против размера ``size``.
+        """Parse the ``Range`` header against ``size``.
 
-        Возвращает ``(start, end, is_range)`` (end включительно) или ``None``,
-        если диапазон не удовлетворить (caller обязан ответить 416)."""
+        Returns ``(start, end, is_range)`` (end inclusive), or ``None`` if the
+        range can't be satisfied (the caller must then respond with 416)."""
         range_header = self.headers.get("Range", "")
         if not range_header.startswith("bytes="):
             return 0, size - 1, False
         try:
             spec = range_header[len("bytes=") :].split(",")[0].strip()
             lo, _, hi = spec.partition("-")
-            if lo == "":  # суффиксный диапазон bytes=-N
+            if lo == "":  # suffix range bytes=-N
                 length = int(hi)
                 start = max(0, size - length)
                 end = size - 1
@@ -345,10 +348,10 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(length))
         if content_range is not None:
             self.send_header("Content-Range", content_range)
-        # Имя файла может содержать кириллицу/эмодзи; HTTP-заголовки кодируются
-        # latin-1, поэтому сырое не-ASCII имя роняет send_header (UnicodeEncodeError)
-        # и обрывает ответ → плеер не получает ни данных, ни картинки. Даём
-        # ASCII-фолбэк + RFC 5987 filename* (UTF-8, percent-encoded).
+        # The filename may contain Cyrillic/emoji; HTTP headers are encoded as
+        # latin-1, so a raw non-ASCII name crashes send_header (UnicodeEncodeError)
+        # and aborts the response — the player gets neither data nor a thumbnail.
+        # Provide an ASCII fallback plus an RFC 5987 filename* (UTF-8, percent-encoded).
         from urllib.parse import quote
 
         safe_name = filename.replace('"', "").replace("\r", "").replace("\n", "")
@@ -364,7 +367,7 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def _serve_file(self, fr: FileResponse) -> None:
-        """Отдать уже собранный файл с поддержкой HTTP Range (стрим/перемотка)."""
+        """Serve an already-assembled file with HTTP Range support (streaming/seeking)."""
         import os
 
         try:
@@ -402,8 +405,8 @@ class _Handler(BaseHTTPRequestHandler):
                 remaining -= len(chunk)
 
     def _serve_stream(self, sr: StreamResponse) -> None:
-        """Отдать файл, СОБИРАЯ его из чанков на лету по запрошенному Range —
-        скачиваются только перекрытые диапазоном части (инкремент 9/10)."""
+        """Serve a file by ASSEMBLING it from chunks on the fly for the requested
+        Range — only the parts overlapping the range are downloaded (increment 9/10)."""
         from app.core.stream import iter_range_bytes
 
         layout = sr.layout
@@ -415,17 +418,19 @@ class _Handler(BaseHTTPRequestHandler):
             return
         start, end, is_range = resolved
 
-        # Скачать (или взять из кэша) ТОЛЬКО части, перекрытые диапазоном.
-        # Окно стрима: за один Range-ответ отдаём не больше ~_STREAM_WINDOW_BYTES
-        # байт. Иначе открытый `Range: bytes=0-` от плеера разворачивается в
-        # `0..size-1` и тянет ВЕСЬ файл разом — шквал getFile → FloodWait, а
-        # воспроизведение стартует только после полной загрузки. Плеер до-запросит
-        # следующие окна по мере проигрывания, а после перемотки пришлёт Range от
-        # новой позиции — части качаются от текущей точки таймлайна и до конца.
-        # Окно небольшое (не 48+ МБ) намеренно: время до первого байта плееру —
-        # это время скачивания частей, покрывающих окно, а не всего окна целиком,
-        # так что маленькое окно = быстрый старт воспроизведения. Догрузка
-        # следующего окна идёт по мере проигрывания + _prefetch_next греет вперёд.
+        # Download (or take from cache) ONLY the parts overlapping the range.
+        # Stream window: never serve more than ~_STREAM_WINDOW_BYTES in a single
+        # Range response. Otherwise an open-ended `Range: bytes=0-` from the player
+        # expands to `0..size-1` and pulls the ENTIRE file at once — a flood of
+        # getFile calls → FloodWait, and playback only starts once everything has
+        # downloaded. The player will request the next windows as playback
+        # progresses, and after seeking it sends a Range from the new position —
+        # parts are downloaded from the current timeline point to the end.
+        # The window is intentionally small (not 48+ MB): the time to first byte
+        # for the player is the time to download the parts covering the window,
+        # not the whole window, so a small window means a fast playback start.
+        # The rest of the window is fetched as playback progresses, and
+        # _prefetch_next warms the next part ahead of time.
         needed = layout.select_parts(start, end)
         if needed and (end - start + 1) > self._STREAM_WINDOW_BYTES:
             capped = []
@@ -436,13 +441,13 @@ class _Handler(BaseHTTPRequestHandler):
             if len(capped) < len(needed):
                 needed = capped
                 end = needed[-1].plain_end - 1
-                is_range = True  # ответ стал частичным → 206 + Content-Range
+                is_range = True  # response became partial → 206 + Content-Range
         part_indices = [p.part_index for p in needed]
-        # Части бывают огромными (сотни МБ) — без этого плеер ждал бы, пока
-        # скачается ВСЯ часть целиком, хотя из неё для текущего окна нужен лишь
-        # небольшой отрезок в начале. Работает только для незашифрованных
-        # объектов (см. TgDownloader.fetch_parts_decrypted) — для зашифрованных
-        # downloader сам проигнорирует подсказку и скачает часть целиком.
+        # Parts can be huge (hundreds of MB) — without this, the player would wait
+        # for the ENTIRE part to download, even though the current window only
+        # needs a small chunk at the start of it. This only works for unencrypted
+        # objects (see TgDownloader.fetch_parts_decrypted) — for encrypted ones
+        # the downloader ignores the hint and downloads the whole part anyway.
         prefix_bytes = {
             p.part_index: (min(end, p.plain_end - 1) - p.plain_start) + 1
             for p in needed
@@ -461,13 +466,14 @@ class _Handler(BaseHTTPRequestHandler):
             self._write_json(503, {"error": "stream parts could not be fetched"})
             return
 
-        # Упреждающая подкачка: пока текущее окно стримится плееру, в фоне греем
-        # следующую часть в тот же кэш — к моменту, когда плеер до неё доиграет,
-        # она уже на диске, и его Range-запрос не упирается в скачивание (нет паузы).
+        # Read-ahead prefetch: while the current window streams to the player, warm
+        # the next part into the same cache in the background — by the time the
+        # player reaches it, it's already on disk, so its Range request doesn't
+        # stall on a download (no pause).
         if needed:
             self._prefetch_next(sr, layout, needed[-1].part_index)
 
-        # Считаем «скачивание» один раз — на запросе с начала файла.
+        # Count a "download" only once — on a request starting from the beginning.
         if start == 0:
             try:
                 self._ctx.repo.increment_share_downloads(sr.token)
@@ -494,13 +500,14 @@ class _Handler(BaseHTTPRequestHandler):
             logger.warning("Stream part vanished mid-serve for token=%s", sr.token)
 
     def _prefetch_next(self, sr: StreamResponse, layout, last_index: int) -> None:
-        """Упреждающе скачать СЛЕДУЮЩУЮ часть в фоне, пока текущая стримится, —
-        чтобы при достижении её плеером она уже лежала в кэше (без паузы)."""
+        """Proactively download the NEXT part in the background while the current
+        one is streaming, so it's already cached by the time the player reaches
+        it (no pause)."""
         import threading
 
         next_index = last_index + 1
         if next_index >= len(layout.parts):
-            return  # последняя часть — впереди греть нечего
+            return  # this was the last part — nothing ahead to warm
         inflight = globals().setdefault("_STREAM_PREFETCH_INFLIGHT", set())
         lock = globals().setdefault("_STREAM_PREFETCH_LOCK", threading.Lock())
         key = (sr.file_key, next_index)
@@ -511,9 +518,9 @@ class _Handler(BaseHTTPRequestHandler):
 
         def _warm() -> None:
             try:
-                # Греем только одно окно вперёд, а не всю (возможно, огромную)
-                # следующую часть — тот же смысл, что и prefix_bytes в
-                # _serve_stream: докачается остальное по мере проигрывания.
+                # Warm only one window ahead, not the whole (possibly huge) next
+                # part — same idea as prefix_bytes in _serve_stream: the rest is
+                # fetched as playback progresses.
                 self._ctx.worker.fetch_stream_parts_blocking(
                     sr.folder,
                     sr.file_key,
@@ -528,12 +535,12 @@ class _Handler(BaseHTTPRequestHandler):
         threading.Thread(target=_warm, daemon=True).start()
 
     def _serve_transcode(self, tr: TranscodeResponse) -> None:
-        """Отдать исходник, пересобранный ffmpeg'ом в fragmented MP4 на лету.
+        """Serve the source repackaged by ffmpeg into fragmented MP4 on the fly.
 
-        Вход ffmpeg — этот же сервер (обычная раздача с Range: ffmpeg сам
-        сикает по индексу контейнера); выход — поток неизвестной длины,
-        поэтому без Content-Length и без Range: играется с первого байта,
-        перемотки в v1 нет. См. app.core.transcode."""
+        ffmpeg's input is this same server (a normal Range-based serve: ffmpeg
+        seeks on its own using the container index); the output is a stream of
+        unknown length, so no Content-Length and no Range: playback starts from
+        the first byte, no seeking in v1. See app.core.transcode."""
         import subprocess
         from urllib.parse import urlencode
 
@@ -571,7 +578,7 @@ class _Handler(BaseHTTPRequestHandler):
         )
 
         try:
-            proc = subprocess.Popen(  # noqa: S603 — фиксированный бинарь из PATH
+            proc = subprocess.Popen(  # noqa: S603 — fixed binary resolved from PATH
                 build_ffmpeg_args(input_url, plan),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
@@ -584,7 +591,7 @@ class _Handler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "video/mp4")
             self.send_header("Cache-Control", "no-store")
-            # Длина неизвестна (живой пайп) — конец потока = закрытие соединения.
+            # Length is unknown (live pipe) — end of stream = connection close.
             self.send_header("Connection", "close")
             self.end_headers()
             self.close_connection = True
@@ -598,7 +605,7 @@ class _Handler(BaseHTTPRequestHandler):
                 try:
                     self.wfile.write(chunk)
                 except (BrokenPipeError, ConnectionResetError):
-                    break  # плеер закрыл соединение — ffmpeg гасится в finally
+                    break  # player closed the connection — ffmpeg is killed in finally
         finally:
             try:
                 proc.kill()
@@ -620,7 +627,7 @@ class _Handler(BaseHTTPRequestHandler):
 
 
 class ApiServer:
-    """Запускает/останавливает REST API в фоновом демон-потоке."""
+    """Starts/stops the REST API in a background daemon thread."""
 
     def __init__(self, config: Any, repo: Any, worker: Any) -> None:
         self._config = config
@@ -647,8 +654,8 @@ class ApiServer:
 
     @property
     def address(self) -> tuple[str, int] | None:
-        """Фактический (host, port) после старта — порт реальный, даже если в
-        конфиге был 0 (эфемерный). None, если сервер не запущен."""
+        """The actual (host, port) after startup — the port is real even if the
+        config had 0 (ephemeral). None if the server isn't running."""
         if self._httpd is None:
             return None
         host, port = self._httpd.server_address[:2]
@@ -680,10 +687,10 @@ class ApiServer:
         return True
 
     def ensure_media_server(self) -> tuple[str, str] | None:
-        """Гарантировать запущенный локальный сервер для просмотра без скачивания.
-        Если REST API уже запущен (api.enabled) — переиспользуем его. Иначе
-        поднимаем петлевой сервер на 127.0.0.1 с эфемерным портом и случайным
-        токеном. Возвращает (base_url, token) или None."""
+        """Ensure a local server is running for viewing without downloading.
+        If the REST API is already running (api.enabled), reuse it. Otherwise
+        spin up a loopback server on 127.0.0.1 with an ephemeral port and a
+        random token. Returns (base_url, token) or None."""
         if self._httpd is None:
             if not self._ctx.token:
                 self._ctx.token = secrets.token_urlsafe(24)

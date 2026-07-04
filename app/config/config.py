@@ -24,7 +24,7 @@ class ConfigError(RuntimeError):
 
 
 def default_config_path(base_dir: str | Path | None = None) -> Path:
-    # Не cwd: frozen-приложение запускают из произвольной директории.
+    # Not cwd: a frozen app can be launched from an arbitrary directory.
     root = Path(base_dir) if base_dir else app_base_dir()
     return root / "config.json"
 
@@ -40,8 +40,8 @@ def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
 
 
 def _build_config(merged: dict[str, Any]) -> AppConfig:
-    # Приоритет: переменные окружения (.env), фолбэк — config.json
-    # (заполняется в GUI при первом запуске — работает без ручного .env).
+    # Priority: environment variables (.env), fallback — config.json
+    # (filled in from the GUI on first run — works without a manual .env).
     api_id_raw = os.getenv("TG_API_ID", "").strip()
     api_hash = os.getenv("TG_API_HASH", "").strip()
     if not api_id_raw:
@@ -66,8 +66,8 @@ def _build_config(merged: dict[str, Any]) -> AppConfig:
             "TG_API_HASH must be a 32-character hex string from my.telegram.org/apps"
         )
 
-    # Каналы теперь берутся из БД (accounts table), а не из config.json
-    # Валидация происходит при загрузке аккаунтов в worker.py
+    # Channels are now sourced from the DB (accounts table), not config.json.
+    # Validation happens when accounts are loaded in worker.py.
 
     main_channel_index = int(merged.get("main_channel_index", 0))
     if main_channel_index < 0:
@@ -77,9 +77,8 @@ def _build_config(merged: dict[str, Any]) -> AppConfig:
         str(merged.get("channel_sharding_mode", "")).strip().lower()
     )
     if not channel_sharding_mode_raw:
-        channel_sharding_mode = (
-            "part_striping"  # Определяется динамически по кол-ву аккаунтов в БД
-        )
+        # Determined dynamically from the number of accounts in the DB.
+        channel_sharding_mode = "part_striping"
     else:
         channel_sharding_mode = channel_sharding_mode_raw
     if channel_sharding_mode not in {"single", "part_striping"}:
@@ -274,9 +273,10 @@ def _build_config(merged: dict[str, Any]) -> AppConfig:
         except ValueError as exc:
             raise ConfigError(f"Invalid tg_proxy: {exc}") from exc
 
-    # В config.json пути могут быть относительными (./var/…) — файл остаётся
-    # переносимым. В AppConfig кладём абсолютные: относительные считаются от
-    # app_base_dir() (рядом с exe / корень проекта), а не от произвольной cwd.
+    # Paths in config.json can be relative (./var/…) — this keeps the file
+    # portable. In AppConfig we store absolute paths: relative ones are
+    # resolved against app_base_dir() (next to the exe / project root),
+    # not an arbitrary cwd.
     download_dir_raw = str(merged.get("download_dir", "")).strip()
     return AppConfig(
         tg_api_id=api_id,
@@ -379,8 +379,8 @@ def load_app_config(
     config_path: str | Path | None = None,
     dotenv_path: str | Path | None = None,
 ) -> AppConfig:
-    # Явный путь к .env: дефолтный поиск load_dotenv идёт от cwd и во frozen-
-    # сборке файл рядом с exe не находит.
+    # Explicit .env path: load_dotenv's default search starts from cwd, and in a
+    # frozen build it won't find the file next to the exe.
     load_dotenv(dotenv_path=dotenv_path or (app_base_dir() / ".env"))
 
     path = Path(config_path) if config_path else default_config_path()

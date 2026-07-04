@@ -56,11 +56,11 @@ class TgClientManager:
         self._client: TelegramClient | None = None
 
     async def start(self, account_targets: list[str] | None = None) -> TgSession:
-        """Запускает сессию Telegram.
+        """Start a Telegram session.
 
         Args:
-            account_targets: список chat_target строк из DB accounts.
-                             Если None — используется пустой список (только main сессия).
+            account_targets: list of chat_target strings from DB accounts.
+                             If None, an empty list is used (main session only).
         """
         if account_targets is None:
             account_targets = []
@@ -115,7 +115,7 @@ class TgClientManager:
 
         self._client = client
 
-        # Проверка доступа к каналам
+        # Check access to channels
         try:
             channel_checks = await check_channels_access(
                 client=client,
@@ -127,7 +127,7 @@ class TgClientManager:
             logger.exception("Failed to check channels access")
             channel_checks = []
 
-        # Логирование отчёта о доступе
+        # Log the access report
         try:
             log_access_report(me, is_premium, channel_checks)
         except Exception:
@@ -198,7 +198,7 @@ class TgClientManager:
     async def _resolve_main_chats(
         self, client: TelegramClient, account_targets: list[str]
     ) -> tuple[list[object], list[str]]:
-        """Разрешает chat_target строки из DB accounts в Telegram entity объекты."""
+        """Resolve chat_target strings from DB accounts into Telegram entity objects."""
         resolved_chats: list[object] = []
         chat_ids: list[str] = []
         for raw_target in account_targets:
@@ -435,7 +435,7 @@ async def check_channels_access(
     chat_ids: list[str],
     targets: list[str],
 ) -> list[ChannelAccessCheck]:
-    """Проверяет доступ ко всем каналам и возвращает детальную информацию."""
+    """Check access to all channels and return detailed information."""
     results: list[ChannelAccessCheck] = []
     for idx, (chat_obj, chat_id, target) in enumerate(zip(chats, chat_ids, targets)):
         accessible = True
@@ -527,7 +527,7 @@ def log_access_report(
     is_premium: bool,
     channel_checks: list[ChannelAccessCheck],
 ) -> None:
-    """Логирует детальный отчёт о доступе."""
+    """Log a detailed access report."""
     logger.info("=" * 60)
     logger.info("🔐 TELEGRAM ACCOUNT INFO")
     logger.info("=" * 60)

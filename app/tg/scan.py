@@ -133,7 +133,7 @@ class TgScanner:
 
         scanned_chat_ids = {cid for _, cid in self._channels}
 
-        # В режиме reconcile проверяем, нет ли в базе "осиротевших" чатов
+        # In reconcile mode, check whether the database has any "orphaned" chats
         if mode == "reconcile":
             all_db_chat_ids = set(self.repo.list_all_indexed_chat_ids())
             orphaned = all_db_chat_ids - scanned_chat_ids

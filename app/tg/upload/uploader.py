@@ -146,8 +146,8 @@ class TgUploader(
             max_rate=max(send_rate, send_rate * 4.0),
             window_sec=send_window,
         )
-        # Лимит полосы загрузки (МБ/с), общий на инстанс — параллельные части
-        # делят бюджет. 0 = без лимита (acquire — no-op).
+        # Upload bandwidth limit (MB/s), shared across the instance — parallel
+        # parts split the budget. 0 = no limit (acquire is a no-op).
         self._upload_bandwidth = BandwidthLimiter(
             float(getattr(self.config, "upload_throttle_mbps", 0.0))
         )
@@ -678,7 +678,7 @@ class TgUploader(
                 "max_concurrency": worker_tasks_count,
             }
 
-            # Системные метрики каждые 5 секунд
+            # System metrics every 5 seconds
             sys_info = ""
             if force or (now - telemetry_last_ts) >= 5.0:
                 try:

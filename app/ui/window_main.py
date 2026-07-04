@@ -5,7 +5,7 @@ from collections import deque
 from pathlib import Path
 from typing import Any, Callable
 
-from PySide6.QtCore import QModelIndex, QSize, Qt, QTimer
+from PySide6.QtCore import QEvent, QModelIndex, QSize, Qt, QTimer
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QApplication,
@@ -23,11 +23,19 @@ from PySide6.QtWidgets import (
     QSplitter,
     QStackedLayout,
     QSystemTrayIcon,
+    QToolButton,
     QTreeView,
     QVBoxLayout,
     QWidget,
 )
 
+from app.core.i18n import (
+    available_languages,
+    install_language,
+    language_by_code,
+    save_language,
+    saved_language,
+)
 from app.core.types import AppConfig, JobEvent
 from app.core.worker import TelegramWorker
 from app.db.repo import DbRepo
@@ -106,8 +114,8 @@ class MainWindow(
         self._job_log_bucket: dict[int, int] = {}
         self._local_presence_cache: dict[str, tuple[float, bool]] = {}
         self._lazy_presence_mode = False
-        self._trash_view = False  # режим «Корзина» (soft-deleted объекты)
-        # Превью картинок (1b): дозагрузка нескачанных во временную папку.
+        self._trash_view = False  # "Trash" mode (soft-deleted objects)
+        # Image previews: lazily fetch not-yet-downloaded thumbnails into a temp dir.
         self._thumb_fetch_dir = str(
             Path(config.cache_dir).expanduser() / ".thumb_fetch"
         )
@@ -136,10 +144,10 @@ class MainWindow(
         self._finished_transfer_total_bytes = 0.0
         self._finished_transfer_done_bytes = 0.0
         self._finalized_transfer_jobs: set[int] = set()
-        # Оценка скорости/ETA: кольцо сэмплов (monotonic_ts, done_bytes) за
-        # последние _ETA_WINDOW_SEC секунд. Скорость считаем по реальному
-        # временно́му окну, а не по числу событий (события джоб приходят
-        # пачками — иначе цифры дёргаются).
+        # Speed/ETA estimate: a ring buffer of (monotonic_ts, done_bytes) samples
+        # over the last _ETA_WINDOW_SEC seconds. Speed is computed over a real
+        # time window rather than event count — job events arrive in bursts,
+        # which would otherwise make the numbers jump around.
         self._eta_samples: deque[tuple[float, float]] = deque()
         self._eta_display_speed_bps = 0.0
 
@@ -195,14 +203,16 @@ class MainWindow(
         self._startup_overlay.retry_requested.connect(self._on_reconnect)
         self._startup_overlay.accounts_requested.connect(self._on_accounts)
         self._startup_overlay.setGeometry(self.centralWidget().rect())
-        self._startup_overlay.show_loading("Подключение к Telegram…")
+        self._startup_overlay.show_loading(self.tr("Connecting to Telegram…"))
 
         # System tray
         self._tray = QSystemTrayIcon(self)
-        tray_menu = QMenu()
-        tray_menu.addAction("Показать", self.show)
-        tray_menu.addAction("Выйти", QApplication.quit)
-        self._tray.setContextMenu(tray_menu)
+        self._tray_menu = QMenu()
+        self._tray_action_show = self._tray_menu.addAction(self.tr("Show"), self.show)
+        self._tray_action_quit = self._tray_menu.addAction(
+            self.tr("Quit"), QApplication.quit
+        )
+        self._tray.setContextMenu(self._tray_menu)
         self._tray.activated.connect(self._on_tray_activated)
         self._tray.show()
 
@@ -218,30 +228,21 @@ class MainWindow(
         self.reload_all()
 
     def _build_ui(self) -> None:
-        menubar = self.menuBar()
-        lang_menu = menubar.addMenu(self.tr("Язык / Language"))
-        ru_action = QAction("Русский", self)
-        en_action = QAction("English", self)
-        ru_action.triggered.connect(lambda: self._switch_language("ru_RU"))
-        en_action.triggered.connect(lambda: self._switch_language("en_US"))
-        lang_menu.addAction(ru_action)
-        lang_menu.addAction(en_action)
-
-        self.action_settings = QAction(self.tr("Настройки"), self)
-        self.action_reconnect = QAction(self.tr("Переподключить"), self)
+        self.action_settings = QAction(self.tr("Settings"), self)
+        self.action_reconnect = QAction(self.tr("Reconnect"), self)
         self.action_reconnect.setEnabled(False)
-        self.action_accounts = QAction(self.tr("Telegram Аккаунты"), self)
+        self.action_accounts = QAction(self.tr("Telegram Accounts"), self)
 
-        # Standalone actions (used in context menus, not in toolbar)
-        self.action_create_folder = QAction("Создать папку", self)
-        self.action_upload = QAction("Загрузить", self)
-        self.action_download = QAction("Скачать", self)
-        self.action_download_folder = QAction("Скачать папку", self)
-        self.action_delete_local = QAction("Удалить локально", self)
-        self.action_delete = QAction("Удалить удалённо", self)
-        self.action_refresh = QAction("Обновить", self)
-        self.action_reconcile = QAction(self.tr("Сверить базу"), self)
-        self.action_reindex = QAction(self.tr("Полная переиндексация"), self)
+        # Standalone actions (used in context menus, not in the toolbar)
+        self.action_create_folder = QAction(self.tr("Create folder"), self)
+        self.action_upload = QAction(self.tr("Upload"), self)
+        self.action_download = QAction(self.tr("Download"), self)
+        self.action_download_folder = QAction(self.tr("Download folder"), self)
+        self.action_delete_local = QAction(self.tr("Delete locally"), self)
+        self.action_delete = QAction(self.tr("Delete remotely"), self)
+        self.action_refresh = QAction(self.tr("Refresh"), self)
+        self.action_reconcile = QAction(self.tr("Reconcile database"), self)
+        self.action_reindex = QAction(self.tr("Full reindex"), self)
 
         central = QWidget(self)
         central.setObjectName("mainCentral")
@@ -264,34 +265,36 @@ class MainWindow(
             btn.setObjectName("navButton")
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             top_bar_layout.addWidget(btn)
-        self.nav_back_btn.setToolTip("Назад (Alt+Left)")
-        self.nav_forward_btn.setToolTip("Вперёд (Alt+Right)")
-        self.nav_up_btn.setToolTip("Наверх (Alt+Up)")
+        self.nav_back_btn.setToolTip(self.tr("Back (Alt+Left)"))
+        self.nav_forward_btn.setToolTip(self.tr("Forward (Alt+Right)"))
+        self.nav_up_btn.setToolTip(self.tr("Up (Alt+Up)"))
 
         self.path_bar = QLineEdit()
         self.path_bar.setObjectName("pathBar")
         self.path_bar.setReadOnly(True)
         self.path_bar.setMinimumHeight(36)
-        self.path_bar.setPlaceholderText("Путь в облаке")
-        self.path_bar.setToolTip("Текущий путь")
+        self.path_bar.setPlaceholderText(self.tr("Cloud path"))
+        self.path_bar.setToolTip(self.tr("Current path"))
         top_bar_layout.addWidget(self.path_bar, 1)
 
         self.search_edit = QLineEdit()
         self.search_edit.setObjectName("searchEdit")
-        self.search_edit.setPlaceholderText("Поиск по имени файла")
+        self.search_edit.setPlaceholderText(self.tr("Search by file name"))
         self.search_edit.setClearButtonEnabled(True)
         self.search_edit.setMinimumHeight(36)
         self.search_edit.setFixedWidth(320)
-        self.search_edit.setToolTip("Поиск файлов в текущей папке (Ctrl+F)")
+        self.search_edit.setToolTip(
+            self.tr("Search files in the current folder (Ctrl+F)")
+        )
         top_bar_layout.addWidget(self.search_edit)
 
-        self.search_everywhere_btn = QPushButton("Везде")
+        self.search_everywhere_btn = QPushButton(self.tr("Everywhere"))
         self.search_everywhere_btn.setObjectName("topActionButton")
         self.search_everywhere_btn.setCheckable(True)
         self.search_everywhere_btn.setFixedSize(64, 36)
         self.search_everywhere_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.search_everywhere_btn.setToolTip(
-            "Искать по всем вложенным папкам (рекурсивно), а не только в текущей"
+            self.tr("Search all nested folders (recursively), not just the current one")
         )
         top_bar_layout.addWidget(self.search_everywhere_btn)
 
@@ -301,26 +304,26 @@ class MainWindow(
         self.trash_btn.setFixedSize(36, 36)
         self.trash_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.trash_btn.setToolTip(
-            "Корзина: удалённые файлы (восстановить / удалить навсегда)"
+            self.tr("Trash: deleted files (restore / delete permanently)")
         )
         top_bar_layout.addWidget(self.trash_btn)
 
         self.status_combo = QComboBox()
         self.status_combo.setObjectName("statusCombo")
-        self.status_combo.addItems(
-            [self.tr("Все"), self.tr("Завершенные"), self.tr("В процессе")]
-        )
+        self.status_combo.addItem(self.tr("All"), userData="all")
+        self.status_combo.addItem(self.tr("Completed"), userData="complete")
+        self.status_combo.addItem(self.tr("In progress"), userData="incomplete")
         self.status_combo.currentIndexChanged.connect(self.reload_items)
         self.status_combo.setMinimumHeight(36)
         self.status_combo.setFixedWidth(154)
-        self.status_combo.setToolTip("Фильтр по статусу загрузки")
+        self.status_combo.setToolTip(self.tr("Filter by transfer status"))
         top_bar_layout.addWidget(self.status_combo)
 
-        self.filter_btn = QPushButton("Применить")
+        self.filter_btn = QPushButton(self.tr("Apply"))
         self.filter_btn.setObjectName("applyFilterButton")
         self.filter_btn.setFixedSize(116, 36)
         self.filter_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.filter_btn.setToolTip("Применить текущие фильтры")
+        self.filter_btn.setToolTip(self.tr("Apply the current filters"))
         top_bar_layout.addWidget(self.filter_btn)
 
         top_bar_layout.addSpacing(4)
@@ -329,22 +332,24 @@ class MainWindow(
         self.btn_reconnect.setFixedSize(36, 36)
         self.btn_reconnect.setEnabled(False)
         self.btn_reconnect.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_reconnect.setToolTip("Переподключить Telegram")
+        self.btn_reconnect.setToolTip(self.tr("Reconnect Telegram"))
         top_bar_layout.addWidget(self.btn_reconnect)
 
         self.btn_settings = QPushButton("⚙")
         self.btn_settings.setObjectName("topActionButton")
         self.btn_settings.setFixedSize(36, 36)
         self.btn_settings.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_settings.setToolTip("Настройки")
+        self.btn_settings.setToolTip(self.tr("Settings"))
         top_bar_layout.addWidget(self.btn_settings)
 
         self.btn_accounts = QPushButton("◈")
         self.btn_accounts.setObjectName("topActionButton")
         self.btn_accounts.setFixedSize(36, 36)
         self.btn_accounts.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_accounts.setToolTip("Telegram Аккаунты")
+        self.btn_accounts.setToolTip(self.tr("Telegram Accounts"))
         top_bar_layout.addWidget(self.btn_accounts)
+
+        self._build_language_switcher(top_bar_layout)
         self._apply_top_bar_icons()
 
         root.addWidget(top_bar)
@@ -362,13 +367,13 @@ class MainWindow(
         left_layout.setSpacing(10)
         left_header = QHBoxLayout()
         left_header.setSpacing(8)
-        folder_title = QLabel("Папки")
-        folder_title.setObjectName("panelTitle")
-        left_header.addWidget(folder_title)
+        self._folder_title_label = QLabel(self.tr("Folders"))
+        self._folder_title_label.setObjectName("panelTitle")
+        left_header.addWidget(self._folder_title_label)
         left_header.addStretch(1)
-        folder_hint = QLabel("Структура")
-        folder_hint.setObjectName("panelHint")
-        left_header.addWidget(folder_hint)
+        self._folder_hint_label = QLabel(self.tr("Structure"))
+        self._folder_hint_label.setObjectName("panelHint")
+        left_header.addWidget(self._folder_hint_label)
         left_layout.addLayout(left_header)
 
         self.folder_tree = QTreeView()
@@ -392,13 +397,15 @@ class MainWindow(
 
         right_header = QHBoxLayout()
         right_header.setSpacing(8)
-        objects_title = QLabel("Файлы в облаке")
-        objects_title.setObjectName("panelTitle")
-        right_header.addWidget(objects_title)
+        self._objects_title_label = QLabel(self.tr("Files in the cloud"))
+        self._objects_title_label.setObjectName("panelTitle")
+        right_header.addWidget(self._objects_title_label)
         right_header.addStretch(1)
-        hint_label = QLabel("Перетащите файлы или нажмите ПКМ для действий")
-        hint_label.setObjectName("panelHint")
-        right_header.addWidget(hint_label)
+        self._objects_hint_label = QLabel(
+            self.tr("Drag files here or right-click for actions")
+        )
+        self._objects_hint_label.setObjectName("panelHint")
+        right_header.addWidget(self._objects_hint_label)
         right_layout.addLayout(right_header)
 
         self.explorer_view = ExplorerListView()
@@ -422,7 +429,9 @@ class MainWindow(
         self.explorer_view.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
-        self.explorer_view.setToolTip("Двойной клик — скачать. ПКМ — доп. действия.")
+        self.explorer_view.setToolTip(
+            self.tr("Double-click to download. Right-click for more actions.")
+        )
         self.explorer_view.export_paths_provider = self._provide_export_paths_for_drag
         self.explorer_view.export_success_notifier = self._on_export_success
 
@@ -460,20 +469,46 @@ class MainWindow(
         self.progress_widget.logs_container.hide()
 
         # Bottom status bar toggle
-        self.log_toggle_btn = QPushButton("▲ Логи")
+        self.log_toggle_btn = QPushButton()
         self.log_toggle_btn.setObjectName("logToggleButton")
         self.log_toggle_btn.setCheckable(True)
         self.log_toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.statusBar().addPermanentWidget(self.log_toggle_btn)
 
-        self.process_toggle_btn = QPushButton("▲ Процессы")
+        self.process_toggle_btn = QPushButton()
         self.process_toggle_btn.setObjectName("processToggleButton")
         self.process_toggle_btn.setCheckable(True)
         self.process_toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.statusBar().addPermanentWidget(self.process_toggle_btn)
 
-        self.statusBar().showMessage("Готово")
+        self._update_toggle_button_labels()
+        self.statusBar().showMessage(self.tr("Ready"))
         self._sync_empty_state()
+
+    def _build_language_switcher(self, top_bar_layout: QHBoxLayout) -> None:
+        """A one-click language switch button, always visible in the top bar."""
+        self.lang_button = QToolButton()
+        self.lang_button.setObjectName("topActionButton")
+        self.lang_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.lang_button.setFixedHeight(36)
+        self.lang_button.setMinimumWidth(72)
+        self.lang_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.lang_button.setToolTip(self.tr("Change interface language"))
+
+        self._lang_menu = QMenu(self.lang_button)
+        for lang in available_languages():
+            action = QAction(f"{lang.flag}  {lang.native_name}", self._lang_menu)
+            action.triggered.connect(
+                lambda _checked=False, code=lang.code: self._switch_language(code)
+            )
+            self._lang_menu.addAction(action)
+        self.lang_button.setMenu(self._lang_menu)
+        self._update_language_button_label()
+        top_bar_layout.addWidget(self.lang_button)
+
+    def _update_language_button_label(self) -> None:
+        current = language_by_code(saved_language())
+        self.lang_button.setText(f"{current.flag} {current.code[:2].upper()}")
 
     def _apply_top_bar_icons(self) -> None:
         if qta is None:
@@ -560,28 +595,36 @@ class MainWindow(
         self._configure_shortcuts()
         self._refresh_action_state()
 
+    def _update_toggle_button_labels(self) -> None:
+        self.log_toggle_btn.setText(
+            ("▼ " if self.log_toggle_btn.isChecked() else "▲ ") + self.tr("Logs")
+        )
+        self.process_toggle_btn.setText(
+            ("▼ " if self.process_toggle_btn.isChecked() else "▲ ")
+            + self.tr("Processes")
+        )
+
     def _toggle_logs(self, checked: bool = False) -> None:
         if self.log_toggle_btn.isChecked():
             self.progress_widget.logs_container.show()
             self.progress_widget.logs_container.raise_()
-            self.log_toggle_btn.setText("▼ Логи")
         else:
             self.progress_widget.logs_container.hide()
-            self.log_toggle_btn.setText("▲ Логи")
+        self._update_toggle_button_labels()
 
     def _toggle_processes(self, checked: bool = False) -> None:
         if self.process_toggle_btn.isChecked():
             self._toast_overlay.show()
             self._toast_overlay.raise_()
-            self.process_toggle_btn.setText("▼ Процессы")
         else:
             self._toast_overlay.hide()
-            self.process_toggle_btn.setText("▲ Процессы")
+        self._update_toggle_button_labels()
 
     def _cleanup_thumbnail_dirs_async(self) -> None:
-        """При старте: чистим stale temp-картинки (.thumb_fetch), ограничиваем
-        дисковый кэш миниатюр (.thumb_cache) LRU и сносим эфемерный кэш собранных
-        для шар-ссылок файлов (.share_cache — пересоберётся по запросу). В фоне."""
+        """On startup: purge stale temp images (.thumb_fetch), cap the thumbnail
+        disk cache (.thumb_cache) with LRU eviction, and drop the ephemeral cache
+        of files assembled for share links (.share_cache — rebuilt on demand).
+        Runs in the background."""
         cache_root = Path(self.config.cache_dir).expanduser()
         fetch_dir = self._thumb_fetch_dir
         thumb_cache = str(cache_root / ".thumb_cache")
@@ -602,10 +645,10 @@ class MainWindow(
         threading.Thread(target=_run, daemon=True).start()
 
     def _run_stream_cleanup(self) -> None:
-        """Периодическая LRU-очистка кэша стриминга во время просмотра."""
+        """Periodic LRU cleanup of the streaming cache while media is being viewed."""
         max_mb = int(getattr(self.config, "stream_cache_max_mb", 2048))
         if max_mb <= 0:
-            return  # 0 — без лимита, кэш не вытесняем
+            return  # 0 = no limit, never evict
         cache_root = Path(self.config.cache_dir).expanduser()
         stream_cache = cache_root / ".share_cache" / ".stream"
         if not stream_cache.exists():
@@ -648,17 +691,15 @@ class MainWindow(
             return
 
         search = self.search_edit.text().strip() or None
-        status = self.status_combo.currentText()
-        if status == "Все":
-            status_filter = None
-        elif status == "Завершенные":
-            status_filter = "complete"
-        else:
-            status_filter = "incomplete"
+        # Compare against the combo box's item data, not its display text —
+        # display text is translated and changes with the active language.
+        status_key = self.status_combo.currentData()
+        status_filter = None if status_key in (None, "all") else str(status_key)
 
-        # «Везде» + непустой запрос → рекурсивный поиск по всему поддереву
-        # (или по всему облаку, если мы в корне). Папки-дети в этом режиме не
-        # показываем — результат это плоский список файлов из разных папок.
+        # "Everywhere" + a non-empty query → recursive search across the whole
+        # subtree (or the whole cloud if we're at the root). Child folders are
+        # not shown in this mode — the result is a flat list of files from
+        # different folders.
         recursive_search = bool(self.search_everywhere_btn.isChecked()) and bool(search)
 
         items: list = []
@@ -692,8 +733,8 @@ class MainWindow(
         chat_ids_map: dict = {}
         lost_keys: set = set()
         notes_map: dict = {}
-        # В рекурсивном поиске результаты из разных папок — per-folder агрегаты
-        # неприменимы; падаем на сохранённый status (overlay не считаем).
+        # In a recursive search, results span multiple folders, so per-folder
+        # aggregates don't apply — fall back to the stored status (no overlay).
         if self.current_folder and file_rows and not recursive_search:
             try:
                 chat_ids_map = self.repo.get_part_chat_ids_by_folder(
@@ -747,12 +788,12 @@ class MainWindow(
             selection_model.clearCurrentIndex()
 
         self._update_path_bar()
-        self.statusBar().showMessage(f"Элементов: {len(items)}")
+        self.statusBar().showMessage(self.tr("Items: {0}").format(len(items)))
         self._refresh_action_state()
 
     def _on_toggle_trash_view(self, checked: bool) -> None:
         self._trash_view = bool(checked)
-        # В корзине поиск/папки не применяются — гасим контролы для ясности.
+        # Search/folders don't apply in Trash — disable those controls for clarity.
         self.search_edit.setEnabled(not self._trash_view)
         self.search_everywhere_btn.setEnabled(not self._trash_view)
         self.reload_items()
@@ -794,7 +835,7 @@ class MainWindow(
         self.explorer_view.clearSelection()
         self.explorer_view.setCurrentIndex(QModelIndex())
         self._update_path_bar()
-        self.statusBar().showMessage(f"Корзина: {len(items)}")
+        self.statusBar().showMessage(self.tr("Trash: {0}").format(len(items)))
         self._refresh_action_state()
 
     def _sync_empty_state(self) -> None:
@@ -807,21 +848,26 @@ class MainWindow(
 
         if self._trash_view:
             self._empty_state_label.setText(
-                "Корзина пуста.\nУдалённые файлы попадают сюда и их можно восстановить."
+                self.tr("Trash is empty.\nDeleted files land here and can be restored.")
             )
         elif self.current_folder:
             self._empty_state_label.setText(
-                "Папка пуста.\nПеретащите файлы сюда, нажмите Загрузить или создайте подпапку."
+                self.tr(
+                    "This folder is empty.\nDrag files here, click Upload, or "
+                    "create a subfolder."
+                )
             )
         else:
             self._empty_state_label.setText(
-                "Папка не выбрана.\nВыберите папку слева или создайте новую."
+                self.tr(
+                    "No folder selected.\nPick a folder on the left or create a new one."
+                )
             )
         self._explorer_stack.setCurrentWidget(self._empty_state_label)
 
     def keyPressEvent(self, event) -> None:  # noqa: N802
-        # Esc на главном окне открывает диалог «Выйти или свернуть».
-        # Срабатывает только если фокусный дочерний виджет/модалка не съели Esc.
+        # Esc on the main window opens the "Quit or minimize" dialog.
+        # Only fires if the focused child widget/dialog didn't consume Esc first.
         if event.key() == Qt.Key.Key_Escape and not getattr(
             self, "_shutdown_started", False
         ):
@@ -830,25 +876,98 @@ class MainWindow(
             return
         super().keyPressEvent(event)
 
+    def changeEvent(self, event) -> None:  # noqa: N802
+        if event.type() == QEvent.Type.LanguageChange:
+            self._retranslate_ui()
+        super().changeEvent(event)
+
+    def _retranslate_ui(self) -> None:
+        """Re-apply every translatable string after a language switch.
+
+        Qt does not retranslate widget text automatically when the active
+        translator changes — each piece of text has to be re-set via tr().
+        """
+        self.action_settings.setText(self.tr("Settings"))
+        self.action_reconnect.setText(self.tr("Reconnect"))
+        self.action_accounts.setText(self.tr("Telegram Accounts"))
+        self.action_create_folder.setText(self.tr("Create folder"))
+        self.action_upload.setText(self.tr("Upload"))
+        self.action_download.setText(self.tr("Download"))
+        self.action_download_folder.setText(self.tr("Download folder"))
+        self.action_delete_local.setText(self.tr("Delete locally"))
+        self.action_delete.setText(self.tr("Delete remotely"))
+        self.action_refresh.setText(self.tr("Refresh"))
+        self.action_reconcile.setText(self.tr("Reconcile database"))
+        self.action_reindex.setText(self.tr("Full reindex"))
+
+        self.nav_back_btn.setToolTip(self.tr("Back (Alt+Left)"))
+        self.nav_forward_btn.setToolTip(self.tr("Forward (Alt+Right)"))
+        self.nav_up_btn.setToolTip(self.tr("Up (Alt+Up)"))
+        self.path_bar.setPlaceholderText(self.tr("Cloud path"))
+        self.path_bar.setToolTip(self.tr("Current path"))
+        self.search_edit.setPlaceholderText(self.tr("Search by file name"))
+        self.search_edit.setToolTip(
+            self.tr("Search files in the current folder (Ctrl+F)")
+        )
+        self.search_everywhere_btn.setText(self.tr("Everywhere"))
+        self.search_everywhere_btn.setToolTip(
+            self.tr("Search all nested folders (recursively), not just the current one")
+        )
+        self.trash_btn.setToolTip(
+            self.tr("Trash: deleted files (restore / delete permanently)")
+        )
+        self.filter_btn.setText(self.tr("Apply"))
+        self.filter_btn.setToolTip(self.tr("Apply the current filters"))
+        self.btn_reconnect.setToolTip(self.tr("Reconnect Telegram"))
+        self.btn_settings.setToolTip(self.tr("Settings"))
+        self.btn_accounts.setToolTip(self.tr("Telegram Accounts"))
+        self.lang_button.setToolTip(self.tr("Change interface language"))
+        self._update_language_button_label()
+
+        idx = self.status_combo.currentIndex()
+        self.status_combo.setItemText(0, self.tr("All"))
+        self.status_combo.setItemText(1, self.tr("Completed"))
+        self.status_combo.setItemText(2, self.tr("In progress"))
+        self.status_combo.setCurrentIndex(idx)
+
+        self._folder_title_label.setText(self.tr("Folders"))
+        self._folder_hint_label.setText(self.tr("Structure"))
+        self._objects_title_label.setText(self.tr("Files in the cloud"))
+        self._objects_hint_label.setText(
+            self.tr("Drag files here or right-click for actions")
+        )
+        self.explorer_view.setToolTip(
+            self.tr("Double-click to download. Right-click for more actions.")
+        )
+
+        self._update_toggle_button_labels()
+        self._tray_action_show.setText(self.tr("Show"))
+        self._tray_action_quit.setText(self.tr("Quit"))
+        self._sync_empty_state()
+
     def closeEvent(self, event) -> None:  # noqa: N802
         # If there are active jobs, warn user
         has_active = bool(self._active_jobs or self._pending_upload_jobs)
         if has_active:
             box = QMessageBox(self)
-            box.setWindowTitle("Активные передачи")
+            box.setWindowTitle(self.tr("Active transfers"))
             box.setText(
-                f"У вас {len(self._active_jobs)} активных задач и "
-                f"{len(self._pending_upload_jobs)} в ожидании.\n"
-                "Они будут отменены при выходе."
+                self.tr(
+                    "You have {active} active job(s) and {pending} waiting.\n"
+                    "They will be cancelled on exit."
+                ).format(
+                    active=len(self._active_jobs),
+                    pending=len(self._pending_upload_jobs),
+                )
             )
-            box.setInformativeText("Что вы хотите сделать?")
+            box.setInformativeText(self.tr("What would you like to do?"))
             minimize_btn = box.addButton(
-                "Свернуть в трей", QMessageBox.ButtonRole.AcceptRole
+                self.tr("Minimize to tray"), QMessageBox.ButtonRole.AcceptRole
             )
             wait_btn = box.addButton(
-                "Ожидать завершения", QMessageBox.ButtonRole.ActionRole
+                self.tr("Wait for completion"), QMessageBox.ButtonRole.ActionRole
             )
-            box.addButton("Выйти сейчас", QMessageBox.ButtonRole.RejectRole)
+            box.addButton(self.tr("Quit now"), QMessageBox.ButtonRole.RejectRole)
             box.setDefaultButton(minimize_btn)
             box.exec()
             clicked = box.clickedButton()
@@ -862,31 +981,31 @@ class MainWindow(
                     "Waiting for active transfers to complete. You can cancel manually."
                 )
                 return
-            # quit_btn → proceed with shutdown
+            # quit_btn → proceed with shutdown below
         else:
             from app.ui.dialogs import ConfirmDialog
 
             dialog = ConfirmDialog(
-                title="Закрыть",
-                message="Выйти из приложения или свернуть в трей?",
+                title=self.tr("Close"),
+                message=self.tr("Quit the application or minimize to tray?"),
                 parent=self,
                 is_destructive=False,
             )
-            # Enter (кнопка по умолчанию) — выход, Esc — свернуть в трей.
-            dialog.btn_confirm.setText("Выйти")
-            dialog.btn_cancel.setText("Свернуть")
+            # Enter (default button) = quit, Esc = minimize to tray.
+            dialog.btn_confirm.setText(self.tr("Quit"))
+            dialog.btn_cancel.setText(self.tr("Minimize"))
             result = dialog.exec()
             if result != QDialog.DialogCode.Accepted:
-                # Esc / «Свернуть» / закрытие окна диалога — прячем в трей.
+                # Esc / "Minimize" / closing the dialog itself → hide to tray.
                 event.ignore()
                 self.hide()
                 return
-            # Accepted → продолжаем штатное завершение ниже.
+            # Accepted → proceed with the normal shutdown below.
 
         # Graceful shutdown: stop worker → disconnect → close DB
         self._shutdown_started = True
-        self.progress_widget.append_log("Завершение работы... отмена активных задач")
-        self.statusBar().showMessage("Завершение работы...")
+        self.progress_widget.append_log("Shutting down... cancelling active jobs")
+        self.statusBar().showMessage(self.tr("Shutting down…"))
         self._toast_overlay.hide_all()
         self._tray.hide()
 
@@ -899,24 +1018,8 @@ class MainWindow(
         event.accept()
 
     def _switch_language(self, lang_code: str) -> None:
-        from PySide6.QtCore import QSettings
-
-        settings = QSettings("TGCCM", "App")
-        settings.setValue("language", lang_code)
-
+        save_language(lang_code)
         app = QApplication.instance()
-        if hasattr(app, "tg_translator") and hasattr(app, "i18n_path"):
-            app.tg_translator.load(f"{lang_code}.qm", str(app.i18n_path))
-
-        # Обновим базовые UI-элементы для демонстрации
-        self.action_settings.setText(self.tr("Настройки"))
-        self.action_reconnect.setText(self.tr("Переподключить"))
-        self.action_accounts.setText(self.tr("Telegram Аккаунты"))
-        self.action_reconcile.setText(self.tr("Сверить базу"))
-        self.action_reindex.setText(self.tr("Полная переиндексация"))
-
-        idx = self.status_combo.currentIndex()
-        self.status_combo.setItemText(0, self.tr("Все"))
-        self.status_combo.setItemText(1, self.tr("Завершенные"))
-        self.status_combo.setItemText(2, self.tr("В процессе"))
-        self.status_combo.setCurrentIndex(idx)
+        if hasattr(app, "tg_translator"):
+            install_language(app, lang_code, app.tg_translator)
+        self._retranslate_ui()

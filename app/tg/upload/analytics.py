@@ -1,10 +1,11 @@
-"""Единый сборщик блока ``analytics`` для всех веток загрузки.
+"""Single builder of the ``analytics`` block for all upload branches.
 
-Раньше ~80-строчный dict собирался отдельно в `_single_part_upload`,
-`chunked_upload` (in-memory multipart) и `_multipart_upload_from_disk` — три
-почти одинаковые копии, которые разъезжались (см. историю с «мёртвым» адаптивом).
-Здесь общая часть строится один раз; ветка передаёт только измеренные фазы и свой
-``upload_profile`` (самая вариативная часть остаётся за вызывающим).
+Previously, a ~80-line dict was assembled separately in `_single_part_upload`,
+`chunked_upload` (in-memory multipart), and `_multipart_upload_from_disk` —
+three nearly identical copies that drifted apart over time (see the history
+around the "dead" adaptive controller bug). Here the common part is built
+once; each branch only passes in its measured phases and its own
+``upload_profile`` (the most variable part is left to the caller).
 """
 
 from __future__ import annotations

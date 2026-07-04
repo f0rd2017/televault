@@ -1,8 +1,8 @@
-"""Адаптивные контроллеры параллелизма для загрузки/выгрузки.
+"""Adaptive concurrency controllers for upload/download.
 
-Контроллеры самодостаточны: реагируют на флуд-вейты и скорость, поднимая/снижая
-конкурентность. Никакой зависимости от TgUploader/TgDownloader — только asyncio,
-время и токен отмены.
+The controllers are self-contained: they react to flood-waits and speed by
+raising/lowering concurrency. No dependency on TgUploader/TgDownloader — just
+asyncio, time, and a cancel token.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ class _AdaptiveUploadController:
         self._upscale_speed_threshold = 5.5 if is_premium else 2.5
         self._downscale_speed_threshold = (
             0.3 if is_premium else 0.15
-        )  # Оптимизация: было 1.4/0.7, не снижать concurrency при нормальной работе через прокси
+        )  # Tuning: was 1.4/0.7 — don't lower concurrency during normal proxy operation
         self._low_speed_guard_mbps = (
             max(2.4, self._downscale_speed_threshold * 1.8)
             if is_premium
@@ -55,7 +55,7 @@ class _AdaptiveUploadController:
         self._probe_interval_seconds = 9.0
         self._min_downscale_interval_seconds = (
             30.0 if is_premium else 30.0
-        )  # Оптимизация: было 9.0/11.0, реже снижать
+        )  # Tuning: was 9.0/11.0 — downscale less often
         self._last_adjust_ts = 0.0
 
     async def acquire_slot(self, cancel_token: CancelToken) -> None:

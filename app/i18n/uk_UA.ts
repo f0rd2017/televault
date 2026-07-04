@@ -1,24 +1,24 @@
 <?xml version='1.0' encoding='utf-8'?>
-<TS version="2.1" language="ru_RU">
+<TS version="2.1">
 <context>
     <name>MainWindow</name>
     <message>
         <location filename="../ui/window_main.py" line="206" />
         <source>Connecting to Telegram…</source>
-        <translation>Подключение к Telegram…</translation>
+        <translation>Підключення до Telegram…</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="211" />
         <location filename="../ui/window_main.py" line="944" />
         <source>Show</source>
-        <translation>Показать</translation>
+        <translation>Показати</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="213" />
         <location filename="../ui/window_main.py" line="945" />
         <location filename="../ui/window_main.py" line="995" />
         <source>Quit</source>
-        <translation>Выйти</translation>
+        <translation>Вийти</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="231" />
@@ -26,13 +26,13 @@
         <location filename="../ui/window_main.py" line="890" />
         <location filename="../ui/window_main.py" line="922" />
         <source>Settings</source>
-        <translation>Настройки</translation>
+        <translation>Налаштування</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="232" />
         <location filename="../ui/window_main.py" line="891" />
         <source>Reconnect</source>
-        <translation>Переподключить</translation>
+        <translation>Перепідключити</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="234" />
@@ -40,61 +40,61 @@
         <location filename="../ui/window_main.py" line="892" />
         <location filename="../ui/window_main.py" line="923" />
         <source>Telegram Accounts</source>
-        <translation>Аккаунты Telegram</translation>
+        <translation>Акаунти Telegram</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="237" />
         <location filename="../ui/window_main.py" line="893" />
         <source>Create folder</source>
-        <translation>Создать папку</translation>
+        <translation>Створити папку</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="238" />
         <location filename="../ui/window_main.py" line="894" />
         <source>Upload</source>
-        <translation>Загрузить</translation>
+        <translation>Завантажити</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="239" />
         <location filename="../ui/window_main.py" line="895" />
         <source>Download</source>
-        <translation>Скачать</translation>
+        <translation>Скачати</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="240" />
         <location filename="../ui/window_main.py" line="896" />
         <source>Download folder</source>
-        <translation>Скачать папку</translation>
+        <translation>Скачати папку</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="241" />
         <location filename="../ui/window_main.py" line="897" />
         <source>Delete locally</source>
-        <translation>Удалить локально</translation>
+        <translation>Видалити локально</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="242" />
         <location filename="../ui/window_main.py" line="898" />
         <source>Delete remotely</source>
-        <translation>Удалить удалённо</translation>
+        <translation>Видалити віддалено</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="243" />
         <location filename="../ui/window_main.py" line="899" />
         <source>Refresh</source>
-        <translation>Обновить</translation>
+        <translation>Оновити</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="244" />
         <location filename="../ui/window_main.py" line="900" />
         <source>Reconcile database</source>
-        <translation>Сверить базу</translation>
+        <translation>Звірити базу</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="245" />
         <location filename="../ui/window_main.py" line="901" />
         <source>Full reindex</source>
-        <translation>Полная переиндексация</translation>
+        <translation>Повна переіндексація</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="268" />
@@ -106,96 +106,96 @@
         <location filename="../ui/window_main.py" line="269" />
         <location filename="../ui/window_main.py" line="904" />
         <source>Forward (Alt+Right)</source>
-        <translation>Вперёд (Alt+Right)</translation>
+        <translation>Вперед (Alt+Right)</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="270" />
         <location filename="../ui/window_main.py" line="905" />
         <source>Up (Alt+Up)</source>
-        <translation>Наверх (Alt+Up)</translation>
+        <translation>Вгору (Alt+Up)</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="276" />
         <location filename="../ui/window_main.py" line="906" />
         <source>Cloud path</source>
-        <translation>Путь в облаке</translation>
+        <translation>Шлях у хмарі</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="277" />
         <location filename="../ui/window_main.py" line="907" />
         <source>Current path</source>
-        <translation>Текущий путь</translation>
+        <translation>Поточний шлях</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="282" />
         <location filename="../ui/window_main.py" line="908" />
         <source>Search by file name</source>
-        <translation>Поиск по имени файла</translation>
+        <translation>Пошук за назвою файлу</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="287" />
         <location filename="../ui/window_main.py" line="910" />
         <source>Search files in the current folder (Ctrl+F)</source>
-        <translation>Поиск файлов в текущей папке (Ctrl+F)</translation>
+        <translation>Пошук файлів у поточній папці (Ctrl+F)</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="291" />
         <location filename="../ui/window_main.py" line="912" />
         <source>Everywhere</source>
-        <translation>Везде</translation>
+        <translation>Всюди</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="297" />
         <location filename="../ui/window_main.py" line="914" />
         <source>Search all nested folders (recursively), not just the current one</source>
-        <translation>Искать по всем вложенным папкам (рекурсивно), а не только в текущей</translation>
+        <translation>Шукати в усіх вкладених папках (рекурсивно), а не лише в поточній</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="307" />
         <location filename="../ui/window_main.py" line="917" />
         <source>Trash: deleted files (restore / delete permanently)</source>
-        <translation>Корзина: удалённые файлы (восстановить / удалить навсегда)</translation>
+        <translation>Кошик: видалені файли (відновити / видалити назавжди)</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="313" />
         <location filename="../ui/window_main.py" line="928" />
         <source>All</source>
-        <translation>Все</translation>
+        <translation>Усі</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="314" />
         <location filename="../ui/window_main.py" line="929" />
         <source>Completed</source>
-        <translation>Завершённые</translation>
+        <translation>Завершені</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="315" />
         <location filename="../ui/window_main.py" line="930" />
         <source>In progress</source>
-        <translation>В процессе</translation>
+        <translation>У процесі</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="319" />
         <source>Filter by transfer status</source>
-        <translation>Фильтр по статусу загрузки</translation>
+        <translation>Фільтр за статусом передачі</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="322" />
         <location filename="../ui/window_main.py" line="919" />
         <source>Apply</source>
-        <translation>Применить</translation>
+        <translation>Застосувати</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="326" />
         <location filename="../ui/window_main.py" line="920" />
         <source>Apply the current filters</source>
-        <translation>Применить текущие фильтры</translation>
+        <translation>Застосувати поточні фільтри</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="335" />
         <location filename="../ui/window_main.py" line="921" />
         <source>Reconnect Telegram</source>
-        <translation>Переподключить Telegram</translation>
+        <translation>Перепідключити Telegram</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="370" />
@@ -213,19 +213,19 @@
         <location filename="../ui/window_main.py" line="400" />
         <location filename="../ui/window_main.py" line="935" />
         <source>Files in the cloud</source>
-        <translation>Файлы в облаке</translation>
+        <translation>Файли в хмарі</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="405" />
         <location filename="../ui/window_main.py" line="937" />
         <source>Drag files here or right-click for actions</source>
-        <translation>Перетащите файлы или нажмите ПКМ для действий</translation>
+        <translation>Перетягніть файли або натисніть ПКМ для дій</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="433" />
         <location filename="../ui/window_main.py" line="940" />
         <source>Double-click to download. Right-click for more actions.</source>
-        <translation>Двойной клик — скачать. ПКМ — доп. действия.</translation>
+        <translation>Подвійний клік — завантажити. ПКМ — додаткові дії.</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="485" />
@@ -236,100 +236,100 @@
         <location filename="../ui/window_main.py" line="496" />
         <location filename="../ui/window_main.py" line="924" />
         <source>Change interface language</source>
-        <translation>Сменить язык интерфейса</translation>
+        <translation>Змінити мову інтерфейсу</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="600" />
         <source>Logs</source>
-        <translation>Логи</translation>
+        <translation>Журнали</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="604" />
         <source>Processes</source>
-        <translation>Процессы</translation>
+        <translation>Процеси</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="791" />
         <source>Items: {0}</source>
-        <translation>Элементов: {0}</translation>
+        <translation>Елементів: {0}</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="838" />
         <source>Trash: {0}</source>
-        <translation>Корзина: {0}</translation>
+        <translation>Кошик: {0}</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="851" />
         <source>Trash is empty.
 Deleted files land here and can be restored.</source>
-        <translation>Корзина пуста.
-Удалённые файлы попадают сюда, и их можно восстановить.</translation>
+        <translation>Кошик порожній.
+Видалені файли потрапляють сюди, їх можна відновити.</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="856" />
         <source>This folder is empty.
 Drag files here, click Upload, or create a subfolder.</source>
-        <translation>Папка пуста.
-Перетащите файлы сюда, нажмите «Загрузить» или создайте подпапку.</translation>
+        <translation>Папка порожня.
+Перетягніть файли сюди, натисніть «Завантажити» або створіть підпапку.</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="863" />
         <source>No folder selected.
 Pick a folder on the left or create a new one.</source>
-        <translation>Папка не выбрана.
-Выберите папку слева или создайте новую.</translation>
+        <translation>Папку не вибрано.
+Оберіть папку зліва або створіть нову.</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="953" />
         <source>Active transfers</source>
-        <translation>Активные передачи</translation>
+        <translation>Активні передачі</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="956" />
         <source>You have {active} active job(s) and {pending} waiting.
 They will be cancelled on exit.</source>
-        <translation>У вас {active} активных задач и {pending} в ожидании.
-Они будут отменены при выходе.</translation>
+        <translation>У вас {active} активних завдань і {pending} в очікуванні.
+Їх буде скасовано під час виходу.</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="963" />
         <source>What would you like to do?</source>
-        <translation>Что вы хотите сделать?</translation>
+        <translation>Що ви хочете зробити?</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="965" />
         <source>Minimize to tray</source>
-        <translation>Свернуть в трей</translation>
+        <translation>Згорнути в трей</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="968" />
         <source>Wait for completion</source>
-        <translation>Ожидать завершения</translation>
+        <translation>Зачекати на завершення</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="970" />
         <source>Quit now</source>
-        <translation>Выйти сейчас</translation>
+        <translation>Вийти зараз</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="989" />
         <source>Close</source>
-        <translation>Закрыть</translation>
+        <translation>Закрити</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="990" />
         <source>Quit the application or minimize to tray?</source>
-        <translation>Выйти из приложения или свернуть в трей?</translation>
+        <translation>Вийти з програми чи згорнути в трей?</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="996" />
         <source>Minimize</source>
-        <translation>Свернуть</translation>
+        <translation>Згорнути</translation>
     </message>
     <message>
         <location filename="../ui/window_main.py" line="1008" />
         <source>Shutting down…</source>
-        <translation>Завершение работы…</translation>
+        <translation>Завершення роботи…</translation>
     </message>
 </context>
 </TS>

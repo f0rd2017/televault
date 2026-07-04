@@ -266,8 +266,8 @@ class _DownloadFetchMixin:
                             "used_stride_streams": int(used_streams),
                         }
             except (ConnectionError, TimeoutError) as exc:
-                # Все ретраи исчерпаны ошибкой соединения — возможно, умер
-                # прокси. Пробуем следующий уровень цепочки (backup→direct).
+                # All retries exhausted with a connection error — the proxy may
+                # have died. Try the next level in the chain (backup->direct).
                 await self._on_persistent_connection_failure(client, exc)
                 raise
             except FileReferenceExpiredError:
@@ -338,12 +338,13 @@ class _DownloadFetchMixin:
         end_byte: int,
         msg_id: int,
     ) -> int:
-        """Дорастить локальный файл ``target_path`` до ``end_byte`` байт префикса
-        сообщения (только для НЕзашифрованных частей — plaintext совпадает с
-        сырыми байтами, поэтому читать начальный отрезок без полной части можно).
-        Уже имеющиеся байты (``start_offset``) не перекачиваются — используется
-        ``iter_download(offset=..., limit=...)``, а не полный ``download_media``.
-        Возвращает итоговый размер файла на диске."""
+        """Grow the local file ``target_path`` to ``end_byte`` bytes of the
+        message's prefix (only for UNencrypted parts — the plaintext matches
+        the raw message bytes, so the leading segment can be read without the
+        full part). Bytes already present (``start_offset``) are not
+        re-downloaded — this uses ``iter_download(offset=..., limit=...)``
+        rather than a full ``download_media``. Returns the resulting file size
+        on disk."""
         request_size = self._tg_request_size
         aligned_offset = (max(0, start_offset) // request_size) * request_size
         chunks_needed = max(0, -(-(end_byte - aligned_offset) // request_size))

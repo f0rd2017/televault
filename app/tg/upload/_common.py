@@ -1,4 +1,4 @@
-"""Общие хелперы для пакета upload."""
+"""Shared helpers for the upload package."""
 
 from __future__ import annotations
 

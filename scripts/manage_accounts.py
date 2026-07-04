@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Управление Telegram аккаунтами для upload через терминал.
-Использование: python scripts/manage_accounts.py
+Manage Telegram accounts for uploads from the terminal.
+Usage: python scripts/manage_accounts.py
 """
 
 import asyncio
@@ -9,7 +9,7 @@ import re
 import sys
 from pathlib import Path
 
-# Добавляем корень проекта
+# Add the project root to the path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dotenv import load_dotenv
@@ -50,7 +50,7 @@ def print_accounts(accounts: list[TelegramAccount]):
 async def authorize_account(
     phone: str, api_id: int, api_hash: str, session_path: str, proxy: str = ""
 ) -> dict | None:
-    """Авторизовать новый аккаунт через терминал."""
+    """Authorize a new account from the terminal."""
     from telethon import TelegramClient
     from telethon.errors import FloodWaitError
     from app.core.utils import build_telethon_proxy
@@ -99,7 +99,7 @@ async def authorize_account(
                 await client.disconnect()
                 return None
 
-        # Получаем инфо
+        # Fetch info
         me = await client.get_me()
         info = {
             "id": getattr(me, "id", 0),
@@ -122,7 +122,7 @@ async def authorize_account(
 
 
 async def add_account(repo: DbRepo, default_api_id: int, default_api_hash: str):
-    """Добавить новый аккаунт."""
+    """Add a new account."""
     print("\n➕ Добавление нового аккаунта")
     print("-" * 40)
 
@@ -131,7 +131,7 @@ async def add_account(repo: DbRepo, default_api_id: int, default_api_hash: str):
         print("❌ Метка обязательна")
         return
 
-    # API ID/Hash для этого аккаунта
+    # API ID/Hash for this account
     print(f"\n🔑 API ID/Hash (нажми Enter чтобы использовать общие: {default_api_id})")
     api_id_str = input("API ID: ").strip()
     if api_id_str:
@@ -159,13 +159,13 @@ async def add_account(repo: DbRepo, default_api_id: int, default_api_hash: str):
         print("❌ Телефон обязателен")
         return
 
-    # Валидация формата номера телефона
+    # Validate phone number format
     phone_pattern = r"^\+?[1-9]\d{1,14}$"
     if not re.match(phone_pattern, phone.replace(" ", "").replace("-", "")):
         print("❌ Неверный формат номера телефона")
         return
 
-    # Проверка на дубликат
+    # Check for a duplicate
     phone_clean = re.sub(r"[^0-9]", "", phone)
     for acc in repo.list_accounts():
         acc_phone_clean = re.sub(r"[^0-9]", "", acc.phone_masked or "")
@@ -175,19 +175,19 @@ async def add_account(repo: DbRepo, default_api_id: int, default_api_hash: str):
             )
             return
 
-    # Авторизация
+    # Authorization
     session_dir = Path("./var/data/account_sessions")
     ensure_dir(session_dir)
     session_path = str(session_dir / f"acc_{phone_clean}.session")
 
-    # Спрашиваем прокси ДО авторизации
+    # Ask for the proxy BEFORE authorizing
     print("\n🌐 Прокси для подключения (пусто = напрямую)")
     print(
         "   Формат: host:port:user:pass | socks5://… | http://… (тип определится автоматически)"
     )
     proxy = input("Прокси: ").strip()
     if proxy:
-        # Валидация формата (socks5/socks4/http; со схемой или короткой формой)
+        # Validate the format (socks5/socks4/http; with scheme or short form)
         from app.core.utils import parse_proxy
 
         try:
@@ -204,7 +204,7 @@ async def add_account(repo: DbRepo, default_api_id: int, default_api_hash: str):
     if not info:
         return
 
-    # Канал
+    # Channel
     channel = input(
         "\n💬 Ссылка на канал (https://t.me/+xxxxx или @username): "
     ).strip()
@@ -212,7 +212,7 @@ async def add_account(repo: DbRepo, default_api_id: int, default_api_hash: str):
         print("❌ Канал обязателен")
         return
 
-    # Валидация формата ссылки на канал
+    # Validate the channel link format
     channel_pattern = r"^(https://t\.me/[\w\d_]+|@[\w\d_]+|[\w\d_]+)$"
     if not re.match(channel_pattern, channel):
         print(
@@ -220,7 +220,7 @@ async def add_account(repo: DbRepo, default_api_id: int, default_api_hash: str):
         )
         return
 
-    # Первый аккаунт = основной
+    # The first account becomes the primary one
     is_primary = len(repo.list_accounts()) == 0
 
     account = TelegramAccount(
@@ -246,24 +246,24 @@ async def add_account(repo: DbRepo, default_api_id: int, default_api_hash: str):
 
 
 async def set_primary(repo: DbRepo, account_id: int):
-    """Сделать аккаунт основным."""
-    # Проверим, что аккаунт существует
+    """Make an account the primary one."""
+    # Check that the account exists
     acc = repo.get_account(account_id)
     if not acc:
         print(f"❌ Аккаунт ID={account_id} не найден")
         return
 
-    # Снять primary со всех и установить для выбранного в одной транзакции
+    # Clear primary from all and set it for the chosen one in a single transaction
     with repo.conn:
-        # Сначала снимаем primary со всех
+        # First clear primary from all accounts
         repo.conn.execute("UPDATE accounts SET is_primary = 0")
-        # Потом устанавливаем для выбранного
+        # Then set it for the chosen account
         repo.update_account(account_id, is_primary=1)
     print(f"✅ Аккаунт ID={account_id} теперь основной")
 
 
 async def toggle_active(repo: DbRepo, account_id: int):
-    """Включить/выключить аккаунт."""
+    """Enable/disable an account."""
     acc = repo.get_account(account_id)
     if not acc:
         print(f"❌ Аккаунт ID={account_id} не найден")
@@ -275,7 +275,7 @@ async def toggle_active(repo: DbRepo, account_id: int):
 
 
 async def set_channel(repo: DbRepo, account_id: int):
-    """Изменить канал аккаунта."""
+    """Change an account's channel."""
     acc = repo.get_account(account_id)
     if not acc:
         print(f"❌ Аккаунт ID={account_id} не найден")
@@ -284,7 +284,7 @@ async def set_channel(repo: DbRepo, account_id: int):
     print(f"Текущий канал: {acc.chat_target}")
     channel = input("Новый канал (https://t.me/+xxxxx или @username): ").strip()
     if channel:
-        # Валидация формата ссылки на канал
+        # Validate the channel link format
         channel_pattern = r"^(https://t\.me/[\w\d_]+|@[\w\d_]+|[\w\d_]+)$"
         if not re.match(channel_pattern, channel):
             print(
@@ -296,7 +296,7 @@ async def set_channel(repo: DbRepo, account_id: int):
 
 
 async def set_proxy(repo: DbRepo, account_id: int):
-    """Изменить прокси аккаунта."""
+    """Change an account's proxy."""
     acc = repo.get_account(account_id)
     if not acc:
         print(f"❌ Аккаунт ID={account_id} не найден")
@@ -307,7 +307,7 @@ async def set_proxy(repo: DbRepo, account_id: int):
         "Новый прокси (IP:PORT:USER:PASS, или пусто для отключения): "
     ).strip()
     if proxy:
-        # Валидация формата (socks5/socks4/http; со схемой или короткой формой)
+        # Validate the format (socks5/socks4/http; with scheme or short form)
         from app.core.utils import parse_proxy
 
         try:
@@ -323,7 +323,7 @@ async def set_proxy(repo: DbRepo, account_id: int):
 
 
 async def delete_account(repo: DbRepo, account_id: int):
-    """Удалить аккаунт."""
+    """Delete an account."""
     acc = repo.get_account(account_id)
     if not acc:
         print(f"❌ Аккаунт ID={account_id} не найден")
@@ -333,7 +333,7 @@ async def delete_account(repo: DbRepo, account_id: int):
     if confirm != "y":
         return
 
-    # Удалить session файл
+    # Remove the session file
     session_path = Path(acc.session_path)
     if session_path.exists():
         try:
@@ -349,11 +349,11 @@ async def main():
     load_dotenv()
     import os
 
-    # Определяем корень проекта (на 2 уровня выше скрипта)
+    # Resolve the project root (two levels above this script)
     project_root = Path(__file__).resolve().parent.parent
     os.chdir(project_root)
 
-    # Проверяем и получаем API ID/Hash
+    # Check and fetch API ID/Hash
     api_id_str = os.getenv("TG_API_ID", "0")
     api_hash = os.getenv("TG_API_HASH", "")
 
@@ -367,7 +367,7 @@ async def main():
         print("❌ TG_API_ID и TG_API_HASH не настроены в .env!")
         return
 
-    # Подключаем БД — используем абсолютный путь
+    # Connect to the DB — use an absolute path
     db_path = project_root / "data" / "index.sqlite3"
     try:
         db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -380,12 +380,12 @@ async def main():
     try:
         conn = connect_db(db_path)
         repo = DbRepo(conn)
-        repo.init_schema()  # Гарантируем что таблица accounts существует
+        repo.init_schema()  # Ensure the accounts table exists
     except Exception as e:
         print(f"❌ Не удалось подключиться к базе данных: {e}")
         return
 
-    # Проверяем что таблица создана
+    # Verify the table was created
     try:
         tables = conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table'"

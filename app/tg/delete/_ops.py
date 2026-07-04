@@ -59,9 +59,9 @@ class _OpsMixin:
                 deleted_refs.extend((part_chat_id, msg_id) for msg_id in deleted_ids)
                 clients_used.add(str(route_label))
                 if failed_ids:
-                    # Недоступный канал (нет маршрута) — помечаем как orphaned,
-                    # реальные отказы (forbidden/невалидная сущность) — как ошибку
-                    # с понятной причиной для пользователя.
+                    # An unreachable channel (no route) is marked as orphaned;
+                    # real failures (forbidden/invalid entity) are treated as
+                    # an error with a reason the user can understand.
                     if reason and "No delete route available" in reason:
                         logger.warning(
                             "No route for chat_id=%s — marking %d parts as orphaned (legacy channel)",
@@ -100,7 +100,7 @@ class _OpsMixin:
                 if first_error is None:
                     first_error = str(exc)
 
-        # Помечаем удалённые + orphaned (legacy каналы, недоступные для удаления)
+        # Mark deleted + orphaned (legacy channels no longer reachable for deletion)
         deleted = self.repo.mark_messages_deleted_refs(deleted_refs)
         if orphaned_refs:
             orphaned_deleted = self.repo.mark_messages_deleted_refs(orphaned_refs)
@@ -119,9 +119,10 @@ class _OpsMixin:
                 len(failed_refs),
                 error_suffix,
             )
-            # ВАЖНО: Мы не помечаем failed_refs как orphaned автоматически здесь,
-            # чтобы не удалять из базы то, что не удалилось в реальности.
-            # Тесты ожидают, что при ошибке объект остается в базе.
+            # IMPORTANT: we deliberately do not mark failed_refs as orphaned
+            # here, so we don't remove from the database something that
+            # wasn't actually deleted. Tests expect the object to remain in
+            # the database when an error occurs.
 
             channels_used = sorted(refs_by_chat.keys())
             raise RuntimeError(
@@ -251,15 +252,15 @@ class _OpsMixin:
         self.repo.mark_batch_blob_deleted(member.blob_key)
         if failed_refs:
             error_suffix = f": {first_error}" if first_error else ""
-            # Логируем детали о неудачных попытках удаления
+            # Log details about the failed delete attempts
             logger.error(
                 "Failed to delete blob message part(s) in Telegram%s. Chat references may be invalid.",
                 error_suffix,
             )
-            # Помечаем неудачные попытки как удаленные, чтобы не пытаться снова
+            # Mark failed attempts as deleted so we don't retry them forever
             for chat_id, msg_id in failed_refs:
                 try:
-                    # Проверим, существует ли сообщение вообще
+                    # Check whether the message even exists
                     route_client, route_chat, route_label = await self._pick_route(
                         chat_id
                     )
@@ -267,7 +268,7 @@ class _OpsMixin:
                         route_chat, route_client
                     )
                     if validated_chat is None:
-                        # Если не можем получить действительный чат, помечаем как удаленный
+                        # If we can't obtain a valid chat, mark it as deleted
                         orphaned_deleted = self.repo.mark_messages_deleted_refs(
                             [(chat_id, msg_id)]
                         )
@@ -277,7 +278,7 @@ class _OpsMixin:
                             chat_id,
                         )
                 except Exception:
-                    # Если вообще не можем обработать чат, помечаем как удаленный
+                    # If we can't handle the chat at all, mark it as deleted
                     orphaned_deleted = self.repo.mark_messages_deleted_refs(
                         [(chat_id, msg_id)]
                     )
@@ -287,7 +288,7 @@ class _OpsMixin:
                         chat_id,
                     )
 
-            # Возвращаем результат с информацией о фактически удаленных сообщениях
+            # Return the result with info about the messages actually deleted
             channels_used = sorted(refs_by_chat.keys())
             return {
                 "deleted": max(1, int(deleted) + len(orphaned_refs)),
@@ -321,13 +322,14 @@ class _OpsMixin:
     ) -> dict[str, int]:
         objects = self.repo.list_objects_recursive(folder_path)
 
-        # Собираем ВСЕ живые сообщения папки напрямую из msg_index. Это покрывает
-        # и обычные файлы, и batch-blob'ы (зип-архивы мелких файлов), сообщения
-        # которых не попадают в objects, когда участники уже логически удалены.
-        # Источник — msg_index (is_deleted=0), т.е. то, что reconcile реально
-        # видел в канале: повторное удаление дотирает то, что прошлая неудачная
-        # попытка оставила в канале (флаг batch_blobs.is_deleted может разойтись
-        # с реальностью и тогда блобы пропускались навсегда).
+        # Collect ALL live messages for the folder directly from msg_index. This
+        # covers both regular files and batch blobs (zip archives of small files),
+        # whose messages don't show up in objects once their members have been
+        # logically deleted. The source is msg_index (is_deleted=0), i.e. what
+        # reconcile actually observed in the channel: a repeated delete cleans up
+        # whatever a previous failed attempt left behind in the channel (the
+        # batch_blobs.is_deleted flag can drift out of sync with reality, in
+        # which case blobs would otherwise be skipped forever).
         refs_by_chat: dict[str, list[int]] = {}
         for chat_id, msg_id in self.repo.get_live_msg_refs_for_folder(
             folder_path, recursive=True
@@ -335,7 +337,7 @@ class _OpsMixin:
             refs_by_chat.setdefault(chat_id, []).append(msg_id)
 
         if not refs_by_chat:
-            # Удалять в канале нечего — чистим локальные записи (включая blob'ы).
+            # Nothing to delete in the channel — clean up local records (including blobs).
             self.repo.mark_folder_batch_blobs_deleted(folder_path)
             self.repo.delete_folder(folder_path)
             local_dir = Path(
@@ -345,7 +347,7 @@ class _OpsMixin:
                 shutil.rmtree(local_dir, ignore_errors=True)
             return {"deleted": 0, "files": len(objects)}
 
-        # Удаляем сообщения пакетно — один delete_messages на каждый chat_id
+        # Delete messages in batches — one delete_messages call per chat_id
         total_deleted = 0
         total_failed = 0
         total_refs = sum(len(ids) for ids in refs_by_chat.values())
@@ -418,13 +420,13 @@ class _OpsMixin:
                     pct, f"Deleted {processed_refs}/{total_refs} message parts"
                 )
 
-        # Помечаем blob'ы папки удалёнными, чтобы они не воскресали из batch-таблиц.
+        # Mark the folder's blobs as deleted so they don't resurrect from batch tables.
         self.repo.mark_folder_batch_blobs_deleted(folder_path)
 
-        # Удаляем записи папки из БД
+        # Remove the folder's records from the database
         self.repo.delete_folder(folder_path)
 
-        # Удаляем локальные кэшированные файлы
+        # Remove local cached files
         local_dir = Path(
             self.config.cache_dir
         ).expanduser().resolve() / normalize_folder_path(folder_path)

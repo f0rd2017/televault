@@ -1,9 +1,10 @@
-"""Буфер пакетной записи частей в индекс (общий для multi-part веток).
+"""Buffer for batched writes of parts to the index (shared by the multi-part branches).
 
-`chunked_upload` (in-memory) и `_multipart_upload_from_disk` независимо держали
-идентичные замыкания `flush_records`/`add_record` с горой `nonlocal`. Здесь это
-один объект: копит PartRecord, пишет пачками по `batch_size`, троттлит пересборку
-агрегата объекта и сам считает потраченное на БД время.
+`chunked_upload` (in-memory) and `_multipart_upload_from_disk` each independently
+kept identical `flush_records`/`add_record` closures with a pile of `nonlocal`
+variables. Here it's a single object: it accumulates PartRecords, writes them
+in batches of `batch_size`, throttles the object-aggregate rebuild, and tracks
+the time spent on the database itself.
 """
 
 from __future__ import annotations

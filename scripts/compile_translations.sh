@@ -3,7 +3,7 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-echo "==> Компиляция файлов перевода (.ts -> .qm)..."
+echo "==> Compiling translation files (.ts -> .qm)..."
 ./.venv/bin/pyside6-lrelease app/i18n/*.ts
 
-echo "==> Готово. Скомпилированные .qm файлы готовы к использованию."
+echo "==> Done. Compiled .qm files are ready to use."

@@ -1,6 +1,6 @@
-"""Инспекция файла в локальном индексе по file_key: сырой SQL + через DbRepo.
+"""Inspect a file in the local index by file_key: raw SQL + via DbRepo.
 
-Пример: .venv/bin/python scripts/debug/lookup_file.py 1e99bca377ae --folder main/TG_bd
+Example: .venv/bin/python scripts/debug/lookup_file.py 1e99bca377ae --folder main/TG_bd
 """
 
 from __future__ import annotations

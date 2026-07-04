@@ -1,13 +1,14 @@
-"""Возобновление прерванной загрузки.
+"""Resuming an interrupted upload.
 
-Источник истины об уже залитых частях — индекс ``msg_index`` (строка пишется
-только после успешной отправки части в Telegram). Возобновление = пропустить
-части, которые уже есть в индексе для того же ``file_key`` с тем же
-``parts_total`` и тем же payload-sha256 (берётся из подписи части).
+The source of truth for parts already uploaded is the ``msg_index`` (a row is
+written only after the part was successfully sent to Telegram). Resuming means
+skipping parts that already exist in the index for the same ``file_key`` with
+the same ``parts_total`` and the same payload sha256 (taken from the part's
+caption signature).
 
-Для детерминированного ключа (``use_sha_as_key=True``) ``file_key`` совпадает
-между запусками сам по себе. Для случайного ключа ``file_key`` восстанавливается
-из sidecar-манифеста рядом с кэшем (симметрично resume у выгрузки).
+For a deterministic key (``use_sha_as_key=True``), ``file_key`` naturally
+matches across runs. For a random key, ``file_key`` is recovered from a
+sidecar manifest next to the cache (mirroring download's resume mechanism).
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ _RESUME_DIRNAME = ".upload_resume"
 
 
 def source_signature(source_path: Path, *, size: int, mtime_ns: int) -> str:
-    """Стабильная подпись исходного файла: путь + размер + mtime."""
+    """Stable signature of the source file: path + size + mtime."""
     raw = f"{Path(source_path).resolve()}|{int(size)}|{int(mtime_ns)}".encode()
     return hashlib.sha256(raw).hexdigest()
 
@@ -39,7 +40,7 @@ def _sidecar_path(cache_dir: str | Path, signature: str) -> Path:
 def load_resume_file_key(
     cache_dir: str | Path, *, signature: str, payload_sha256: str
 ) -> str | None:
-    """Вернуть сохранённый ``file_key`` для этого источника, если payload совпал."""
+    """Return the saved ``file_key`` for this source, if the payload matches."""
     path = _sidecar_path(cache_dir, signature)
     if not path.exists():
         return None
@@ -64,7 +65,7 @@ def write_resume_file(
     payload_sha256: str,
     orig_name: str,
 ) -> None:
-    """Сохранить sidecar для возможного возобновления (best-effort)."""
+    """Save a sidecar for possible resumption (best-effort)."""
     payload = {
         "file_key": str(file_key),
         "parts_total": int(parts_total),
@@ -81,7 +82,7 @@ def write_resume_file(
 
 
 def clear_resume_file(cache_dir: str | Path, *, signature: str) -> None:
-    """Удалить sidecar (после успешной полной загрузки; best-effort)."""
+    """Remove the sidecar (after a successful full upload; best-effort)."""
     try:
         _sidecar_path(cache_dir, signature).unlink(missing_ok=True)
     except OSError as exc:
@@ -95,11 +96,12 @@ def existing_completed_parts(
     payload_sha256: str,
     caption_prefix: str,
 ) -> set[int]:
-    """Множество ``part_index`` уже залитых частей, подходящих под возобновление.
+    """The set of ``part_index`` values already uploaded that qualify for resume.
 
-    Часть засчитывается только если её ``parts_total`` совпадает с планируемым и
-    sha256 в подписи совпадает с digest текущего payload — это исключает
-    несовпадение раскладки (сменился пул аккаунтов) и недетерминированное сжатие.
+    A part only counts if its ``parts_total`` matches the planned value and the
+    sha256 in its caption signature matches the current payload's digest — this
+    rules out a layout mismatch (the account pool changed) and non-deterministic
+    compression.
     """
     target = str(payload_sha256).lower()
     completed: set[int] = set()

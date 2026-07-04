@@ -31,8 +31,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class _PreparedBatch:
-    """Готовая к отправке пачка: либо одиночный файл (без zip), либо собранный
-    архив. Архивация делается заранее (конвейер), отправка — отдельной стадией."""
+    """A batch ready to send: either a single file (no zip) or an assembled
+    archive. Archiving happens ahead of time (pipeline stage); sending is a
+    separate stage."""
 
     kind: str  # "single" | "archive"
     upload_path: str
@@ -77,9 +78,9 @@ class _SmallBatchMixin:
                 continue
             seen.add(dedup_key)
             if not candidate.exists() or not candidate.is_file():
-                # Файл мог быть удалён/перемещён между постановкой джобы и
-                # стартом загрузки. Пропускаем его, а не валим всю пачку —
-                # остальные валидные файлы группы должны загрузиться.
+                # The file may have been deleted/moved between job creation and
+                # the start of the upload. Skip it rather than failing the whole
+                # batch — the group's other valid files should still upload.
                 logger.warning("Skipping missing file in upload group: %s", candidate)
                 continue
             normalized_items.append((key, member_folder))
@@ -91,8 +92,8 @@ class _SmallBatchMixin:
         source_folder: str,
         token: CancelToken,
     ) -> _PreparedBatch:
-        """Стадия архивации конвейера: собрать zip (в потоке) или, для одного
-        файла, отдать его как есть. Не отправляет — только готовит payload."""
+        """Pipeline archiving stage: build a zip (on a thread) or, for a single
+        file, hand it back as-is. Does not send anything — only prepares the payload."""
 
         def _payload_bytes(items: list[tuple[str, str]]) -> int:
             total = 0
@@ -154,8 +155,8 @@ class _SmallBatchMixin:
         token: CancelToken,
         progress_cb=None,
     ) -> dict[str, object]:
-        """Стадия отправки конвейера: залить уже готовый payload (одиночный файл
-        или собранный архив), проиндексировать оверлей и убрать temp."""
+        """Pipeline send stage: upload an already-prepared payload (single file
+        or assembled archive), index the overlay, and clean up temp files."""
         try:
             result = await self.chunked_upload(
                 prepared.upload_path,
@@ -218,9 +219,10 @@ class _SmallBatchMixin:
         cancel_token: CancelToken | None = None,
         progress_cb=None,
     ) -> dict[str, object]:
-        """Конвейер для множества мелких пачек одного дропа: фоновый архиватор
-        готовит пачку N+1, пока пачка N льётся всеми аккаунтами. Так сеть не
-        простаивает на время zip-сборки, а отправки не конкурируют за аккаунты."""
+        """Pipeline for multiple small batches from a single drop: a background
+        archiver prepares batch N+1 while batch N is being uploaded across all
+        accounts. This way the network doesn't sit idle during zip building,
+        and uploads don't compete with each other for accounts."""
         token = cancel_token or CancelToken()
 
         plan: list[tuple[list[tuple[str, str]], str]] = []
@@ -444,10 +446,10 @@ class _SmallBatchMixin:
         ]
         self.repo.upsert_batch_members_bulk(member_rows)
 
-        # Replace-by-name для мелких файлов: только что залитый член вытесняет
-        # старые версии того же файла (та же папка+имя, другой ключ). Без этого
-        # обновлённый мелкий файл оставлял дубль, т.к. session-путь пропускает
-        # replace-by-name в worker.py.
+        # Replace-by-name for small files: the just-uploaded member supersedes
+        # older versions of the same file (same folder+name, different key).
+        # Without this, an updated small file would leave a duplicate behind,
+        # since the session path bypasses replace-by-name in worker.py.
         superseded = 0
         for member in member_rows:
             superseded += self.repo.supersede_batch_members_by_name(

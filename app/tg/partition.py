@@ -1,9 +1,9 @@
-"""Математика разбиения файла на логические части для загрузки.
+"""Math for splitting a file into logical parts for upload.
 
-Чистые функции без состояния: сколько частей планировать, как ровно разложить
-байты, как ребалансировать между несколькими аккаунтами, сколько внутренних
-воркеров давать части. Вынесено из ``TgUploader`` для читаемости и точечного
-тестирования.
+Pure, stateless functions: how many parts to plan, how to lay out the bytes
+evenly, how to rebalance across multiple accounts, and how many internal
+workers to give each part. Extracted out of ``TgUploader`` for readability
+and focused testing.
 """
 
 from __future__ import annotations

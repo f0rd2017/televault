@@ -1,4 +1,4 @@
-"""Общие примитивы REST API: контекст, ответы, ошибки и парсинг запросов."""
+"""Shared REST API primitives: context, responses, errors, and request parsing."""
 
 from __future__ import annotations
 
@@ -11,16 +11,17 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# Защита от случайно гигантского тела (пути файлов — небольшие JSON).
+# Guard against an accidentally huge body (file paths are small JSON payloads).
 MAX_BODY_BYTES = 1 * 1024 * 1024
 
 
 @dataclass
 class ApiContext:
-    """То, что нужно обработчикам: чтение (repo), запись (worker), авторизация.
+    """Everything handlers need: reads (repo), writes (worker), auth.
 
-    ``config`` нужен шар-ссылкам (download_root для поиска уже скачанного файла);
-    ``share_dir`` — куда собирать файл для раздачи, если локально его ещё нет.
+    ``config`` is needed by share links (download_root, to look for an already
+    downloaded file); ``share_dir`` is where to assemble the file for serving
+    if it isn't available locally yet.
     """
 
     repo: Any
@@ -32,7 +33,7 @@ class ApiContext:
 
 @dataclass
 class FileResponse:
-    """Ответ-файл (вместо JSON): обработчик стримит его с поддержкой Range."""
+    """A file response (instead of JSON): the handler streams it with Range support."""
 
     path: str
     filename: str
@@ -41,12 +42,13 @@ class FileResponse:
 
 @dataclass
 class StreamResponse:
-    """Ответ-стрим: файл собирается ИЗ ЧАНКОВ на лету по запрошенному Range —
-    скачиваются только нужные части, а не весь файл (инкремент 9/10).
+    """A streaming response: the file is assembled FROM CHUNKS on the fly for the
+    requested Range — only the needed parts are downloaded, not the whole file
+    (increment 9/10).
 
-    ``layout`` — :class:`app.core.stream.StreamLayout` (plaintext-смещения частей),
-    ``cache_dir`` — куда складывать расшифрованные части (переиспользуются между
-    запросами/перемоткой)."""
+    ``layout`` is a :class:`app.core.stream.StreamLayout` (plaintext part offsets);
+    ``cache_dir`` is where decrypted parts are stored (reused across
+    requests/seeking)."""
 
     token: str
     folder: str
@@ -59,12 +61,13 @@ class StreamResponse:
 
 @dataclass
 class TranscodeResponse:
-    """Ответ-транскод: ffmpeg на лету пересобирает исходник в fragmented MP4.
+    """A transcode response: ffmpeg repackages the source into fragmented MP4
+    on the fly.
 
-    ``input_path``/``input_query`` — путь и query СВОЕГО ЖЕ сервера, откуда
-    ffmpeg читает исходник (обычная раздача с Range); полный URL собирает
-    обработчик — только он знает фактический порт. Выход — chunked-поток без
-    Range/перемотки (см. app.core.transcode)."""
+    ``input_path``/``input_query`` are the path and query of THIS SAME server,
+    where ffmpeg reads the source from (a normal Range-based serve); the full
+    URL is assembled by the handler — only it knows the actual port. The output
+    is a chunked stream without Range/seeking support (see app.core.transcode)."""
 
     input_path: str
     input_query: dict[str, str]
@@ -72,7 +75,7 @@ class TranscodeResponse:
 
 
 class ApiError(Exception):
-    """HTTP-ошибка с кодом и сообщением (сериализуется в ``{"error": ...}``)."""
+    """An HTTP error with a code and message (serialized as ``{"error": ...}``)."""
 
     def __init__(self, status: int, message: str) -> None:
         super().__init__(message)
@@ -90,7 +93,7 @@ def _first(query: dict[str, list[str]], key: str, default: str = "") -> str:
 def _require_token(ctx: ApiContext, headers: dict[str, str], query: dict) -> None:
     token = str(ctx.token or "").strip()
     if not token:
-        return  # авторизация отключена (полагаемся на host=127.0.0.1)
+        return  # auth is disabled (relying on host=127.0.0.1)
     provided = ""
     auth = ""
     for key, value in (headers or {}).items():

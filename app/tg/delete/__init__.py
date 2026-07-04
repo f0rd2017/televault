@@ -31,7 +31,7 @@ class TgDeleter(_OpsMixin, _RetryMixin, _RoutesMixin):
         self.chat_id = chat_id
         self._routes_by_chat_id: dict[str, list[tuple[object, object, str]]] = {}
 
-        # Валидация main chat_obj
+        # Validate the main chat_obj
         if chat is None:
             logger.warning(
                 "TgDeleter initialized with chat=None for chat_id=%s. "
@@ -53,7 +53,7 @@ class TgDeleter(_OpsMixin, _RetryMixin, _RoutesMixin):
                 route_chat_id = resolved_chat_ids[idx]
                 if route_chat_id in endpoint_chat_ids:
                     continue
-                # Валидация для дополнительных чатов
+                # Validate additional chats
                 if resolved_chat is None:
                     logger.warning(
                         "TgDeleter initialized with chats[%d]=None for chat_id=%s. "
@@ -79,7 +79,7 @@ class TgDeleter(_OpsMixin, _RetryMixin, _RoutesMixin):
                     endpoint_client is not None,
                 )
                 continue
-            # Валидация endpoint.chat
+            # Validate endpoint.chat
             if endpoint_chat is None:
                 logger.warning(
                     "Delete endpoint has chat=None for chat_id=%s. "

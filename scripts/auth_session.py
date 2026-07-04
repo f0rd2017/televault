@@ -1,7 +1,7 @@
 """
-Скрипт для авторизации нового Telegram аккаунта.
-Запускается отдельно от основного приложения чтобы не конфликтовать с event loop.
-Использование: python auth_session.py <phone> <session_path> <api_id> <api_hash>
+Script for authorizing a new Telegram account.
+Run separately from the main application so it doesn't conflict with the event loop.
+Usage: python auth_session.py <phone> <session_path> <api_id> <api_hash>
 """
 
 import asyncio
@@ -41,7 +41,7 @@ async def authorize(phone: str, session_path: str, api_id: int, api_hash: str) -
         try:
             await client.sign_in(phone, code)
         except SessionPasswordNeededError:
-            # На аккаунте включена двухфакторная аутентификация (облачный пароль).
+            # Two-factor authentication (cloud password) is enabled on the account.
             print("Требуется пароль двухфакторной аутентификации (2FA).")
             for _ in range(3):
                 password = getpass("Введите пароль 2FA: ").strip()
@@ -67,7 +67,7 @@ async def authorize(phone: str, session_path: str, api_id: int, api_hash: str) -
             await client.disconnect()
             return False
 
-    # Получаем инфу о пользователе
+    # Fetch user info
     me = await client.get_me()
     info = {
         "id": getattr(me, "id", 0),
@@ -81,7 +81,7 @@ async def authorize(phone: str, session_path: str, api_id: int, api_hash: str) -
     print(f"   Телефон: {info['phone']}")
     print(f"   Premium: {'Да' if info['premium'] else 'Нет'}")
 
-    # Сохраняем инфу
+    # Save the info
     session_dir = Path(session_path).parent
     phone_clean = info["phone"].replace("+", "").replace(" ", "").replace("-", "")
     info_path = session_dir / f"auth_{phone_clean}_info.json"
@@ -103,7 +103,7 @@ def main():
     api_id = int(sys.argv[3])
     api_hash = sys.argv[4]
 
-    # Создаём директорию
+    # Create the directory
     Path(session_path).parent.mkdir(parents=True, exist_ok=True)
 
     ok = asyncio.run(authorize(phone, session_path, api_id, api_hash))

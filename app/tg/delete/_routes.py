@@ -10,16 +10,16 @@ class _RoutesMixin:
     def _register_route(self, chat_id: str, client, chat, label: str) -> None:
         normalized_chat_id = str(chat_id or "").strip()
 
-        # Fallback: если chat_id пустой, попытаться получить из chat объекта
+        # Fallback: if chat_id is empty, try to get it from the chat object
         if not normalized_chat_id and chat is not None:
             resolved_id = getattr(chat, "id", None)
             if resolved_id is not None:
                 normalized_chat_id = str(resolved_id).strip()
 
-        # Fallback: если chat_id всё ещё пустой, попытаться получить из client
+        # Fallback: if chat_id is still empty, try to get it from the client
         if not normalized_chat_id and client is not None:
             try:
-                # Попытка получить self from client (для основного пользователя)
+                # Try to get self from the client (for the main user)
                 if hasattr(client, "_self") and client._self is not None:
                     resolved_id = getattr(client._self, "id", None)
                     if resolved_id is not None:
@@ -27,7 +27,7 @@ class _RoutesMixin:
             except Exception:
                 pass
 
-        # Если chat_id всё ещё пустой — пропускаем
+        # If chat_id is still empty, skip
         if not normalized_chat_id:
             logger.warning(
                 "Skipping route registration: cannot determine chat_id for label=%s",
@@ -35,7 +35,7 @@ class _RoutesMixin:
             )
             return
 
-        # Проверяем, что объект чата действителен перед регистрацией
+        # Verify the chat object is valid before registering
         if chat is None:
             logger.warning(
                 "Skipping route registration for chat_id=%s: chat object is None",
@@ -54,7 +54,7 @@ class _RoutesMixin:
         if not normalized_chat_id:
             normalized_chat_id = str(self.chat_id)
 
-        # Если chat_id всё ещё пустой или "0" — пробуем использовать self.chat_id из объекта
+        # If chat_id is still empty or "0", try using self.chat_id from the object
         if not normalized_chat_id or normalized_chat_id == "0":
             if self.chat and hasattr(self.chat, "id") and self.chat.id:
                 normalized_chat_id = str(self.chat.id)
@@ -68,7 +68,7 @@ class _RoutesMixin:
 
         routes = self._routes_by_chat_id.get(normalized_chat_id, [])
 
-        # Попытка разрешить чат если роут не найден (используем main client)
+        # Try to resolve the chat if no route was found (using the main client)
         if not routes:
             resolved = await self._resolve_chat_for_main_client(normalized_chat_id)
             if resolved is not None:
@@ -77,7 +77,7 @@ class _RoutesMixin:
                 )
                 routes = self._routes_by_chat_id.get(normalized_chat_id, [])
 
-        # Попытка разрешить чат через все доступные клиенты (если main не сработал)
+        # Try to resolve the chat through all available clients (if main didn't work)
         if not routes:
             all_clients = [self.client]
             for clients_list in self._routes_by_chat_id.values():
@@ -85,7 +85,7 @@ class _RoutesMixin:
                     if c not in all_clients:
                         all_clients.append(c)
 
-            for ca_client in all_clients[:5]:  # Ограничиваем до 5 клиентов
+            for ca_client in all_clients[:5]:  # Limit to 5 clients
                 try:
                     resolved = await self._resolve_chat_for_client(
                         ca_client, normalized_chat_id
@@ -103,7 +103,7 @@ class _RoutesMixin:
                         exc,
                     )
 
-        # Fallback: если в роуте chat=None, попытаться разрешить заново
+        # Fallback: if a route has chat=None, try to resolve it again
         if routes:
             updated_routes = []
             for route_client, route_chat, route_label in routes:
@@ -118,7 +118,7 @@ class _RoutesMixin:
                     if resolved is not None:
                         updated_routes.append((route_client, resolved, route_label))
                     else:
-                        # Пропускаем этот маршрут, если не удалось разрешить чат
+                        # Skip this route if the chat could not be resolved
                         logger.warning(
                             "Could not resolve chat for route with client for chat_id=%s, skipping route",
                             normalized_chat_id,
@@ -126,7 +126,7 @@ class _RoutesMixin:
                 else:
                     updated_routes.append((route_client, route_chat, route_label))
 
-            # Обновляем маршруты только с валидными чатами
+            # Update routes to keep only valid chats
             self._routes_by_chat_id[normalized_chat_id] = updated_routes
             routes = updated_routes
 
@@ -161,7 +161,7 @@ class _RoutesMixin:
             else:
                 resolved_entity = await client.get_entity(normalized_chat_id)
 
-            # Проверяем, что сущность действительна (имеет id)
+            # Verify the entity is valid (has an id)
             if hasattr(resolved_entity, "id") and resolved_entity.id:
                 return resolved_entity
             return None
@@ -183,7 +183,7 @@ class _RoutesMixin:
             else:
                 resolved_entity = await self.client.get_entity(normalized_chat_id)
 
-            # Проверяем, что сущность действительна (имеет id)
+            # Verify the entity is valid (has an id)
             if hasattr(resolved_entity, "id") and resolved_entity.id:
                 return resolved_entity
             return None

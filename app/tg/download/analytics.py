@@ -1,9 +1,9 @@
-"""Единый сборщик блока ``analytics`` для веток выгрузки.
+"""Single builder of the ``analytics`` block for the download branches.
 
-Симметрично `app/tg/upload/analytics.py`: общая обвязка (phase_seconds,
-speed_mbps, bytes, performance, tg_limits) строится один раз, а
-`chunked_download` и `_download_batch_member` передают только измеренные фазы,
-свой ``download_profile`` и переменные значения параллелизма.
+Mirrors `app/tg/upload/analytics.py`: the common scaffolding (phase_seconds,
+speed_mbps, bytes, performance, tg_limits) is built once, while
+`chunked_download` and `_download_batch_member` only pass in their measured
+phases, their own ``download_profile``, and the variable concurrency values.
 """
 
 from __future__ import annotations

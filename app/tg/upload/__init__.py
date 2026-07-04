@@ -1,7 +1,7 @@
-"""Загрузка файлов в Telegram (TgUploader).
+"""Uploading files to Telegram (TgUploader).
 
-Класс разбит на mixin'ы по тому же принципу, что и панели MainWindow
-(app/ui/panels). Здесь — публичный re-export.
+The class is split into mixins following the same principle as the
+MainWindow panels (app/ui/panels). This module is the public re-export.
 """
 
 from __future__ import annotations

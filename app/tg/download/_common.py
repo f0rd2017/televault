@@ -1,4 +1,4 @@
-"""Общие хелперы для пакета download."""
+"""Shared helpers for the download package."""
 
 from __future__ import annotations
 

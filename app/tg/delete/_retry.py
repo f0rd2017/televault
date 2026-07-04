@@ -138,10 +138,10 @@ class _RetryMixin:
                 "Reconnect accounts and verify channel access."
             )
 
-        # Получаем ID чата, который нужен для выполнения удаления
+        # Get the chat ID needed to perform the deletion
         chat_id = getattr(chat, "id", None)
         if chat_id is None:
-            # Пробуем получить ID из chat_id, если объект chat не содержит id
+            # Try to get the ID from chat_id if the chat object doesn't contain one
             chat_id = getattr(self, "chat_id", None)
 
         if chat_id is None:
@@ -164,10 +164,10 @@ class _RetryMixin:
                 ):
                     with attempt:
                         try:
-                            # Используем объект чата напрямую для лучшего разрешения сущностей в Telethon
+                            # Use the chat object directly for better entity resolution in Telethon
                             await client.delete_messages(chat, msg_ids)
                         except Exception as e:
-                            # Fallback для приватных чатов/групп если возникла ошибка "Invalid channel object"
+                            # Fallback for private chats/groups when an "Invalid channel object" error occurs
                             err_str = str(e)
                             if "Invalid channel object" in err_str:
                                 logger.debug(
@@ -179,7 +179,7 @@ class _RetryMixin:
                                 raise
                         return
             except (TypeError, AttributeError, ValueError) as e:
-                # Ошибка типа или значения, которая может возникнуть при попытке удаления с недействительным объектом чата
+                # A type or value error that can happen when trying to delete with an invalid chat object
                 err_str = str(e)
                 if "Invalid channel object" in err_str or "input entity" in err_str:
                     raise RuntimeError(
@@ -194,16 +194,16 @@ class _RetryMixin:
                 raise RuntimeError(f"Invalid channel object for deletion: {e}")
 
             except Exception as e:
-                # Любая другая ошибка, включая RPC ошибки, которые могут указывать на недопустимый тип сущности
+                # Any other error, including RPC errors that may indicate an invalid entity type
                 if "channel object" in str(
                     e
                 ).lower() or "channel entity does not contain an ID" in str(e):
                     logger.error("Invalid channel object for deletion: %s", e)
-                    # Вместо выбрасывания исключения, логируем ошибку и пробрасываем дальше
-                    # чтобы внешний обработчик мог принять решение о частичном результате
+                    # Instead of raising, log the error and re-raise it further up
+                    # so the outer handler can decide on a partial result
                     raise RuntimeError(f"Invalid channel object for deletion: {e}")
                 else:
-                    # Если это другая ошибка, пробрасываем её дальше
+                    # If it's a different error, propagate it further up
                     raise e
             except FloodWaitError as exc:
                 flood_wait_retries += 1
@@ -239,7 +239,7 @@ class _RetryMixin:
         # First, try to get the client's own user entity
         try:
             await client.get_me()
-            # Не используем пользователя для удаления сообщений
+            # Don't use the user entity for deleting messages
             logger.debug("Client's user entity is not suitable for message deletion")
             return None
         except Exception:
@@ -261,10 +261,10 @@ class _RetryMixin:
             logger.warning("Cannot delete message %s: chat object is None", msg_id)
             return False, "chat object is None"
 
-        # Получаем ID чата, который нужен для выполнения удаления
+        # Get the chat ID needed to perform the deletion
         chat_id = getattr(chat, "id", None)
         if chat_id is None:
-            # Пробуем получить ID из chat_id, если объект chat не содержит id
+            # Try to get the ID from chat_id if the chat object doesn't contain one
             chat_id = getattr(self, "chat_id", None)
 
         if chat_id is None:
@@ -288,10 +288,10 @@ class _RetryMixin:
                 ):
                     with attempt:
                         try:
-                            # Используем объект чата напрямую для лучшего разрешения сущностей в Telethon
+                            # Use the chat object directly for better entity resolution in Telethon
                             await client.delete_messages(chat, [int(msg_id)])
                         except Exception as e:
-                            # Fallback для приватных чатов/групп если возникла ошибка "Invalid channel object"
+                            # Fallback for private chats/groups when an "Invalid channel object" error occurs
                             err_str = str(e)
                             if "Invalid channel object" in err_str:
                                 logger.debug(
@@ -318,7 +318,7 @@ class _RetryMixin:
                     "message delete forbidden (no rights to delete this message)",
                 )
             except (TypeError, AttributeError, ValueError) as e:
-                # Ошибка типа или значения, которая может возникнуть при попытке удаления с недействительным объектом чата
+                # A type or value error that can happen when trying to delete with an invalid chat object
                 err_str = str(e)
                 if "Invalid channel object" in err_str or "input entity" in err_str:
                     raise RuntimeError(
@@ -329,7 +329,7 @@ class _RetryMixin:
                 return False, err_str or "invalid channel object"
 
             except Exception as e:
-                # Проверяем, не является ли это ошибкой Invalid channel object
+                # Check whether this is an Invalid channel object error
                 if "Invalid channel object" in str(
                     e
                 ) or "channel entity does not contain an ID" in str(e):
@@ -337,7 +337,7 @@ class _RetryMixin:
                         f"Delete route unusable for msg_id={msg_id}: {e}"
                     ) from e
                 else:
-                    # Если это другая ошибка, пробрасываем её дальше
+                    # If it's a different error, propagate it further up
                     raise e
             except FloodWaitError as exc:
                 flood_wait_retries += 1

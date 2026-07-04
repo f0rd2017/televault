@@ -388,8 +388,8 @@ class _ParallelUploadMixin:
                         )
                         return
             except (ConnectionError, TimeoutError) as exc:
-                # Все ретраи исчерпаны ошибкой соединения — возможно, умер
-                # прокси. Пробуем следующий уровень цепочки (backup→direct).
+                # All retries exhausted with a connection error — the proxy may
+                # have died. Try the next level in the chain (backup->direct).
                 await self._on_persistent_connection_failure(effective_client, exc)
                 raise
             except FloodWaitError as exc:

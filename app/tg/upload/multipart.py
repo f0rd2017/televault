@@ -135,7 +135,7 @@ class _MultipartUploadMixin:
         transfer_started = time.monotonic()
         upload_ok = False
 
-        # Логирование системных метрик при старте upload
+        # Log system metrics at upload start
         _proc = psutil.Process()
         _mem = psutil.virtual_memory()
         logger.info(

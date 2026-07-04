@@ -65,19 +65,13 @@ def run() -> int:
 
     from PySide6.QtCore import QTranslator
 
+    from app.core.i18n import i18n_dir, install_language, saved_language
+
     translator = QTranslator(app)
-    # Для Proof-of-Concept загружаем дефолтный или системный язык
-    # Можно использовать QSettings для сохранения выбора
-    from PySide6.QtCore import QSettings
-
-    settings = QSettings("TGCCM", "App")
-    lang = settings.value("language", "ru_RU")
-
-    i18n_path = Path(__file__).resolve().parent / "i18n"
-    if translator.load(f"{lang}.qm", str(i18n_path)):
-        app.installTranslator(translator)
-    app.tg_translator = translator  # сохраним для смены языка на лету
-    app.i18n_path = i18n_path
+    lang = saved_language()
+    install_language(app, lang, translator)
+    app.tg_translator = translator  # kept around so the UI can retranslate on the fly
+    app.i18n_path = i18n_dir()
 
     apply_theme(app)
     icon_path = _resolve_app_icon_path()

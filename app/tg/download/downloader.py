@@ -145,7 +145,7 @@ class TgDownloader(
             max_rate=max(get_rate, get_rate * 4.0),
             window_sec=get_window,
         )
-        # Лимит полосы скачивания (МБ/с), общий на инстанс. 0 = без лимита.
+        # Download bandwidth limit (MB/s), shared across the instance. 0 = no limit.
         self._download_bandwidth = BandwidthLimiter(
             float(getattr(self.config, "download_throttle_mbps", 0.0))
         )
@@ -162,22 +162,22 @@ class TgDownloader(
         cancel_token: CancelToken | None = None,
         prefix_bytes: dict[int, int] | None = None,
     ) -> dict[int, str]:
-        """Скачать и расшифровать ТОЛЬКО указанные части в ``cache_dir`` (стрим,
-        инкремент 9/10). Возвращает ``{part_index: путь к plaintext part-файлу}``.
-        Уже закэшированные части переиспользует — перемотка видео не качает их
-        заново. Переиспользует обычную инфраструктуру маршрутов/скачивания/дешифра,
-        движок передачи не меняет.
+        """Download and decrypt ONLY the requested parts into ``cache_dir`` (streaming,
+        increment 9/10). Returns ``{part_index: path to the decrypted plaintext part file}``.
+        Already-cached parts are reused — seeking within a video doesn't re-download
+        them. Reuses the regular route/download/decrypt infrastructure; the transfer
+        engine is unchanged.
 
-        ``prefix_bytes`` (опционально): ``{part_index: сколько байт от начала
-        части реально нужно прямо сейчас}``. Части могут весить сотни МБ — без
-        этого плеер ждал бы, пока скачается ВСЯ часть, хотя текущему окну стрима
-        нужен лишь небольшой отрезок в её начале. Работает только для
-        НЕзашифрованных объектов (тогда plaintext совпадает с сырыми байтами
-        сообщения — можно читать префикс без полной расшифровки части целиком).
-        Уже скачанный на диск отрезок ДОРАСТАЕТ до нужной длины (докачивается
-        только недостающий хвост), а не перекачивается с нуля. При включённом
-        шифровании (или если part_index не упомянут в prefix_bytes) часть
-        скачивается целиком, как раньше."""
+        ``prefix_bytes`` (optional): ``{part_index: how many bytes from the start
+        of the part are actually needed right now}``. Parts can be hundreds of MB —
+        without this, the player would wait for the ENTIRE part to download even
+        though the current stream window only needs a small chunk at its start.
+        This only works for UNencrypted objects (in which case the plaintext
+        matches the message's raw bytes, so the prefix can be read without fully
+        decrypting the whole part). A segment already downloaded to disk is GROWN
+        to the required length (only the missing tail is fetched) rather than
+        re-downloaded from scratch. With encryption enabled (or if part_index isn't
+        listed in prefix_bytes), the part is downloaded in full, as before."""
         import os
         import uuid
         from pathlib import Path
@@ -245,12 +245,13 @@ class TgDownloader(
             need_fetch + [part for part, _ in need_prefix]
         )
 
-        # Части окна скачиваем ПАРАЛЛЕЛЬНО (а не одну за другой) — плеер ждёт,
-        # пока весь диапазон не окажется на диске, и последовательная загрузка
-        # напрямую складывалась в задержку первого кадра/буферизацию. Бюджет
-        # TG-соединений (обычно занят частями через part_concurrency в обычной
-        # закачке) здесь целиком свободен — стрим качает только одно окно за
-        # раз, — поэтому делим его между конкурентными частями этого окна.
+        # Download the window's parts in PARALLEL (not one after another) — the
+        # player waits for the whole range to land on disk, and sequential
+        # downloading directly translated into first-frame delay/buffering. The
+        # TG connection budget (normally occupied by parts via part_concurrency
+        # during a regular download) is entirely free here — streaming only
+        # downloads one window at a time — so we split it across this window's
+        # concurrent parts.
         total_jobs = len(need_fetch) + len(need_prefix)
         concurrency = max(1, min(total_jobs, self._download_part_concurrency_cap))
         semaphore = asyncio.Semaphore(concurrency)
@@ -267,12 +268,13 @@ class TgDownloader(
                         f"msg_id={part.msg_id}"
                     )
                 dl_client, dl_chat, msg, _label = route
-                # Уникальные temp-файлы на каждый запрос: параллельные Range-соединения
-                # FFmpeg (особенно .avi — заголовок в начале + индекс в конце) тянут
-                # одни и те же части ОДНОВРЕМЕННО. С общими именами part_*.bin/.enc они
-                # затирали друг друга, а полуготовый .bin виделся как валидный кэш.
-                # Качаем во временный файл и публикуем готовую часть атомарно через
-                # os.replace (last-writer-wins, содержимое идентично — конфликта нет).
+                # Unique temp files per request: FFmpeg's parallel Range connections
+                # (especially for .avi — header at the start + index at the end) pull
+                # the same parts SIMULTANEOUSLY. With shared part_*.bin/.enc names they
+                # would clobber each other, and a half-written .bin would look like a
+                # valid cache entry. We download into a temp file and publish the
+                # finished part atomically via os.replace (last-writer-wins is fine —
+                # the content is identical, so there's no real conflict).
                 uniq = f"{os.getpid()}_{uuid.uuid4().hex}"
                 tmp_bin = cache / f"part_{int(part.part_index):08d}.{uniq}.bin.tmp"
                 tmp_enc = cache / f"part_{int(part.part_index):08d}.{uniq}.enc.tmp"
@@ -312,10 +314,11 @@ class TgDownloader(
                         f"msg_id={part.msg_id}"
                     )
                 dl_client, _dl_chat, msg, _label = route
-                # Одна и та же часть может расти по нескольким последовательным
-                # окнам стрима (плеер продвигается по времени) — лочим по файлу,
-                # чтобы основной запрос и фоновый prefetch не растили один и тот
-                # же файл параллельно (иначе оба truncate/seek друг друга ломают).
+                # The same part can grow across several consecutive stream windows
+                # (as the player advances through time) — we lock per file so the
+                # main request and a background prefetch don't grow the same file
+                # in parallel (otherwise their truncate/seek calls would clobber
+                # each other).
                 lock_key = str(out_path)
                 lock = self._stream_prefix_locks.setdefault(lock_key, asyncio.Lock())
                 async with lock:

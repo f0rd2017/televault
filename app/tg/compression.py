@@ -1,9 +1,10 @@
-"""Сжатие и архивация для пути загрузки.
+"""Compression and archiving for the upload path.
 
-Чистые синхронные функции (запускаются через ``asyncio.to_thread`` из
-``TgUploader``): быстрый zip одиночного файла (с MT-бэкендом 7z, если доступен),
-эвристики «сжимать ли», и сборка прозрачного STORED-архива для батча мелких
-файлов. Никакого состояния — только переданные аргументы и токен отмены.
+Pure synchronous functions (run via ``asyncio.to_thread`` from
+``TgUploader``): fast single-file zip (with the MT 7z backend, if available),
+"should we compress" heuristics, and building a transparent STORED archive
+for a batch of small files. No state — only the passed-in arguments and the
+cancel token.
 """
 
 from __future__ import annotations

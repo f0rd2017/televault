@@ -1,4 +1,4 @@
-"""Публичные шар-ссылки и локальная медиа-раздача REST API."""
+"""Public share links and local media serving for the REST API."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ def _transcode_requested(query: dict[str, list[str]]) -> bool:
 logger = logging.getLogger(__name__)
 
 
-# ── Шар-ссылки ───────────────────────────────────────────────────────────────
+# ── Share links ──────────────────────────────────────────────────────────────
 
 
 def _share_public_url(ctx: ApiContext, token: str) -> str:
@@ -39,7 +39,9 @@ def _share_public_url(ctx: ApiContext, token: str) -> str:
         return f"/share/{token}"
     host = str(getattr(api, "host", "127.0.0.1") or "127.0.0.1")
     if host in {"0.0.0.0", "::"}:
-        host = "127.0.0.1"  # для отображения — реальный внешний адрес знает юзер
+        host = (
+            "127.0.0.1"  # for display only — the user knows the real external address
+        )
     return f"http://{host}:{int(getattr(api, 'port', 0))}/share/{token}"
 
 
@@ -107,8 +109,8 @@ def _handle_list_shares(ctx: ApiContext) -> dict[str, Any]:
 
 
 def _resolve_share(ctx: ApiContext, token: str, password: str) -> dict[str, Any]:
-    """Проверить токен/отзыв/срок/пароль. Возвращает запись share или бросает
-    ApiError. Чистая (без сокетов) — тестируется напрямую."""
+    """Check the token/revocation/expiry/password. Returns the share record or
+    raises ApiError. Pure (no sockets) — can be tested directly."""
     share = ctx.repo.get_share(token)
     if share is None:
         raise ApiError(404, "Share not found")
@@ -125,8 +127,9 @@ def _resolve_share(ctx: ApiContext, token: str, password: str) -> dict[str, Any]
 
 
 def _ensure_share_file(ctx: ApiContext, share: dict[str, Any]) -> str | None:
-    """Путь к собранному файлу: сперва ищем уже скачанный, иначе собираем из
-    чанков через worker (блокирующе). None — собрать не удалось."""
+    """Path to the assembled file: first look for an already-downloaded one,
+    otherwise assemble it from chunks via the worker (blocking). None means
+    assembly failed."""
     folder = str(share["folder_path"])
     file_key = str(share["file_key"])
     orig_name = str(share["orig_name"])
@@ -140,7 +143,7 @@ def _ensure_share_file(ctx: ApiContext, share: dict[str, Any]) -> str | None:
                 return str(local)
         except Exception:  # noqa: BLE001
             pass
-    # Уже собран ранее в share-кэше? Не пересобираем на повторных запросах.
+    # Already assembled earlier into the share cache? Don't rebuild on repeat requests.
     if ctx.share_dir:
         try:
             cached = build_safe_output_path(ctx.share_dir, folder, orig_name)
@@ -156,21 +159,24 @@ def _ensure_share_file(ctx: ApiContext, share: dict[str, Any]) -> str | None:
 
 
 def _build_stream_layout(ctx: ApiContext, share: dict[str, Any]):
-    """Попытаться построить раскладку частей для стрима без полного скачивания.
+    """Try to build a part layout for streaming without a full download.
 
-    Возвращает ``StreamLayout`` или ``None`` (тогда раздача откатится на полную
-    сборку файла). Стрим возможен только для чанкованных объектов с известными
-    размерами частей; batch-member (мелкие файлы в blob), неполные/несвязные
-    объекты, отсутствие worker/config — всё уходит в None. Любая ошибка → None
-    (раздача всё равно отдаст файл целиком).
+    Returns a ``StreamLayout`` or ``None`` (in which case serving falls back to
+    a full file assembly). Streaming is only possible for chunked objects with
+    known part sizes; batch members (small files packed into a blob),
+    incomplete/inconsistent objects, or a missing worker/config all fall
+    through to None. Any error also falls back to None (the file will still be
+    served in full).
 
-    Контейнеры с индексом в хвосте (AVI/ASF/WMV/FLV/MPEG-PS) сюда НЕ фильтруются
-    намеренно: детектор (см. _is_non_streamable_container) сам вынужден качать
-    целую первую часть ради 64КБ заголовка, а полная пересборка как фолбэк
-    синхронно блокирует HTTP-ответ на десятки секунд для крупных файлов — плеер
-    не дожидается и рвёт соединение (таймаут), картинка вообще не появляется.
-    Частичный Range-стрим на практике у таких файлов работает нормально —
-    демуксер сам сикает куда нужно, сервер отдаёт любой запрошенный диапазон."""
+    Containers with a trailing index (AVI/ASF/WMV/FLV/MPEG-PS) are
+    intentionally NOT filtered out here: the detector (see
+    _is_non_streamable_container) would itself have to download the entire
+    first part just to inspect a 64KB header, and falling back to full
+    assembly synchronously blocks the HTTP response for tens of seconds on
+    large files — the player gives up and drops the connection (timeout)
+    before any picture even appears. In practice, partial Range streaming
+    works fine for such files anyway — the demuxer seeks wherever it needs,
+    and the server serves whatever range is requested."""
     if ctx.worker is None or not ctx.share_dir or ctx.config is None:
         return None
     if not hasattr(ctx.worker, "fetch_stream_parts_blocking"):
@@ -182,7 +188,7 @@ def _build_stream_layout(ctx: ApiContext, share: dict[str, Any]):
 
         storage = str(ctx.repo.resolve_object_storage(folder, file_key)).strip().lower()
         if storage == "batch_member":
-            return None  # мелкий файл в общем blob — собираем целиком, дёшево
+            return None  # small file inside a shared blob — cheap to assemble whole
         parts = ctx.repo.get_parts_for_object(folder_path=folder, file_key=file_key)
         caption_prefix = str(getattr(ctx.config, "caption_prefix", "FC1|"))
         try:
@@ -203,8 +209,8 @@ def _handle_serve_share(
         mimetypes.guess_type(str(share["orig_name"]))[0] or "application/octet-stream"
     )
 
-    # ?transcode=1 — пересобрать в fragmented MP4 на лету (не-нативный формат).
-    # ffmpeg читает исходник с этого же сервера по обычному пути раздачи.
+    # ?transcode=1 — repackage into fragmented MP4 on the fly (non-native format).
+    # ffmpeg reads the source from this same server via the normal serving path.
     if _transcode_requested(query):
         input_query = {"pw": password} if password else {}
         return TranscodeResponse(
@@ -213,7 +219,7 @@ def _handle_serve_share(
             filename=str(share["orig_name"]),
         )
 
-    # Путь A — настоящий стрим: качаем только нужные части по Range.
+    # Path A — real streaming: download only the parts needed for the range.
     layout = _build_stream_layout(ctx, share)
     if layout is not None:
         from pathlib import Path
@@ -229,7 +235,8 @@ def _handle_serve_share(
             cache_dir=cache_dir,
         )
 
-    # Путь B — фолбэк: собрать файл целиком и отдать (тоже с Range, но после сборки).
+    # Path B — fallback: assemble the whole file and serve it (still with Range,
+    # but only after assembly).
     path = _ensure_share_file(ctx, share)
     if not path:
         raise ApiError(503, "File could not be assembled from storage")
@@ -240,22 +247,23 @@ def _handle_serve_share(
 
 
 def _mp4_needs_full_assembly(head: bytes) -> bool:
-    """True, если в начале MP4/MOV первым крупным боксом идёт ``mdat`` (``moov`` в
-    хвосте) — частичный Range-стрим отдаёт mdat без индекса, видеодорожка не
-    собирается. False для faststart (``moov`` раньше ``mdat``)."""
+    """True if, at the start of an MP4/MOV, the first large box is ``mdat``
+    (``moov`` at the tail) — a partial Range stream then serves mdat without
+    the index, so the video track can't be assembled. False for faststart
+    files (``moov`` before ``mdat``)."""
     moov_pos = head.find(b"moov")
     mdat_pos = head.find(b"mdat")
     return mdat_pos != -1 and (moov_pos == -1 or mdat_pos < moov_pos)
 
 
-# Контейнеры с индексом в хвосте файла — теоретически частичный Range-стрим им
-# может ломать видеодорожку (демуксер сикает в конец за индексом). На практике
-# для реальных файлов это не подтвердилось, а фолбэк (полная сборка) синхронно
-# блокирует HTTP-ответ и рвёт плеер по таймауту на крупных файлах — то есть хуже
-# исходной проблемы. _is_non_streamable_container ниже НЕ вызывается из раздачи
-# (см. _build_stream_layout) — оставлено как готовый детектор на случай, если
-# для какого-то формата понадобится не блокирующий, а асинхронный/предзаборный
-# фолбэк.
+# Containers with a trailing index — in theory a partial Range stream could
+# break their video track (the demuxer seeks to the end for the index). In
+# practice this hasn't been confirmed on real files, and the fallback (full
+# assembly) synchronously blocks the HTTP response and causes the player to
+# time out on large files — which is worse than the original problem.
+# _is_non_streamable_container below is NOT called from the serving path (see
+# _build_stream_layout) — it's kept as a ready-made detector in case some
+# format later needs a non-blocking, async/prefetch-based fallback.
 _NON_STREAMABLE_EXT = (
     ".avi",
     ".flv",
@@ -276,10 +284,11 @@ def _is_non_streamable_container(
     orig_name: str,
     ext_fallback: tuple[str, ...],
 ) -> bool:
-    """True для контейнеров с индексом в хвосте файла (AVI/ASF/WMV/FLV/MPEG-PS) —
-    их частичный Range-стрим ломает видеодорожку. Контейнер определяем по сигнатуре
-    первых байт part 0 (а не по расширению: файл может быть MP4 с именем .avi);
-    если part 0 прочитать не удалось — откатываемся на эвристику по расширению."""
+    """True for containers with a trailing index (AVI/ASF/WMV/FLV/MPEG-PS) —
+    their partial Range stream breaks the video track. The container is
+    detected from the byte signature of part 0's head (not the extension: a
+    file could be an MP4 named .avi); if part 0 can't be read, fall back to
+    the extension heuristic."""
     try:
         from pathlib import Path
 
@@ -298,10 +307,10 @@ def _is_non_streamable_container(
 
     if head[4:8] == b"ftyp" or head[:4] == b"\x1a\x45\xdf\xa3":
         if head[:4] == b"\x1a\x45\xdf\xa3":
-            return False  # Matroska/WebM — стримится по Range
+            return False  # Matroska/WebM — streams fine over Range
         if _mp4_needs_full_assembly(head):
-            return True  # moov в хвосте — частичный Range ломает видео
-        return False  # faststart MP4/MOV — стримится по Range
+            return True  # moov at the tail — partial Range breaks the video
+        return False  # faststart MP4/MOV — streams fine over Range
     if head[:4] == b"RIFF" and head[8:12] == b"AVI ":
         return True
     if head[:4] == b"\x30\x26\xb2\x75":  # ASF/WMV
@@ -316,10 +325,11 @@ def _is_non_streamable_container(
 def _handle_local_media(
     ctx: ApiContext, query: dict[str, list[str]]
 ) -> FileResponse | StreamResponse | TranscodeResponse:
-    """Локальный просмотр объекта без полного скачивания (для GUI). Требует
-    api-токен. Стримит по Range только нужные части; для batch-member/неполных
-    объектов откатывается на полную сборку. ``transcode=1`` — пересобрать в
-    fragmented MP4 на лету (для форматов, которые плеер не берёт нативно)."""
+    """Local object viewing without a full download (for the GUI). Requires an
+    API token. Streams over Range for only the needed parts; falls back to a
+    full assembly for batch members/incomplete objects. ``transcode=1``
+    repackages into fragmented MP4 on the fly (for formats the player can't
+    play natively)."""
     folder = _first(query, "folder")
     file_key = _first(query, "file_key")
     if not folder or not file_key:
@@ -339,9 +349,10 @@ def _handle_local_media(
         )
     parts = ctx.repo.get_parts_for_object(folder_path=folder, file_key=file_key)
     if not parts:
-        # Мелкие файлы хранятся как batch-member (в общем blob, без частей в
-        # msg_index) — у них нет «частей», поэтому стрим невозможен. Не 404-им,
-        # а собираем файл целиком из blob и отдаём (Path B).
+        # Small files are stored as batch members (packed into a shared blob,
+        # with no parts in msg_index) — they have no "parts", so streaming isn't
+        # possible. Instead of a 404, assemble the whole file from the blob and
+        # serve it (Path B).
         obj = _lookup_object(ctx, folder, file_key)
         if obj is None:
             raise ApiError(404, "Object not found")
@@ -370,10 +381,10 @@ def _handle_local_media(
     }
     content_type = mimetypes.guess_type(orig_name)[0] or "application/octet-stream"
 
-    # Путь A — стрим: качаем только перекрытые Range части. Контейнеры с индексом
-    # в хвосте файла (AVI/ASF/WMV/FLV/MPEG-PS, не-faststart MP4) сюда не попадают —
-    # _build_stream_layout уже отсеивает их через _layout_is_streamable, возвращая
-    # None, и раздача откатывается на Путь B ниже.
+    # Path A — streaming: download only the parts overlapping the range.
+    # Containers with a trailing index (AVI/ASF/WMV/FLV/MPEG-PS, non-faststart
+    # MP4) don't reach here — _build_stream_layout already filters them out via
+    # _layout_is_streamable, returning None, and serving falls back to Path B below.
     layout = _build_stream_layout(ctx, pseudo)
     if layout is not None:
         from pathlib import Path
@@ -389,7 +400,7 @@ def _handle_local_media(
             cache_dir=cache_dir,
         )
 
-    # Путь B — фолбэк: собрать файл целиком (мелкий/неполный) и отдать с Range.
+    # Path B — fallback: assemble the whole file (small/incomplete) and serve it with Range.
     path = _ensure_share_file(ctx, pseudo)
     if not path:
         raise ApiError(503, "File could not be assembled from storage")
