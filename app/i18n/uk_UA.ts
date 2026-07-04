@@ -1,6 +1,29 @@
 <?xml version='1.0' encoding='utf-8'?>
 <TS version="2.1" language="uk_UA">
 <context>
+    <name />
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="86" />
+        <source>Complete</source>
+        <translation>Повний</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="87" />
+        <source>Not fully uploaded</source>
+        <translation>Не довантажено</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="88" />
+        <source>Account offline</source>
+        <translation>Акаунт офлайн</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="89" />
+        <source>Damaged (a part was lost)</source>
+        <translation>Пошкоджено (частину втрачено)</translation>
+    </message>
+</context>
+<context>
     <name>AccountsDialog</name>
     <message>
         <location filename="../ui/dialogs/_accounts.py" line="180" />
@@ -347,6 +370,400 @@ The session will be deleted.</source>
     </message>
 </context>
 <context>
+    <name>ExplorerGridModel</name>
+    <message>
+        <location filename="../ui/models_qt/__init__.py" line="649" />
+        <source>⚠ not fully downloaded</source>
+        <translation>⚠ не повністю завантажено</translation>
+    </message>
+    <message>
+        <location filename="../ui/models_qt/__init__.py" line="651" />
+        <source>☁ account offline</source>
+        <translation>☁ акаунт офлайн</translation>
+    </message>
+    <message>
+        <location filename="../ui/models_qt/__init__.py" line="653" />
+        <source>✖ damaged</source>
+        <translation>✖ пошкоджено</translation>
+    </message>
+</context>
+<context>
+    <name>ExplorerPanelMixin</name>
+    <message>
+        <location filename="../ui/panels/explorer_panel.py" line="220" />
+        <source>Restore</source>
+        <translation>Відновити</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/explorer_panel.py" line="221" />
+        <source>Delete forever</source>
+        <translation>Видалити назавжди</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/explorer_panel.py" line="223" />
+        <location filename="../ui/panels/explorer_panel.py" line="305" />
+        <source>Empty trash</source>
+        <translation>Очистити кошик</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/explorer_panel.py" line="240" />
+        <source>Open without downloading</source>
+        <translation>Відкрити без завантаження</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/explorer_panel.py" line="244" />
+        <source>Edit</source>
+        <translation>Редагувати</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/explorer_panel.py" line="249" />
+        <source>Move to trash</source>
+        <translation>Перемістити в кошик</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/explorer_panel.py" line="252" />
+        <source>Share link</source>
+        <translation>Поділитися посиланням</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/explorer_panel.py" line="253" />
+        <location filename="../ui/panels/explorer_panel.py" line="452" />
+        <source>Rename</source>
+        <translation>Перейменувати</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/explorer_panel.py" line="254" />
+        <location filename="../ui/panels/explorer_panel.py" line="285" />
+        <source>Properties</source>
+        <translation>Властивості</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/explorer_panel.py" line="271" />
+        <source>Open '{0}'</source>
+        <translation>Відкрити «{0}»</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/explorer_panel.py" line="273" />
+        <source>Download folder '{0}'</source>
+        <translation>Скачати папку «{0}»</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/explorer_panel.py" line="276" />
+        <source>Sync '{0}'</source>
+        <translation>Синхронізувати «{0}»</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/explorer_panel.py" line="278" />
+        <source>Auto-sync</source>
+        <translation>Автосинхронізація</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/explorer_panel.py" line="283" />
+        <source>Delete folder '{0}'</source>
+        <translation>Видалити папку «{0}»</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/explorer_panel.py" line="687" />
+        <location filename="../ui/panels/explorer_panel.py" line="712" />
+        <source>View</source>
+        <translation>Перегляд</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/explorer_panel.py" line="689" />
+        <source>Could not start the local server for viewing without downloading.</source>
+        <translation>Не вдалося запустити локальний сервер для перегляду без завантаження.</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/explorer_panel.py" line="731" />
+        <location filename="../ui/panels/explorer_panel.py" line="746" />
+        <location filename="../ui/panels/explorer_panel.py" line="761" />
+        <location filename="../ui/panels/explorer_panel.py" line="786" />
+        <source>Editor</source>
+        <translation>Редактор</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/explorer_panel.py" line="733" />
+        <source>File is too large for the editor: {size} MB (limit {limit} MB).</source>
+        <translation>Файл завеликий для редактора: {size} МБ (ліміт {limit} МБ).</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/explorer_panel.py" line="747" />
+        <source>Could not start the local server to open the file.</source>
+        <translation>Не вдалося запустити локальний сервер для відкриття файлу.</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/explorer_panel.py" line="787" />
+        <source>Could not save the file:
+{0}</source>
+        <translation>Не вдалося зберегти файл:
+{0}</translation>
+    </message>
+</context>
+<context>
+    <name>FilePropertiesDialog</name>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="120" />
+        <source>Properties — {0}</source>
+        <translation>Властивості — {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="134" />
+        <source>Name:</source>
+        <translation>Ім'я:</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="135" />
+        <source>Folder:</source>
+        <translation>Папка:</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="136" />
+        <source>Key:</source>
+        <translation>Ключ:</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="137" />
+        <source>Size:</source>
+        <translation>Розмір:</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="140" />
+        <source>Parts:</source>
+        <translation>Частини:</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="144" />
+        <source>Status:</source>
+        <translation>Стан:</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="150" />
+        <source>SHA-256:</source>
+        <translation>SHA-256:</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="155" />
+        <source>Part</source>
+        <translation>Частина</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="156" />
+        <source>Size</source>
+        <translation>Розмір</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="157" />
+        <source>Account / chat</source>
+        <translation>Акаунт / чат</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="158" />
+        <source>msg_id</source>
+        <translation>msg_id</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="159" />
+        <source>Status</source>
+        <translation>Стан</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="175" />
+        <source>lost</source>
+        <translation>втрачено</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="177" />
+        <source>offline</source>
+        <translation>офлайн</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="179" />
+        <source>ok</source>
+        <translation>ок</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="195" />
+        <source>Note about this file…</source>
+        <translation>Нотатка до файлу…</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="197" />
+        <source>Note:</source>
+        <translation>Нотатка:</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="203" />
+        <source>Save note</source>
+        <translation>Зберегти нотатку</translation>
+    </message>
+</context>
+<context>
+    <name>FolderPropertiesDialog</name>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="366" />
+        <source>Folder Properties — {0}</source>
+        <translation>Властивості папки — {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="371" />
+        <source>Name:</source>
+        <translation>Ім'я:</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="375" />
+        <source>Path:</source>
+        <translation>Шлях:</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="377" />
+        <source>Subfolders:</source>
+        <translation>Підпапок:</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="379" />
+        <source>{0} (total: {1})</source>
+        <translation>{0} (всього: {1})</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="384" />
+        <source>Files:</source>
+        <translation>Файлів:</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="385" />
+        <source>Total size:</source>
+        <translation>Загальний розмір:</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="400" />
+        <source>Enabled</source>
+        <translation>Увімкнено</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="400" />
+        <source>Disabled</source>
+        <translation>Вимкнено</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="404" />
+        <source>Auto-sync:</source>
+        <translation>Автосинхронізація:</translation>
+    </message>
+</context>
+<context>
+    <name>ImageViewerWindow</name>
+    <message>
+        <location filename="../ui/media_viewer.py" line="141" />
+        <source>Loading…</source>
+        <translation>Завантаження…</translation>
+    </message>
+    <message>
+        <location filename="../ui/media_viewer.py" line="160" />
+        <source>Buffering…</source>
+        <translation>Буферизація…</translation>
+    </message>
+    <message>
+        <location filename="../ui/media_viewer.py" line="167" />
+        <source>Loading error: {0}</source>
+        <translation>Помилка завантаження: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/media_viewer.py" line="180" />
+        <source>The file is empty.</source>
+        <translation>Файл порожній.</translation>
+    </message>
+    <message>
+        <location filename="../ui/media_viewer.py" line="216" />
+        <source>Converting format...</source>
+        <translation>Конвертація формату...</translation>
+    </message>
+    <message>
+        <location filename="../ui/media_viewer.py" line="254" />
+        <source>Failed to load the converted image.</source>
+        <translation>Не вдалося завантажити конвертоване зображення.</translation>
+    </message>
+    <message>
+        <location filename="../ui/media_viewer.py" line="259" />
+        <source>This image format is not supported by the built-in viewer.</source>
+        <translation>Цей формат зображення не підтримується вбудованим переглядачем.</translation>
+    </message>
+    <message>
+        <location filename="../ui/media_viewer.py" line="281" />
+        <source>Open in external application</source>
+        <translation>Відкрити у зовнішній програмі</translation>
+    </message>
+</context>
+<context>
+    <name>JobEventsMixin</name>
+    <message>
+        <location filename="../ui/panels/job_events.py" line="371" />
+        <source>Operation completed</source>
+        <translation>Операцію завершено</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/job_events.py" line="395" />
+        <source>Operation completed with errors</source>
+        <translation>Операцію завершено з помилками</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/job_events.py" line="862" />
+        <source>Some tasks appear stalled; try cancelling and starting again</source>
+        <translation>Схоже, деякі завдання зависли; спробуйте скасувати і почати знову</translation>
+    </message>
+</context>
+<context>
+    <name>JobToastCard</name>
+    <message>
+        <location filename="../ui/job_toasts.py" line="50" />
+        <location filename="../ui/job_toasts.py" line="93" />
+        <source>Queued</source>
+        <translation>У черзі</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_toasts.py" line="94" />
+        <source>Starting…</source>
+        <translation>Запуск…</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_toasts.py" line="95" />
+        <source>In progress…</source>
+        <translation>У процесі…</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_toasts.py" line="96" />
+        <source>Done</source>
+        <translation>Готово</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_toasts.py" line="97" />
+        <source>Error: {0}</source>
+        <translation>Помилка: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_toasts.py" line="98" />
+        <source>unknown</source>
+        <translation>невідомо</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_toasts.py" line="100" />
+        <source>Cancelled</source>
+        <translation>Скасовано</translation>
+    </message>
+</context>
+<context>
+    <name>JobToastOverlay</name>
+    <message>
+        <location filename="../ui/job_toasts.py" line="172" />
+        <source>Processes</source>
+        <translation>Процеси</translation>
+    </message>
+    <message>
+        <location filename="../ui/job_toasts.py" line="177" />
+        <source>Clear completed</source>
+        <translation>Очистити завершені</translation>
+    </message>
+</context>
+<context>
     <name>MainWindow</name>
     <message>
         <location filename="../ui/window_main.py" line="206" />
@@ -676,6 +1093,226 @@ They will be cancelled on exit.</source>
         <location filename="../ui/window_main.py" line="1008" />
         <source>Shutting down…</source>
         <translation>Завершення роботи…</translation>
+    </message>
+</context>
+<context>
+    <name>MiscMixin</name>
+    <message>
+        <location filename="../ui/panels/misc.py" line="47" />
+        <source>Create folder</source>
+        <translation>Створити папку</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="79" />
+        <source>Settings</source>
+        <translation>Налаштування</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="97" />
+        <source>Apply changes</source>
+        <translation>Застосувати зміни</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="99" />
+        <source>The account list has changed. Changes will only take effect after reconnecting to Telegram.
+
+Reconnect now?</source>
+        <translation>Список акаунтів змінився. Зміни набудуть чинності лише після перепідключення до Telegram.
+
+Перепідключитися зараз?</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="129" />
+        <source>Restarting Telegram connection</source>
+        <translation>Перепідключення до Telegram</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="130" />
+        <source>Restarting Telegram connection…</source>
+        <translation>Перепідключення до Telegram…</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="133" />
+        <source>Restarting the Telegram connection…</source>
+        <translation>Перепідключення до Telegram…</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="150" />
+        <source>Loading data…</source>
+        <translation>Завантаження даних…</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="155" />
+        <source>Telegram connected</source>
+        <translation>Telegram підключено</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="156" />
+        <source>Telegram connected and ready</source>
+        <translation>Telegram підключено і готово до роботи</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="223" />
+        <source>Telegram disconnected</source>
+        <translation>Telegram відключено</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="225" />
+        <source>Connection error: {0}</source>
+        <translation>Помилка підключення: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="230" />
+        <source>Telegram connection error</source>
+        <translation>Помилка підключення до Telegram</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="233" />
+        <source>Reconnecting ({0}/4)</source>
+        <translation>Перепідключення ({0}/4)</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="235" />
+        <source>Reconnecting (attempt {0}/4)…</source>
+        <translation>Перепідключення (спроба {0}/4)…</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="239" />
+        <source>Reconnecting to Telegram ({0}/4)…</source>
+        <translation>Перепідключення до Telegram ({0}/4)…</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="258" />
+        <source>Accounts active for uploading: {active}/{total} — uploading in parallel across {active}.</source>
+        <translation>Акаунтів для завантаження активно: {active}/{total} — паралельне завантаження по {active}.</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="268" />
+        <source>⚠ Upload is using {active} of {total} accounts</source>
+        <translation>⚠ Завантаження використовує {active} із {total} акаунтів</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="274" />
+        <source>⚠ {active}/{total} accounts active. Can't see their channel: {names}. These accounts' channels aren't scanned: their files won't appear in the list, and uploads run with fewer threads. Check whether these accounts have joined their channels.</source>
+        <translation>⚠ Активні {active}/{total} акаунтів. Не бачать свій канал: {names}. Канали цих акаунтів не скануються: їхні файли не відображаються у списку, а завантаження йде меншою кількістю потоків. Перевірте, чи вступили ці акаунти у свої канали.</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="282" />
+        <source>Not all accounts are being used</source>
+        <translation>Не всі акаунти задіяні</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="284" />
+        <source>{active} of {total} accounts are active for uploading.
+
+Can't see their channel:
+{names}
+
+Reason: the account isn't a member of the specified channel. While the channel is unreachable, it isn't scanned: files already uploaded to it are temporarily NOT shown in the list (they aren't deleted — they'll come back once access is restored). Uploads run with fewer threads.
+
+Sign in to these channels with these accounts (or auto-join via the invite link will kick in on the next reconnect).</source>
+        <translation>Для завантаження активно {active} із {total} акаунтів.
+
+Не бачать свій канал:
+{names}
+
+Причина — акаунт не є учасником вказаного каналу. Поки канал недоступний, він не сканується: завантажені в нього файли тимчасово НЕ відображаються у списку (вони не видалені — повернуться після відновлення доступу). Завантаження йде меншою кількістю потоків.
+
+Увійдіть цими акаунтами у свої канали (або спрацює авто-вступ за інвайт-посиланням під час наступного перепідключення).</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="491" />
+        <source>Operation error</source>
+        <translation>Помилка операції</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="492" />
+        <source>Task #{0} ({1}) failed with an error:
+{2}</source>
+        <translation>Завдання #{0} ({1}) завершилося з помилкою:
+{2}</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="498" />
+        <source>{0} operations failed:</source>
+        <translation>{0} операцій завершилися з помилкою:</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="502" />
+        <source>... and {0} more</source>
+        <translation>... і ще {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="503" />
+        <source>Multiple errors</source>
+        <translation>Численні помилки</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="516" />
+        <source>Create subfolder in '{0}'</source>
+        <translation>Створити підпапку в «{0}»</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="520" />
+        <source>Download folder '{0}'</source>
+        <translation>Скачати папку «{0}»</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="524" />
+        <source>Sync '{0}'</source>
+        <translation>Синхронізувати «{0}»</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="527" />
+        <source>Auto-sync</source>
+        <translation>Автосинхронізація</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/misc.py" line="539" />
+        <source>Delete folder '{0}'</source>
+        <translation>Видалити папку «{0}»</translation>
+    </message>
+</context>
+<context>
+    <name>PdfViewerWindow</name>
+    <message>
+        <location filename="../ui/media_viewer.py" line="622" />
+        <source>Loading PDF…</source>
+        <translation>Завантаження PDF…</translation>
+    </message>
+    <message>
+        <location filename="../ui/media_viewer.py" line="645" />
+        <source>Loading error: {0}</source>
+        <translation>Помилка завантаження: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/media_viewer.py" line="655" />
+        <source>The file is empty.</source>
+        <translation>Файл порожній.</translation>
+    </message>
+    <message>
+        <location filename="../ui/media_viewer.py" line="670" />
+        <source>Failed to open the PDF (file corrupted?)</source>
+        <translation>Не вдалося відкрити PDF (файл пошкоджено?)</translation>
+    </message>
+</context>
+<context>
+    <name>ProgressLogWidget</name>
+    <message>
+        <location filename="../ui/widgets.py" line="35" />
+        <source>Cancel</source>
+        <translation>Скасувати</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets.py" line="46" />
+        <location filename="../ui/widgets.py" line="125" />
+        <source>Working</source>
+        <translation>Обробка</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets.py" line="79" />
+        <source>Event log</source>
+        <translation>Журнал подій</translation>
     </message>
 </context>
 <context>
@@ -1213,6 +1850,574 @@ Changing this is NOT recommended once data has already been uploaded.</source>
         <location filename="../ui/dialogs/__init__.py" line="678" />
         <source>Choose folder for downloaded files</source>
         <translation>Вибрати папку для завантажених файлів</translation>
+    </message>
+</context>
+<context>
+    <name>ShareLinkDialog</name>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="227" />
+        <source>Share Link</source>
+        <translation>Посилання для доступу</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="233" />
+        <source>No expiry</source>
+        <translation>Без строку</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="234" />
+        <source>1 hour</source>
+        <translation>1 година</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="235" />
+        <source>1 day</source>
+        <translation>1 день</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="236" />
+        <source>7 days</source>
+        <translation>7 днів</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="237" />
+        <source>30 days</source>
+        <translation>30 днів</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="244" />
+        <source>File: {0}</source>
+        <translation>Файл: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="254" />
+        <source>⚠ REST API is disabled — the link can be created, but it will only work after enabling the API in Settings ('Advanced' tab) and restarting.</source>
+        <translation>⚠ REST API вимкнено — посилання можна створити, але воно запрацює лише після увімкнення API в Налаштуваннях (вкладка «Розширені») і перезапуску.</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="266" />
+        <source>optional</source>
+        <translation>необов'язково</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="268" />
+        <source>Password</source>
+        <translation>Пароль</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="273" />
+        <source>Expires in</source>
+        <translation>Термін дії</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="276" />
+        <source>Create link</source>
+        <translation>Створити посилання</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="282" />
+        <source>the link will appear here</source>
+        <translation>посилання з'явиться тут</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="283" />
+        <source>Copy</source>
+        <translation>Копіювати</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="331" />
+        <source>Error</source>
+        <translation>Помилка</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="332" />
+        <source>Failed to create the link: {0}</source>
+        <translation>Не вдалося створити посилання: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="337" />
+        <source>Create another one</source>
+        <translation>Створити ще одне</translation>
+    </message>
+    <message>
+        <location filename="../ui/dialogs/_properties.py" line="345" />
+        <source>Copied ✓</source>
+        <translation>Скопійовано ✓</translation>
+    </message>
+</context>
+<context>
+    <name>StartupLoadingOverlay</name>
+    <message>
+        <location filename="../ui/widgets.py" line="242" />
+        <source>Starting…</source>
+        <translation>Запуск…</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets.py" line="253" />
+        <source>Retry</source>
+        <translation>Повторити</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets.py" line="257" />
+        <source>Accounts</source>
+        <translation>Акаунти</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets.py" line="274" />
+        <source>Connecting to Telegram…</source>
+        <translation>Підключення до Telegram…</translation>
+    </message>
+    <message>
+        <location filename="../ui/widgets.py" line="283" />
+        <source>Could not connect:
+{0}</source>
+        <translation>Не вдалося підключитися:
+{0}</translation>
+    </message>
+</context>
+<context>
+    <name>TextEditorTab</name>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="456" />
+        <source>⏳ Loading file…</source>
+        <translation>⏳ Завантаження файлу…</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="521" />
+        <source>File too large for the editor (limit {0} MB).</source>
+        <translation>Файл завеликий для редактора (ліміт {0} МБ).</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="528" />
+        <source>Loading error: {0}</source>
+        <translation>Помилка завантаження: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="537" />
+        <source>File too large: {0} MB (limit {1} MB).</source>
+        <translation>Файл завеликий: {0} МБ (ліміт {1} МБ).</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="552" />
+        <source>Could not read as text (binary file?).</source>
+        <translation>Не вдалося прочитати як текст (бінарний файл?).</translation>
+    </message>
+</context>
+<context>
+    <name>TextEditorWindow</name>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="586" />
+        <source>Cloud File Editor</source>
+        <translation>Хмарний текстовий редактор</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="599" />
+        <source>Save to cloud ☁</source>
+        <translation>Зберегти в хмару ☁</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="602" />
+        <source>Save the active file to the cloud (Ctrl+S)</source>
+        <translation>Зберегти поточний файл у хмару (Ctrl+S)</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="604" />
+        <source>Undo (Ctrl+Z)</source>
+        <translation>Скасувати (Ctrl+Z)</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="605" />
+        <source>Redo (Ctrl+Y)</source>
+        <translation>Повторити (Ctrl+Y)</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="610" />
+        <source>Decrease font size (Ctrl+-)</source>
+        <translation>Зменшити розмір шрифту (Ctrl+-)</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="614" />
+        <source>Reset zoom (Ctrl+0)</source>
+        <translation>Скинути масштаб (Ctrl+0)</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="616" />
+        <source>Increase font size (Ctrl++)</source>
+        <translation>Збільшити розмір шрифту (Ctrl++)</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="619" />
+        <source>Find</source>
+        <translation>Знайти</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="619" />
+        <source>Find (Ctrl+F)</source>
+        <translation>Знайти (Ctrl+F)</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="622" />
+        <location filename="../ui/text_editor/__init__.py" line="677" />
+        <source>Replace</source>
+        <translation>Замінити</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="622" />
+        <source>Find and replace (Ctrl+H)</source>
+        <translation>Знайти і замінити (Ctrl+H)</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="627" />
+        <source>Format</source>
+        <translation>Форматувати</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="627" />
+        <source>Auto-format / Trim whitespace</source>
+        <translation>Автоформат / прибрати зайві пробіли</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="629" />
+        <source>Line wrap</source>
+        <translation>Перенесення рядків</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="632" />
+        <source>Ready</source>
+        <translation>Готово</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="660" />
+        <source>Find…</source>
+        <translation>Знайти…</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="664" />
+        <source>Replace with…</source>
+        <translation>Замінити на…</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="668" />
+        <source>Case sensitive</source>
+        <translation>Враховувати регістр</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="670" />
+        <source>Whole word</source>
+        <translation>Ціле слово</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="672" />
+        <source>Regular expression (Regex)</source>
+        <translation>Регулярний вираз (Regex)</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="674" />
+        <source>Previous (Shift+Enter)</source>
+        <translation>Попереднє (Shift+Enter)</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="675" />
+        <source>Next (Enter)</source>
+        <translation>Наступне (Enter)</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="677" />
+        <source>Replace the current match</source>
+        <translation>Замінити поточний збіг</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="680" />
+        <source>Replace all</source>
+        <translation>Замінити все</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="680" />
+        <source>Replace all matches</source>
+        <translation>Замінити всі збіги</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="682" />
+        <source>Close (Esc)</source>
+        <translation>Закрити (Esc)</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="828" />
+        <source>Unsaved changes</source>
+        <translation>Незбережені зміни</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="830" />
+        <source>The file '{0}' has unsaved changes. Save before closing?</source>
+        <translation>У файлі «{0}» є незбережені зміни. Зберегти перед закриттям?</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="864" />
+        <source>Go to line</source>
+        <translation>Перейти до рядка</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="865" />
+        <source>Line (1–{0}):</source>
+        <translation>Рядок (1–{0}):</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="908" />
+        <source>No files open</source>
+        <translation>Немає відкритих файлів</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="942" />
+        <source>Loading…</source>
+        <translation>Завантаження…</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="957" />
+        <source>   •   Selected: {0} chars</source>
+        <translation>   •   Виділено: {0} символ.</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="962" />
+        <source>{0}Ln {1}, Col {2}{3}   •   {4} lines, {5} chars   •   {6}   •   {7}   •   {8}</source>
+        <translation>{0}Рд {1}, Кол {2}{3}   •   {4} рядків, {5} символ.   •   {6}   •   {7}   •   {8}</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="991" />
+        <source>Editor</source>
+        <translation>Редактор</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="992" />
+        <source>Failed to save '{0}':
+{1}</source>
+        <translation>Не вдалося зберегти «{0}»:
+{1}</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="1005" />
+        <source>Queued for upload to the cloud ⬆</source>
+        <translation>У черзі на завантаження в хмару ⬆</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="1071" />
+        <source>Format JSON</source>
+        <translation>Форматувати JSON</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="1072" />
+        <source>JSON syntax error:
+{0}</source>
+        <translation>Помилка синтаксису JSON:
+{0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="1157" />
+        <location filename="../ui/text_editor/__init__.py" line="1233" />
+        <source>Invalid Regex</source>
+        <translation>Некоректний Regex</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="1183" />
+        <source>no matches</source>
+        <translation>немає збігів</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="1262" />
+        <source>Replaced: {0}</source>
+        <translation>Замінено: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="1348" />
+        <source>Unsaved Changes</source>
+        <translation>Незбережені зміни</translation>
+    </message>
+    <message>
+        <location filename="../ui/text_editor/__init__.py" line="1350" />
+        <source>You have {0} unsaved file(s). Save all before closing?</source>
+        <translation>У вас є {0} незбережених файлів. Зберегти всі перед закриттям?</translation>
+    </message>
+</context>
+<context>
+    <name>TransferOpsMixin</name>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="68" />
+        <location filename="../ui/panels/transfer_ops.py" line="76" />
+        <location filename="../ui/panels/transfer_ops.py" line="83" />
+        <source>Download folder</source>
+        <translation>Скачати папку</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="69" />
+        <source>Open a folder first, or select it in the folder tree.</source>
+        <translation>Спочатку відкрийте папку або виберіть її в дереві папок.</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="84" />
+        <source>Folder '{0}' is empty.</source>
+        <translation>Папка «{0}» порожня.</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="167" />
+        <source>Mass download</source>
+        <translation>Масове завантаження</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="169" />
+        <source>This will create {jobs} download tasks ({files} file(s)).
+This may occupy the queue and interface for a long time.
+
+Continue?</source>
+        <translation>Буде створено завдань на завантаження: {jobs} ({files} файл(ів)).
+Це може надовго зайняти чергу та інтерфейс.
+
+Продовжити?</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="206" />
+        <source>{0} file(s) from a batch</source>
+        <translation>{0} файл(ів) з батчу</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="248" />
+        <source>Sync '{0}': everything is up to date</source>
+        <translation>Синхронізація «{0}»: усе актуально</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="257" />
+        <source>Sync '{0}': {1} file(s) to download ({2} job(s))</source>
+        <translation>Синхронізація «{0}»: до завантаження {1} файл(ів) ({2} завдань)</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="276" />
+        <source>Auto-sync enabled: '{0}'</source>
+        <translation>Автосинхронізацію увімкнено: «{0}»</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="281" />
+        <source>Auto-sync disabled: '{0}'</source>
+        <translation>Автосинхронізацію вимкнено: «{0}»</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="295" />
+        <source>Auto-sync: queued {0} job(s)</source>
+        <translation>Автосинхронізація: у чергу поставлено {0} завдань</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="321" />
+        <source>Move to trash failed: {0}</source>
+        <translation>Не вдалося перемістити в кошик: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="325" />
+        <source>Moved to trash: {0} file(s)</source>
+        <translation>Переміщено в кошик: {0} файл(ів)</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="376" />
+        <location filename="../ui/panels/transfer_ops.py" line="385" />
+        <source>Delete from the cloud</source>
+        <translation>Видалити з хмари</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="377" />
+        <source>Delete '{0}' from Telegram?</source>
+        <translation>Видалити «{0}» з Telegram?</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="387" />
+        <source>Delete the selected files ({0}) from Telegram?</source>
+        <translation>Видалити вибрані файли ({0}) з Telegram?</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="416" />
+        <location filename="../ui/panels/transfer_ops.py" line="462" />
+        <location filename="../ui/panels/transfer_ops.py" line="478" />
+        <source>Delete locally</source>
+        <translation>Видалити локально</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="418" />
+        <source>Delete the local copies of the selected files ({0})?</source>
+        <translation>Видалити локальні копії вибраних файлів ({0})?</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="463" />
+        <source>File not found:
+{0}</source>
+        <translation>Файл не знайдено:
+{0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="494" />
+        <source>Delete folder</source>
+        <translation>Видалити папку</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="496" />
+        <source>Delete all files ({0}) in folder '{1}' from Telegram?</source>
+        <translation>Видалити всі файли ({0}) у папці «{1}» з Telegram?</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="503" />
+        <source>Delete folders</source>
+        <translation>Видалити папки</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/transfer_ops.py" line="505" />
+        <source>Delete all files ({0}) in the selected folders ({1}) from Telegram?</source>
+        <translation>Видалити всі файли ({0}) у вибраних папках ({1}) з Telegram?</translation>
+    </message>
+</context>
+<context>
+    <name>UploadDropMixin</name>
+    <message>
+        <location filename="../ui/panels/upload_drop.py" line="24" />
+        <location filename="../ui/panels/upload_drop.py" line="369" />
+        <source>Upload</source>
+        <translation>Завантажити</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/upload_drop.py" line="25" />
+        <source>Open a target folder first, then drop the files</source>
+        <translation>Спочатку відкрийте цільову папку, потім перетягніть файли</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/upload_drop.py" line="369" />
+        <source>Open a folder first</source>
+        <translation>Спочатку відкрийте папку</translation>
+    </message>
+    <message>
+        <location filename="../ui/panels/upload_drop.py" line="373" />
+        <source>Select files to upload</source>
+        <translation>Виберіть файли для завантаження</translation>
+    </message>
+</context>
+<context>
+    <name>VideoViewerWindow</name>
+    <message>
+        <location filename="../ui/media_viewer.py" line="367" />
+        <source>External player</source>
+        <translation>Зовнішній плеєр</translation>
+    </message>
+    <message>
+        <location filename="../ui/media_viewer.py" line="466" />
+        <source>Loading…</source>
+        <translation>Завантаження…</translation>
+    </message>
+    <message>
+        <location filename="../ui/media_viewer.py" line="537" />
+        <source> · buffering…</source>
+        <translation> · буферизація…</translation>
+    </message>
+    <message>
+        <location filename="../ui/media_viewer.py" line="570" />
+        <source>Error: {0}</source>
+        <translation>Помилка: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ui/media_viewer.py" line="587" />
+        <source>Format not supported — transcoding…</source>
+        <translation>Формат не підтримується — перекодування…</translation>
     </message>
 </context>
 <context>
