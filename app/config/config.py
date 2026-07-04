@@ -52,7 +52,7 @@ def _build_config(merged: dict[str, Any]) -> AppConfig:
     if not api_id_raw or not api_hash:
         raise ConfigError(
             "TG_API_ID and TG_API_HASH must be set in .env "
-            "(или заполните «API ID»/«API Hash» в настройках — my.telegram.org/apps)"
+            "(or fill in 'API ID'/'API Hash' in Settings — my.telegram.org/apps)"
         )
 
     try:
