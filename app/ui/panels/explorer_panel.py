@@ -217,10 +217,10 @@ class ExplorerPanelMixin:
 
             if isinstance(item, ExplorerFileItem):
                 if getattr(self, "_trash_view", False):
-                    restore_act = menu.addAction("Восстановить")
-                    forever_act = menu.addAction("Удалить навсегда")
+                    restore_act = menu.addAction(self.tr("Restore"))
+                    forever_act = menu.addAction(self.tr("Delete forever"))
                     menu.addSeparator()
-                    empty_act = menu.addAction("Очистить корзину")
+                    empty_act = menu.addAction(self.tr("Empty trash"))
                     triggered = menu.exec(global_pos)
                     if triggered == restore_act:
                         self._on_restore_from_trash()
@@ -236,20 +236,22 @@ class ExplorerPanelMixin:
                     or is_video_name(item.entry.orig_name)
                     or is_pdf_name(item.entry.orig_name)
                 ):
-                    open_stream_act = menu.addAction("Открыть без скачивания")
+                    open_stream_act = menu.addAction(
+                        self.tr("Open without downloading")
+                    )
                     menu.addSeparator()
                 elif is_text_editable_name(item.entry.orig_name):
-                    edit_act = menu.addAction("Редактировать")
+                    edit_act = menu.addAction(self.tr("Edit"))
                     menu.addSeparator()
                 menu.addAction(self.action_download)
                 menu.addAction(self.action_delete_local)
                 menu.addSeparator()
-                trash_act = menu.addAction("В корзину")
+                trash_act = menu.addAction(self.tr("Move to trash"))
                 menu.addAction(self.action_delete)
                 menu.addSeparator()
-                share_act = menu.addAction("Поделиться ссылкой")
-                rename_act = menu.addAction("Переименовать")
-                props_act = menu.addAction("Свойства")
+                share_act = menu.addAction(self.tr("Share link"))
+                rename_act = menu.addAction(self.tr("Rename"))
+                props_act = menu.addAction(self.tr("Properties"))
                 triggered = menu.exec(global_pos)
                 if open_stream_act is not None and triggered == open_stream_act:
                     self._on_open_stream(item.entry)
@@ -266,15 +268,21 @@ class ExplorerPanelMixin:
                 return
 
             if isinstance(item, ExplorerFolderItem):
-                open_act = menu.addAction(f"Открыть '{item.name}'")
-                download_folder_act = menu.addAction(f"Скачать папку '{item.name}'")
-                sync_folder_act = menu.addAction(f"Синхронизировать '{item.name}'")
-                autosync_act = menu.addAction("Автосинхронизация")
+                open_act = menu.addAction(self.tr("Open '{0}'").format(item.name))
+                download_folder_act = menu.addAction(
+                    self.tr("Download folder '{0}'").format(item.name)
+                )
+                sync_folder_act = menu.addAction(
+                    self.tr("Sync '{0}'").format(item.name)
+                )
+                autosync_act = menu.addAction(self.tr("Auto-sync"))
                 autosync_act.setCheckable(True)
                 autosync_act.setChecked(self.repo.is_folder_synced(item.path))
                 menu.addSeparator()
-                delete_folder_act = menu.addAction(f"Удалить папку '{item.name}'")
-                props_folder_act = menu.addAction("Свойства")
+                delete_folder_act = menu.addAction(
+                    self.tr("Delete folder '{0}'").format(item.name)
+                )
+                props_folder_act = menu.addAction(self.tr("Properties"))
                 triggered = menu.exec(global_pos)
                 if triggered == open_act:
                     self._set_current_folder(
@@ -294,7 +302,7 @@ class ExplorerPanelMixin:
 
         # Empty space
         if getattr(self, "_trash_view", False):
-            empty_act = menu.addAction("Очистить корзину")
+            empty_act = menu.addAction(self.tr("Empty trash"))
             if menu.exec(global_pos) == empty_act:
                 self._on_empty_trash()
             return
@@ -312,7 +320,7 @@ class ExplorerPanelMixin:
         self._on_explorer_context_menu(explorer_pos)
 
     def _connected_account_labels(self) -> dict[str, str]:
-        """chat_id -> метка аккаунта для подключённых сейчас аккаунтов (best-effort)."""
+        """chat_id -> account label for currently connected accounts (best-effort)."""
         labels: dict[str, str] = {}
         manager = getattr(self.worker, "_account_manager", None)
         if manager is None:
@@ -398,7 +406,7 @@ class ExplorerPanelMixin:
             key = str(getattr(obj, "status", "") or "incomplete")
             state_counts[key] = state_counts.get(key, 0) + 1
 
-        # Подпапки: прямые дети и всё поддерево (по списку всех папок).
+        # Subfolders: direct children and the whole subtree (from the list of all folders).
         prefix = f"{folder_path}/"
         try:
             all_folders = [f.folder_path for f in self.repo.list_folders()]
@@ -441,7 +449,7 @@ class ExplorerPanelMixin:
             self.repo.rename_object(entry.folder_path, entry.file_key, new_name)
             self.reload_items()
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Переименование", str(exc))
+            QMessageBox.critical(self, self.tr("Rename"), str(exc))
             return
         # Update TG message captions in background
         self._enqueue_job(
@@ -539,8 +547,8 @@ class ExplorerPanelMixin:
             step = 120
         changed = self.explorer_model.refresh_local_presence_step(max_items=step)
         changed = self.explorer_model.cleanup_recent_export_marks() or changed
-        # Превью картинок: строим миниатюры из локальных файлов/кэша, а для
-        # нескачанных — ставим в очередь фоновую дозагрузку (инкремент 1b).
+        # Image previews: build thumbnails from local files/cache, and for
+        # not-yet-downloaded files, queue a background fetch (increment 1b).
         if bool(getattr(self.config, "show_thumbnails", True)):
             self.explorer_model.refresh_thumbnails_step(max_items=step)
             self._enqueue_video_posters()
@@ -551,8 +559,9 @@ class ExplorerPanelMixin:
             self._refresh_action_state()
 
     def _enqueue_thumbnail_fetches(self) -> None:
-        """Поставить фоновую дозагрузку нескачанных картинок ради превью (1b).
-        Ограничено по числу одновременных, пропускает уже в работе/упавшие."""
+        """Queue background fetches of not-yet-downloaded images for previews (1b).
+        Limited by the number of concurrent fetches; skips ones already in
+        flight/failed."""
         free = self._THUMB_FETCH_MAX_INFLIGHT - len(self._thumb_fetch_inflight)
         if free <= 0:
             return
@@ -574,8 +583,9 @@ class ExplorerPanelMixin:
             free -= 1
 
     def _enqueue_video_posters(self) -> None:
-        """Построить кадры-постеры для локальных видео в фоне через ffmpeg (4).
-        Делит лимит одновременных с дозагрузкой картинок; ffmpeg-только-локально."""
+        """Build poster frames for local videos in the background via ffmpeg (4).
+        Shares the concurrency limit with image fetching; ffmpeg runs on local
+        files only."""
         if not bool(getattr(self.config, "show_thumbnails", True)):
             return
         free = self._THUMB_FETCH_MAX_INFLIGHT - len(self._thumb_fetch_inflight)
@@ -603,13 +613,14 @@ class ExplorerPanelMixin:
                 continue
             free -= 1
 
-    # Максимальный размер видео, для которого тянем превью НЕскачанного файла
-    # (берём только первую часть, но и это ограничиваем порогом).
+    # Maximum size of a video for which we fetch a preview of a NOT-yet-downloaded
+    # file (we only pull the first part, but even that is capped by this threshold).
     _REMOTE_POSTER_MAX_BYTES = 50 * 1024 * 1024 * 1024  # 50 GB
 
     def _enqueue_remote_video_posters(self) -> None:
-        """Фоновое построение постера для НЕскачанных видео (тянем только первую
-        часть). Делит лимит одновременных и трекинг с дозагрузкой картинок."""
+        """Background poster building for NOT-yet-downloaded videos (only pulls
+        the first part). Shares the concurrency limit and tracking with image
+        fetching."""
         if not bool(getattr(self.config, "show_thumbnails", True)):
             return
         free = self._THUMB_FETCH_MAX_INFLIGHT - len(self._thumb_fetch_inflight)
@@ -646,7 +657,8 @@ class ExplorerPanelMixin:
                 folder_path, file_key, temp_path
             )
         finally:
-            # Временный полный файл нам не нужен — превью уже построено/закэшировано.
+            # We don't need the temporary full file — the preview is already
+            # built/cached.
             try:
                 from pathlib import Path as _Path
 
@@ -657,12 +669,12 @@ class ExplorerPanelMixin:
     def _on_thumbnail_failed(self, folder_path: str, file_key: str) -> None:
         key = (folder_path, file_key)
         self._thumb_fetch_inflight.discard(key)
-        # Не дёргаем повторно ту же картинку в этой сессии (битая/недоступна).
+        # Don't retry the same image again this session (broken/unavailable).
         self._thumb_fetch_failed.add(key)
 
     def _on_open_stream(self, entry) -> None:
-        """Открыть фото/видео во внешнем приложении БЕЗ полного скачивания —
-        через локальный стрим-сервер (HTTP Range тянет только нужные части)."""
+        """Open a photo/video in an external app WITHOUT a full download — via
+        the local stream server (HTTP Range pulls only the needed parts)."""
         from urllib.parse import quote
 
         from PySide6.QtWidgets import QMessageBox
@@ -672,8 +684,10 @@ class ExplorerPanelMixin:
         if not info:
             QMessageBox.warning(
                 self,
-                "Просмотр",
-                "Не удалось запустить локальный сервер для просмотра без скачивания.",
+                self.tr("View"),
+                self.tr(
+                    "Could not start the local server for viewing without downloading."
+                ),
             )
             return
         base, token = info
@@ -695,28 +709,32 @@ class ExplorerPanelMixin:
         open_media_viewer(
             self,
             url=url,
-            title=name or "Просмотр",
+            title=name or self.tr("View"),
             viewer_type=viewer_type,
         )
 
     def _on_edit_file(self, entry) -> None:
-        """Открыть текстовый/кодовый файл в редакторе. Содержимое тянется через
-        локальный стрим-сервер (без полного скачивания), а сохранение
-        перезаливает файл в облако под тем же именем (replace-by-name)."""
+        """Open a text/code file in the editor. Content is streamed via the
+        local stream server (without a full download); saving re-uploads the
+        file to the cloud under the same name (replace-by-name)."""
         from urllib.parse import quote
 
         from PySide6.QtWidgets import QMessageBox
 
         from app.ui.text_editor import _MAX_EDIT_BYTES
 
-        # Отсекаем гиганта ДО запуска скачивания: размер известен из индекса.
+        # Reject huge files BEFORE starting the download: size is known from the index.
         total_size = int(getattr(entry, "total_size", 0) or 0)
         if total_size > _MAX_EDIT_BYTES:
             QMessageBox.warning(
                 self,
-                "Редактор",
-                f"Файл слишком большой для редактора: {total_size // (1024 * 1024)} МБ "
-                f"(лимит {_MAX_EDIT_BYTES // (1024 * 1024)} МБ).",
+                self.tr("Editor"),
+                self.tr(
+                    "File is too large for the editor: {size} MB (limit {limit} MB)."
+                ).format(
+                    size=total_size // (1024 * 1024),
+                    limit=_MAX_EDIT_BYTES // (1024 * 1024),
+                ),
             )
             return
 
@@ -725,8 +743,8 @@ class ExplorerPanelMixin:
         if not info:
             QMessageBox.warning(
                 self,
-                "Редактор",
-                "Не удалось запустить локальный сервер для открытия файла.",
+                self.tr("Editor"),
+                self.tr("Could not start the local server to open the file."),
             )
             return
         base, token = info
@@ -740,13 +758,13 @@ class ExplorerPanelMixin:
         open_text_editor(
             self,
             url=url,
-            title=getattr(entry, "orig_name", "") or "Редактор",
+            title=getattr(entry, "orig_name", "") or self.tr("Editor"),
             on_save=lambda data, e=entry: self._save_edited_file(e, data),
         )
 
     def _save_edited_file(self, entry, data: bytes) -> None:
-        """Сохранить отредактированное содержимое: пишем во временный файл с тем
-        же именем и ставим upload-джобу — replace-by-name обновит объект."""
+        """Save the edited content: write to a temp file with the same name
+        and queue an upload job — replace-by-name will update the object."""
         from pathlib import Path as _Path
 
         from PySide6.QtWidgets import QMessageBox
@@ -763,7 +781,11 @@ class ExplorerPanelMixin:
             out_path = edit_dir / name
             out_path.write_bytes(data)
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Редактор", f"Не удалось сохранить файл:\n{exc}")
+            QMessageBox.critical(
+                self,
+                self.tr("Editor"),
+                self.tr("Could not save the file:\n{0}").format(exc),
+            )
             return
         self._enqueue_job(
             JobType.UPLOAD.value,

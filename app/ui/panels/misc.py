@@ -44,7 +44,7 @@ class MiscMixin:
         try:
             self.repo.upsert_folder(full_path)
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Создание папки", str(exc))
+            QMessageBox.critical(self, self.tr("Create folder"), str(exc))
             return
         self.reload_all()
 
@@ -68,19 +68,19 @@ class MiscMixin:
                 from PySide6.QtCore import QSize
 
                 self.config = dataclasses.replace(self.config, ui_icon_size=new_icon_sz)
-                # Обновляем модель — она пересоздаёт иконки и обновляет SizeHintRole
+                # Update the model — it rebuilds icons and refreshes SizeHintRole
                 self.explorer_model.set_icon_size(new_icon_sz)
-                # Обновляем вид
+                # Update the view
                 self.explorer_view.setGridSize(
                     QSize(new_icon_sz + 44, new_icon_sz + 54)
                 )
                 self.explorer_view.setIconSize(QSize(new_icon_sz, new_icon_sz))
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Настройки", str(exc))
+            QMessageBox.critical(self, self.tr("Settings"), str(exc))
             return
 
     def _on_accounts(self) -> None:
-        """Открыть окно управления аккаунтами."""
+        """Open the account management window."""
         from app.ui.dialogs._accounts import AccountsDialog
 
         before = self._accounts_signature()
@@ -89,13 +89,16 @@ class MiscMixin:
         after = self._accounts_signature()
         if before == after:
             return
-        # Аккаунты читаются воркером один раз при старте — без переподключения
-        # правки каналов/прокси не применятся (именно так файлы уходили в 1 канал).
+        # The worker reads accounts once at startup — without a reconnect,
+        # channel/proxy edits won't take effect (this is exactly how files used
+        # to end up in only 1 channel).
         choice = QMessageBox.question(
             self,
-            "Применить изменения",
-            "Список аккаунтов изменён. Изменения вступят в силу только после "
-            "переподключения к Telegram.\n\nПереподключиться сейчас?",
+            self.tr("Apply changes"),
+            self.tr(
+                "The account list has changed. Changes will only take effect "
+                "after reconnecting to Telegram.\n\nReconnect now?"
+            ),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.Yes,
         )
@@ -103,7 +106,7 @@ class MiscMixin:
             self._on_reconnect()
 
     def _accounts_signature(self) -> tuple:
-        """Снимок состава аккаунтов для детекта изменений (канал/прокси/активность)."""
+        """Snapshot of the account set, used to detect changes (channel/proxy/active)."""
         try:
             accounts = self.repo.list_accounts()
         except Exception:
@@ -123,31 +126,34 @@ class MiscMixin:
 
     def _on_reconnect(self) -> None:
         self._set_reconnect_enabled(False)
-        self.statusBar().showMessage("Перезапуск подключения Telegram")
-        self.progress_widget.append_log("Перезапуск подключения Telegram…")
+        self.statusBar().showMessage(self.tr("Restarting Telegram connection"))
+        self.progress_widget.append_log(self.tr("Restarting Telegram connection…"))
         if hasattr(self, "_startup_overlay"):
-            self._startup_overlay.show_loading("Перезапуск подключения к Telegram…")
+            self._startup_overlay.show_loading(
+                self.tr("Restarting the Telegram connection…")
+            )
         self.worker.request_restart()
 
     def _on_worker_ready(self) -> None:
         from PySide6.QtCore import QTimer
 
-        # Подключение к Telegram готово, но данные (дерево папок/индекс) ещё не
-        # подгружены — первичная сверка идёт фоновой джобой. Раньше оверлей
-        # прятался прямо здесь, и пользователь видел, что «загрузка кончилась», а
-        # программа всё ещё что-то догружает. Держим экран загрузки до завершения
-        # первичной сверки (см. _finish_startup_overlay по _ui_initial_load).
+        # The Telegram connection is ready, but the data (folder tree/index)
+        # hasn't been loaded yet — the initial reconciliation runs as a
+        # background job. Previously the overlay hid right here, and the user
+        # would see "loading finished" while the app was still loading things.
+        # Keep the loading screen up until the initial reconciliation completes
+        # (see _finish_startup_overlay, triggered via _ui_initial_load).
         if hasattr(self, "_startup_overlay"):
-            # Сбрасываем флаг (на случай переподключения) и показываем загрузку
-            # данных вместо немедленного скрытия.
+            # Reset the flag (in case of a reconnect) and show the data-loading
+            # screen instead of hiding immediately.
             self._startup_overlay_done = False
-            self._startup_overlay.show_loading("Загрузка данных…")
-            # Защитный таймаут: если сверка зависнет/не завершится — не оставляем
-            # пользователя на экране загрузки навсегда.
+            self._startup_overlay.show_loading(self.tr("Loading data…"))
+            # Safety timeout: if the reconciliation hangs/never finishes, don't
+            # leave the user on the loading screen forever.
             QTimer.singleShot(15000, self._finish_startup_overlay)
         self._set_reconnect_enabled(False)
-        self.statusBar().showMessage("Telegram подключён")
-        self.progress_widget.append_log("Telegram подключён и готов")
+        self.statusBar().showMessage(self.tr("Telegram connected"))
+        self.progress_widget.append_log(self.tr("Telegram connected and ready"))
         self._process_pending_enqueue_retries(force=True)
         account_channels = self._get_account_channels()
         if account_channels:
@@ -182,10 +188,10 @@ class MiscMixin:
             ).start()
 
     def _finish_startup_overlay(self) -> None:
-        """Скрыть стартовый экран загрузки один раз (идемпотентно).
+        """Hide the startup loading screen once (idempotent).
 
-        Вызывается по завершении первичной сверки (DONE/ERROR джобы с маркером
-        _ui_initial_load) либо по защитному таймауту."""
+        Called when the initial reconciliation finishes (a DONE/ERROR job
+        marked with _ui_initial_load), or by the safety timeout."""
         if getattr(self, "_startup_overlay_done", False):
             return
         self._startup_overlay_done = True
@@ -214,25 +220,29 @@ class MiscMixin:
 
     def _on_worker_fatal_error(self, message: str) -> None:
         self._set_reconnect_enabled(True)
-        self.statusBar().showMessage("Telegram отключён")
-        self.progress_widget.append_log(f"Ошибка подключения: {message}")
+        self.statusBar().showMessage(self.tr("Telegram disconnected"))
+        self.progress_widget.append_log(
+            self.tr("Connection error: {0}").format(message)
+        )
         if hasattr(self, "_startup_overlay"):
             self._startup_overlay.show_error(message)
         else:
-            QMessageBox.critical(self, "Ошибка подключения Telegram", message)
+            QMessageBox.critical(self, self.tr("Telegram connection error"), message)
 
     def _on_worker_reconnect_attempt(self, attempt: int) -> None:
-        self.statusBar().showMessage(f"Переподключение ({attempt}/4)")
-        self.progress_widget.append_log(f"Переподключение (попытка {attempt}/4)…")
+        self.statusBar().showMessage(self.tr("Reconnecting ({0}/4)").format(attempt))
+        self.progress_widget.append_log(
+            self.tr("Reconnecting (attempt {0}/4)…").format(attempt)
+        )
         if hasattr(self, "_startup_overlay"):
             self._startup_overlay.show_loading(
-                f"Переподключение к Telegram ({attempt}/4)…"
+                self.tr("Reconnecting to Telegram ({0}/4)…").format(attempt)
             )
 
     def _on_account_pool_status(self, status: object) -> None:
-        """Показать здоровье пула загрузки: сколько аккаунтов реально работают.
-        Когда часть выпала (канал не виден) — striping молча схлопывается, поэтому
-        предупреждаем явно, а не только в логе."""
+        """Show upload-pool health: how many accounts are actually working.
+        When some drop out (channel not visible), striping silently collapses,
+        so we warn explicitly rather than only logging it."""
         if not isinstance(status, dict):
             return
         active = int(status.get("active", 0))
@@ -244,7 +254,10 @@ class MiscMixin:
 
         if not degraded:
             self.progress_widget.append_log(
-                f"Аккаунтов для загрузки активно: {active}/{total} — параллельная заливка по {active}."
+                self.tr(
+                    "Accounts active for uploading: {active}/{total} — uploading in "
+                    "parallel across {active}."
+                ).format(active=active, total=total)
             )
             return
 
@@ -252,24 +265,32 @@ class MiscMixin:
             f"{d.get('label')} → {d.get('chat_target')}" for d in degraded
         )
         self.statusBar().showMessage(
-            f"⚠ Загрузка использует {active} из {total} аккаунтов"
+            self.tr("⚠ Upload is using {active} of {total} accounts").format(
+                active=active, total=total
+            )
         )
         self.progress_widget.append_log(
-            f"⚠ Активно {active}/{total} аккаунтов. Не видят свой канал: {names}. "
-            "Каналы этих аккаунтов не сканируются: их файлы не отображаются в списке, "
-            "а заливка идёт меньшим числом потоков. Проверьте, вступили ли эти аккаунты в свои каналы."
+            self.tr(
+                "⚠ {active}/{total} accounts active. Can't see their channel: {names}. "
+                "These accounts' channels aren't scanned: their files won't appear in "
+                "the list, and uploads run with fewer threads. Check whether these "
+                "accounts have joined their channels."
+            ).format(active=active, total=total, names=names)
         )
         QMessageBox.warning(
             self,
-            "Не все аккаунты задействованы",
-            f"Для загрузки активно {active} из {total} аккаунтов.\n\n"
-            f"Не видят свой канал:\n{names}\n\n"
-            "Причина — аккаунт не состоит в указанном канале. "
-            "Пока канал недоступен, он не сканируется: загруженные в него файлы "
-            "временно НЕ отображаются в списке (они не удалены — вернутся после "
-            "восстановления доступа). Заливка идёт меньшим числом потоков.\n\n"
-            "Зайдите этими аккаунтами в их каналы (или включится авто-вступление по "
-            "инвайт-ссылке при следующем переподключении).",
+            self.tr("Not all accounts are being used"),
+            self.tr(
+                "{active} of {total} accounts are active for uploading.\n\n"
+                "Can't see their channel:\n{names}\n\n"
+                "Reason: the account isn't a member of the specified channel. "
+                "While the channel is unreachable, it isn't scanned: files already "
+                "uploaded to it are temporarily NOT shown in the list (they aren't "
+                "deleted — they'll come back once access is restored). Uploads run "
+                "with fewer threads.\n\n"
+                "Sign in to these channels with these accounts (or auto-join via the "
+                "invite link will kick in on the next reconnect)."
+            ).format(active=active, total=total, names=names),
         )
 
     def _set_reconnect_enabled(self, enabled: bool) -> None:
@@ -278,8 +299,8 @@ class MiscMixin:
 
     def _trigger_initial_refresh(self) -> None:
         # Avoid expensive startup full-scan competing with immediate transfers.
-        # Маркер _ui_initial_load: по завершении этой джобы прячем стартовый
-        # экран загрузки (данные подгружены/сверены).
+        # _ui_initial_load marker: once this job finishes, we hide the startup
+        # loading screen (data has been loaded/reconciled).
         self._enqueue_job(
             JobType.REFRESH.value,
             {"mode": "incremental", "_ui_initial_load": True},
@@ -467,17 +488,19 @@ class MiscMixin:
             job_id, job_type, message = pending[0]
             QMessageBox.critical(
                 self,
-                "Ошибка операции",
-                f"Задача #{job_id} ({job_type}) завершилась с ошибкой:\n{message}",
+                self.tr("Operation error"),
+                self.tr("Task #{0} ({1}) failed with an error:\n{2}").format(
+                    job_id, job_type, message
+                ),
             )
             return
 
-        summary_lines = [f"{len(pending)} операций завершились с ошибкой:"]
+        summary_lines = [self.tr("{0} operations failed:").format(len(pending))]
         for job_id, job_type, message in pending[:4]:
             summary_lines.append(f"- #{job_id} ({job_type}): {message}")
         if len(pending) > 4:
-            summary_lines.append(f"... и ещё {len(pending) - 4}")
-        QMessageBox.critical(self, "Множественные ошибки", "\n".join(summary_lines))
+            summary_lines.append(self.tr("... and {0} more").format(len(pending) - 4))
+        QMessageBox.critical(self, self.tr("Multiple errors"), "\n".join(summary_lines))
 
     def _on_folder_context_menu(self, pos) -> None:
 
@@ -490,18 +513,18 @@ class MiscMixin:
             if folder:
                 short = folder.rsplit("/", 1)[-1]
                 menu.addAction(
-                    f"Создать подпапку в '{short}'",
+                    self.tr("Create subfolder in '{0}'").format(short),
                     lambda f=folder: self._on_create_folder(f),
                 )
                 menu.addAction(
-                    f"Скачать папку '{short}'",
+                    self.tr("Download folder '{0}'").format(short),
                     lambda f=folder: self._on_download_folder(folder_path=f),
                 )
                 menu.addAction(
-                    f"Синхронизировать '{short}'",
+                    self.tr("Sync '{0}'").format(short),
                     lambda f=folder: self._on_sync_folder(f),
                 )
-                autosync_act = menu.addAction("Автосинхронизация")
+                autosync_act = menu.addAction(self.tr("Auto-sync"))
                 autosync_act.setCheckable(True)
                 autosync_act.setChecked(self.repo.is_folder_synced(folder))
                 autosync_act.toggled.connect(
@@ -512,7 +535,9 @@ class MiscMixin:
                 menu.addAction(self.action_reconcile)
                 menu.addAction(self.action_reindex)
                 menu.addSeparator()
-                delete_act = menu.addAction(f"Удалить папку '{short}'")
+                delete_act = menu.addAction(
+                    self.tr("Delete folder '{0}'").format(short)
+                )
                 triggered = menu.exec(global_pos)
                 if triggered == delete_act:
                     self._on_delete_folder(folder)

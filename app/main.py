@@ -77,8 +77,8 @@ def run() -> int:
     icon_path = _resolve_app_icon_path()
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
-    # Не cwd: frozen-приложение запускают из произвольной директории —
-    # config.json ищем рядом с exe / в корне проекта (default_config_path).
+    # Not cwd: a frozen build is launched from an arbitrary directory — look
+    # for config.json next to the exe / at the project root (default_config_path).
     config_path = default_config_path()
 
     if not config_exists(config_path):
@@ -93,14 +93,15 @@ def run() -> int:
         _show_error(str(exc))
         return 1
 
-    # Логирование уже настроено в самом начале run() (var/logs/tgccm.log,
-    # ротация). Раньше здесь был повторный setup_logging(..., cache_dir/tgccm.log)
-    # "чтобы логи лежали рядом с данными" — но setup_logging полностью заменяет
-    # хендлеры, поэтому вместо переноса это давало ДВА файла: старый (var/logs/)
-    # с парой строк до реконфигурации, сиротски остающийся при каждом запуске, и
-    # новый (var/cache/). cache_dir — для кэша, а не логов, так что просто не
-    # переоткрываем лог второй раз.
-    # Логирование аккаунтов из БД
+    # Logging was already set up at the very start of run() (var/logs/tgccm.log,
+    # with rotation). This used to call setup_logging(..., cache_dir/tgccm.log)
+    # a second time here "to keep logs next to the data" — but setup_logging
+    # fully replaces the handlers, so instead of moving the log it produced
+    # TWO files: the old one (var/logs/) with a couple of lines before the
+    # reconfiguration, orphaned on every run, and a new one (var/cache/).
+    # cache_dir is for cache, not logs, so we simply don't reopen the log a
+    # second time.
+    # Log the accounts loaded from the DB.
     db_path_for_accounts = _database_path_from_session(config.tg_session_path)
     conn_for_accounts = connect_db(db_path_for_accounts)
     try:
@@ -173,7 +174,7 @@ def run() -> int:
     window.show()
     worker.start()
 
-    # Локальный REST API (инкремент 5) — выключен по умолчанию, см. config.api.
+    # Local REST API — disabled by default, see config.api.
     api_server = ApiServer(config, repo, worker)
     window.api_server = api_server
     try:

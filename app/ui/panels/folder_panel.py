@@ -114,7 +114,7 @@ class FolderPanelMixin:
             # downloads). Download is explicit now: the D shortcut, the toolbar
             # button, or the right-click menu. Exception: images/videos open in
             # a preview WITHOUT downloading, streamed via the local media server
-            # (same path as the "Открыть без скачивания" menu action).
+            # (same path as the "Open without downloading" menu action).
             name = item.entry.orig_name
             if is_image_name(name) or is_video_name(name) or is_pdf_name(name):
                 self._on_open_stream(item.entry)

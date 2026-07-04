@@ -253,9 +253,9 @@ class JobEventsMixin:
         if not suppress_individual_toast:
             toast = self._toast_by_job_id.get(event.job_id)
             if not self._toast_overlay.is_card_alive(toast):
-                # Карточка отсутствует или была вытеснена лимитом видимых
-                # уведомлений — пробуем поднять по request_id, иначе создаём
-                # заново, чтобы активный процесс снова стал виден.
+                # The card is missing or was evicted by the visible-notification
+                # limit — try to recover it by request_id, otherwise create a
+                # new one so the active process is visible again.
                 self._toast_by_job_id.pop(event.job_id, None)
                 toast = None
                 if request_id and request_id in self._toast_by_request_id:
@@ -309,8 +309,8 @@ class JobEventsMixin:
             return
 
         if event.status in {JobStatus.DONE, JobStatus.CANCELLED, JobStatus.ERROR}:
-            # Первичная сверка завершилась (успехом или ошибкой) — прячем
-            # стартовый экран загрузки: данные подгружены/сверены.
+            # The initial reconciliation finished (success or failure) — hide
+            # the startup loading screen: data has been loaded/reconciled.
             if payload.get("_ui_initial_load") and hasattr(
                 self, "_finish_startup_overlay"
             ):
@@ -368,7 +368,7 @@ class JobEventsMixin:
                 if not still_busy:
                     self._tray.showMessage(
                         "TG Cloud",
-                        "Операция завершена",
+                        self.tr("Operation completed"),
                         QSystemTrayIcon.MessageIcon.Information,
                         3000,
                     )
@@ -392,7 +392,7 @@ class JobEventsMixin:
                 if not still_busy:
                     self._tray.showMessage(
                         "TG Cloud",
-                        "Операция завершена с ошибками",
+                        self.tr("Operation completed with errors"),
                         QSystemTrayIcon.MessageIcon.Warning,
                         3000,
                     )
@@ -859,5 +859,5 @@ class JobEventsMixin:
             f"Watchdog: possible stalled job(s) {ids}. No progress updates for >{int(self._STALE_JOB_SECONDS)}s."
         )
         self.statusBar().showMessage(
-            "Некоторые задачи зависли; попробуйте отменить и запустить заново"
+            self.tr("Some tasks appear stalled; try cancelling and starting again")
         )

@@ -16,18 +16,18 @@ from app.ui.dialogs import ask_confirm_incomplete_download, ConfirmDialog
 class TransferOpsMixin:
     """Methods for download, delete, transfer progress, and busy state."""
 
-    # Окно усреднения скорости/ETA (сек). Скорость = прирост байт за это окно
-    # реального времени → устойчиво к пачкам событий и крупным кускам загрузки.
+    # Speed/ETA averaging window (sec). Speed = bytes gained over this real-time
+    # window → resilient to bursty events and large download chunks.
     _ETA_WINDOW_SEC = 6.0
-    # Минимальный размах окна, чтобы вообще показывать скорость/ETA (защита от
-    # деления на ~0 при двух почти одновременных сэмплах).
+    # Minimum window span before we show speed/ETA at all (guards against
+    # dividing by ~0 when two samples arrive almost simultaneously).
     _ETA_MIN_SPAN_SEC = 0.25
-    # Лёгкая EMA поверх оконной скорости — сглаживает скачки на краю окна.
+    # A light EMA on top of the windowed speed — smooths jumps at the window edge.
     _ETA_SMOOTH_ALPHA = 0.35
-    # Свыше стольких джоб скачивания — спрашиваем подтверждение: тысячи джоб
-    # (папка из тысяч обычных, не-batch файлов) заливают UI событиями и
-    # выглядят как зависание. Batch-члены уже сгруппированы по blob'ам и в
-    # лимит обычно не упираются.
+    # Above this many download jobs, ask for confirmation: thousands of jobs
+    # (a folder of thousands of regular, non-batch files) flood the UI with
+    # events and look like a hang. Batch members are already grouped by blob
+    # and usually don't hit this limit.
     _MASS_DOWNLOAD_CONFIRM_THRESHOLD = 200
 
     def _on_download(
@@ -65,23 +65,23 @@ class TransferOpsMixin:
         if not target_folder:
             QMessageBox.information(
                 self,
-                "Скачивание папки",
-                "Сначала откройте папку или выберите её в дереве папок.",
+                self.tr("Download folder"),
+                self.tr("Open a folder first, or select it in the folder tree."),
             )
             return
 
         try:
             normalized_folder = normalize_folder_path(target_folder)
         except ValueError as exc:
-            QMessageBox.warning(self, "Скачивание папки", str(exc))
+            QMessageBox.warning(self, self.tr("Download folder"), str(exc))
             return
 
         targets = self.repo.list_objects_recursive(normalized_folder)
         if not targets:
             QMessageBox.information(
                 self,
-                "Скачивание папки",
-                f"Папка '{normalized_folder}' пуста.",
+                self.tr("Download folder"),
+                self.tr("Folder '{0}' is empty.").format(normalized_folder),
             )
             return
 
@@ -147,8 +147,8 @@ class TransferOpsMixin:
         """Enqueue downloads efficiently: regular files = one job each; batch
         members are grouped by their blob so one job pulls a blob and extracts
         all its requested members (avoids 1 job per file → UI flood/freeze).
-        ``confirm=False`` пропускает подтверждение массового скачивания
-        (фоновый автосинк — пользователя может не быть за экраном).
+        ``confirm=False`` skips the mass-download confirmation (used by the
+        background auto-sync, where the user may not be at the screen).
         Returns the number of jobs enqueued."""
         regular: list = []
         member_groups: dict[str, list] = {}
@@ -164,12 +164,12 @@ class TransferOpsMixin:
         if confirm and job_count >= self._MASS_DOWNLOAD_CONFIRM_THRESHOLD:
             reply = QMessageBox.question(
                 self,
-                "Массовое скачивание",
-                (
-                    f"Будет создано {job_count} задач скачивания "
-                    f"(файлов: {len(queue_targets)}).\n"
-                    "Это может надолго занять очередь и интерфейс.\n\nПродолжить?"
-                ),
+                self.tr("Mass download"),
+                self.tr(
+                    "This will create {jobs} download tasks ({files} file(s)).\n"
+                    "This may occupy the queue and interface for a long time.\n\n"
+                    "Continue?"
+                ).format(jobs=job_count, files=len(queue_targets)),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
@@ -203,7 +203,7 @@ class TransferOpsMixin:
             "blob_key": str(blob_key),
             "member_file_keys": [str(m.file_key) for m in members],
             "folder_path": folder,
-            "orig_name": f"{len(members)} файл(ов) из пачки",
+            "orig_name": self.tr("{0} file(s) from a batch").format(len(members)),
             "_ui_total_bytes": int(max(0, total_bytes)),
             "_lane": "download",
         }
@@ -245,17 +245,18 @@ class TransferOpsMixin:
         if not needs:
             if not quiet:
                 self.progress_widget.append_log(
-                    f"Синхронизация '{normalized}': всё актуально"
+                    self.tr("Sync '{0}': everything is up to date").format(normalized)
                 )
             return 0
-        # quiet-автосинк идёт фоном (worker ready) — там подтверждение
-        # показывать некому; ручной запуск («Синхронизировать») спрашивает.
+        # Quiet auto-sync runs in the background (worker ready) — there's no
+        # one to show a confirmation to; the manual "Sync" action asks.
         job_count = self._enqueue_download_group(
             needs, fast=False, allow_incomplete=False, confirm=not quiet
         )
         self.progress_widget.append_log(
-            f"Синхронизация '{normalized}': {len(needs)} файл(ов) к загрузке "
-            f"(задач: {job_count})"
+            self.tr("Sync '{0}': {1} file(s) to download ({2} job(s))").format(
+                normalized, len(needs), job_count
+            )
         )
         return job_count
 
@@ -272,12 +273,12 @@ class TransferOpsMixin:
         self.repo.set_folder_sync(normalized, enabled)
         if enabled:
             self.progress_widget.append_log(
-                f"Автосинхронизация включена: '{normalized}'"
+                self.tr("Auto-sync enabled: '{0}'").format(normalized)
             )
             self._sync_folder(normalized, quiet=True)
         else:
             self.progress_widget.append_log(
-                f"Автосинхронизация выключена: '{normalized}'"
+                self.tr("Auto-sync disabled: '{0}'").format(normalized)
             )
 
     def _sync_all_marked_folders(self) -> None:
@@ -291,14 +292,14 @@ class TransferOpsMixin:
             total_jobs += self._sync_folder(folder, quiet=True)
         if total_jobs > 0:
             self.progress_widget.append_log(
-                f"Автосинхронизация: поставлено задач — {total_jobs}"
+                self.tr("Auto-sync: queued {0} job(s)").format(total_jobs)
             )
 
     def _on_delete_remote(self) -> None:
         entries = self._selected_objects()
         self._confirm_and_enqueue_delete_files(entries)
 
-    # === Корзина (soft-delete) ===
+    # === Trash (soft-delete) ===
 
     def _on_move_to_trash(self) -> None:
         entries = self._selected_objects()
@@ -316,9 +317,13 @@ class TransferOpsMixin:
                 )
                 moved += 1
             except Exception as exc:  # noqa: BLE001
-                self.progress_widget.append_log(f"В корзину не удалось: {exc}")
+                self.progress_widget.append_log(
+                    self.tr("Move to trash failed: {0}").format(exc)
+                )
         if moved:
-            self.progress_widget.append_log(f"В корзину: {moved} файл(ов)")
+            self.progress_widget.append_log(
+                self.tr("Moved to trash: {0} file(s)").format(moved)
+            )
             self.reload_items()
 
     def _on_restore_from_trash(self) -> None:
@@ -336,7 +341,7 @@ class TransferOpsMixin:
         entries = self._selected_objects()
         if not entries:
             return
-        # Реальный remote-delete (с подтверждением), затем убираем из корзины.
+        # Actual remote delete (with confirmation), then remove from trash.
         if not self._confirm_and_enqueue_delete_files(entries):
             return
         for entry in entries:
@@ -368,15 +373,19 @@ class TransferOpsMixin:
 
         if len(entries) == 1:
             dialog = ConfirmDialog(
-                title="Удаление из облака",
-                message=f"Удалить '{entries[0].orig_name}' из Telegram?",
+                title=self.tr("Delete from the cloud"),
+                message=self.tr("Delete '{0}' from Telegram?").format(
+                    entries[0].orig_name
+                ),
                 parent=self,
                 is_destructive=True,
             )
         else:
             dialog = ConfirmDialog(
-                title="Удаление из облака",
-                message=f"Удалить выбранные файлы ({len(entries)} шт.) из Telegram?",
+                title=self.tr("Delete from the cloud"),
+                message=self.tr(
+                    "Delete the selected files ({0}) from Telegram?"
+                ).format(len(entries)),
                 parent=self,
                 is_destructive=True,
             )
@@ -404,8 +413,10 @@ class TransferOpsMixin:
 
         if len(entries) > 1:
             dialog = ConfirmDialog(
-                title="Удалить локально",
-                message=f"Удалить локальные копии для выбранных файлов ({len(entries)} шт.)?",
+                title=self.tr("Delete locally"),
+                message=self.tr(
+                    "Delete the local copies of the selected files ({0})?"
+                ).format(len(entries)),
                 parent=self,
                 is_destructive=True,
             )
@@ -447,7 +458,9 @@ class TransferOpsMixin:
         if len(entries) == 1 and missing:
             local_path = missing_example_path or Path(entries[0].orig_name)
             QMessageBox.information(
-                self, "Удаление локального", f"Файл не найден:\n{local_path}"
+                self,
+                self.tr("Delete locally"),
+                self.tr("File not found:\n{0}").format(local_path),
             )
             return
 
@@ -462,7 +475,7 @@ class TransferOpsMixin:
             details = "\n".join(errors[:3])
             if len(errors) > 3:
                 details += f"\n... and {len(errors) - 3} more"
-            QMessageBox.critical(self, "Удаление локального", details)
+            QMessageBox.critical(self, self.tr("Delete locally"), details)
 
     def _on_delete_folder(self, folder_path: str) -> None:
         self._confirm_and_enqueue_delete_folders([folder_path])
@@ -478,15 +491,19 @@ class TransferOpsMixin:
         total_files = sum(file_counts)
         if len(targets) == 1:
             dialog = ConfirmDialog(
-                title="Удаление папки",
-                message=f"Удалить все файлы ({total_files} шт.) в папке '{targets[0]}' из Telegram?",
+                title=self.tr("Delete folder"),
+                message=self.tr(
+                    "Delete all files ({0}) in folder '{1}' from Telegram?"
+                ).format(total_files, targets[0]),
                 parent=self,
                 is_destructive=True,
             )
         else:
             dialog = ConfirmDialog(
-                title="Удаление папок",
-                message=f"Удалить все файлы ({total_files} шт.) в выбранных папках ({len(targets)} шт.) из Telegram?",
+                title=self.tr("Delete folders"),
+                message=self.tr(
+                    "Delete all files ({0}) in the selected folders ({1}) from Telegram?"
+                ).format(total_files, len(targets)),
                 parent=self,
                 is_destructive=True,
             )
@@ -635,38 +652,41 @@ class TransferOpsMixin:
 
         now = time.monotonic()
         samples = self._eta_samples
-        # Регресс done_bytes (сменился активный набор: джоба завершилась/новая
-        # добавилась, агрегат пересчитан) — окно больше не валидно, начинаем заново.
+        # done_bytes regressed (the active set changed: a job finished/a new one
+        # was added, the aggregate was recomputed) — the window is no longer
+        # valid, start over.
         if samples and done_bytes + 1.0 < samples[-1][1]:
             samples.clear()
         samples.append((now, done_bytes))
-        # Выкидываем сэмплы старше окна, но оставляем минимум 2 точки для расчёта.
+        # Drop samples older than the window, but keep at least 2 points for the
+        # calculation.
         while len(samples) > 2 and (now - samples[0][0]) > self._ETA_WINDOW_SEC:
             samples.popleft()
 
         if len(samples) >= 2:
             t0, b0 = samples[0]
-            # Знаменатель флорим — защита от деления на ~0, когда два сэмпла
-            # пришли почти одновременно (в реале span настоящий и флор не влияет).
+            # Floor the denominator — guards against dividing by ~0 when two
+            # samples arrive almost simultaneously (in practice the span is real
+            # and the floor doesn't matter).
             span = max(self._ETA_MIN_SPAN_SEC, now - t0)
-            # Средняя скорость за реальное окно — устойчива к пачкам событий и к
-            # тому, что часть «падает» целиком за один опрос.
+            # Average speed over the real window — resilient to bursty events
+            # and to a chunk "landing" all at once in a single poll.
             window_speed = max(0.0, (done_bytes - b0) / span)
             if window_speed > 0.0:
                 if self._eta_display_speed_bps <= 0.0:
                     self._eta_display_speed_bps = window_speed
                 else:
-                    # Лёгкая EMA поверх окна гасит ступеньки при вытеснении
-                    # крайнего сэмпла.
+                    # A light EMA on top of the window smooths steps when the
+                    # oldest sample is evicted.
                     self._eta_display_speed_bps = (
                         self._ETA_SMOOTH_ALPHA * window_speed
                         + (1.0 - self._ETA_SMOOTH_ALPHA) * self._eta_display_speed_bps
                     )
             elif (now - t0) >= self._ETA_WINDOW_SEC:
-                # Прогресса нет всё окно — реальный стопор, честно показываем 0
-                # (а не плавно затухаем по числу вызовов).
+                # No progress for the whole window — a genuine stall, honestly
+                # show 0 (instead of smoothly decaying by call count).
                 self._eta_display_speed_bps = 0.0
-            # иначе короткая пауза между кусками — держим прошлую скорость.
+            # otherwise: a short pause between chunks — keep the previous speed.
 
         pct = max(0.0, min(100.0, (done_bytes / total_bytes) * 100.0))
         if pct < 1.0:
@@ -706,10 +726,10 @@ class TransferOpsMixin:
     @staticmethod
     def _human_eta(seconds: float) -> str:
         total = max(0, int(round(float(seconds))))
-        # Квантуем по «приятным» шагам, чтобы значение не дёргалось на ±1 при
-        # микроколебаниях скорости (14s→13s→15s выглядит нервно).
+        # Quantize to "nice" steps so the value doesn't jitter by ±1 on small
+        # speed fluctuations (14s→13s→15s looks jumpy).
         if total <= 10:
-            pass  # секунды как есть — мелкие значения и так понятны
+            pass  # keep seconds as-is — small values are clear on their own
         elif total < 60:
             total = int(round(total / 5.0)) * 5
         elif total < 600:

@@ -48,20 +48,12 @@ class ExplorerFileItem:
     entry: ObjectEntry
     local_path: str | None = None
     local_exists: bool = False
-    # Состояние с учётом живых аккаунтов: complete/incomplete/offline/damaged.
+    # State accounting for live accounts: complete/incomplete/offline/damaged.
     display_state: str | None = None
-    # Пользовательская заметка (минипометка).
+    # User note (small caption).
     note: str = ""
-    # Миниатюра для картинок (если уже построена); иначе типовая иконка.
+    # Thumbnail for images (if already built); otherwise a generic icon.
     thumbnail: QIcon | None = None
-
-
-# Авто-подпись (минипометка) под именем для проблемных состояний.
-_DISPLAY_STATE_LABELS = {
-    "incomplete": "⚠ не дозалит",
-    "offline": "☁ аккаунт оффлайн",
-    "damaged": "✖ повреждён",
-}
 
 
 @dataclass
@@ -86,11 +78,12 @@ class FolderTreeModel(QAbstractItemModel):
         self._folder_signature: tuple[str, ...] = ()
 
     def set_folders(self, folders: list[str]) -> None:
-        # Структура папок при скачивании/выгрузке файлов не меняется, а
-        # reload_all() дёргает set_folders на каждом завершении джобы. Полный
-        # beginResetModel схлопывает дерево и сбрасывает выделение → визуально
-        # папки слева «прыгают» (мигают). Если набор папок тот же — выходим без
-        # сброса модели, сохраняя раскрытие/выделение.
+        # The folder structure doesn't change while downloading/uploading files,
+        # but reload_all() calls set_folders() on every job completion. A full
+        # beginResetModel collapses the tree and clears the selection -> the
+        # folders on the left visually "jump" (flicker). If the folder set is
+        # unchanged, bail out without resetting the model, preserving
+        # expansion/selection state.
         signature = tuple(sorted(set(folders), key=lambda x: x.lower()))
         if signature == self._folder_signature:
             return
@@ -213,12 +206,12 @@ class ExplorerGridModel(QAbstractListModel):
         self._transfer_states: dict[tuple[str, str], str] = {}
         self._loading_phase = 0
 
-        # Размер иконок: 58пк по умолчанию, может быть изменён через set_icon_size()
+        # Icon size: 58px by default, can be changed via set_icon_size()
         self._icon_size = 58
 
-        # Превью картинок: размер, дисковый кэш и in-memory поверх него, курсор
-        # ленивого обхода (как у local-presence). thumb_cache_dir может быть None
-        # в тестах/без конфига — тогда только in-memory.
+        # Image previews: size, disk cache and an in-memory layer on top of it,
+        # plus a lazy-scan cursor (like local-presence). thumb_cache_dir can be
+        # None in tests/without a config -- then it's in-memory only.
         self._thumb_size = 58
         self._thumb_cache_dir = thumb_cache_dir
         self._thumb_mem: dict[str, QIcon] = {}
@@ -317,7 +310,7 @@ class ExplorerGridModel(QAbstractListModel):
         except Exception:
             return False
 
-    # ── Превью картинок ──────────────────────────────────────────────────
+    # ── Image previews ───────────────────────────────────────────────────
     def _thumb_key(self, entry: ObjectEntry) -> str:
         import hashlib
 
@@ -330,8 +323,8 @@ class ExplorerGridModel(QAbstractListModel):
         return Path(self._thumb_cache_dir) / f"{self._thumb_key(entry)}.png"
 
     def _load_or_build_thumbnail(self, item: ExplorerFileItem) -> QIcon | None:
-        """Достать миниатюру: память → диск → построить из локального файла.
-        Возвращает None, если построить не удалось (фолбэк на типовую иконку)."""
+        """Fetch a thumbnail: memory -> disk -> build from the local file.
+        Returns None if it couldn't be built (fall back to a generic icon)."""
         entry = item.entry
         key = self._thumb_key(entry)
         cached = self._thumb_mem.get(key)
@@ -348,15 +341,16 @@ class ExplorerGridModel(QAbstractListModel):
 
         if not item.local_path or not self._check_local_exists(item.local_path):
             return None
-        # Видео-постер строится в фоне через ffmpeg (см. video_rows_needing_poster),
-        # синхронно здесь — только дешёвый декод картинок.
+        # The video poster is built in the background via ffmpeg (see
+        # video_rows_needing_poster); synchronously here we only do the cheap
+        # image decode.
         if not is_image_name(entry.orig_name):
             return None
         icon = make_thumbnail_icon(item.local_path, self._thumb_size)
         if icon is None:
             return None
         self._thumb_mem[key] = icon
-        # Сохраняем на диск (best-effort), чтобы пережить рестарт.
+        # Save to disk (best-effort) so it survives a restart.
         if disk is not None:
             try:
                 disk.parent.mkdir(parents=True, exist_ok=True)
@@ -370,8 +364,8 @@ class ExplorerGridModel(QAbstractListModel):
     def set_thumbnail_from_path(
         self, folder_path: str, file_key: str, image_path: str
     ) -> bool:
-        """Построить миниатюру из произвольного файла (напр. временно скачанного
-        для нескачанной картинки) и проставить её всем строкам объекта."""
+        """Build a thumbnail from an arbitrary file (e.g. temporarily downloaded
+        for a not-yet-downloaded image) and apply it to all rows of the object."""
         rows = self._object_rows.get((folder_path, file_key)) or []
         if not rows:
             return False
@@ -413,8 +407,9 @@ class ExplorerGridModel(QAbstractListModel):
         self._emit_data_changed_rows([row], [Qt.ItemDataRole.DecorationRole])
 
     def image_rows_needing_fetch(self, max_items: int = 8) -> list[ExplorerFileItem]:
-        """Картинки без миниатюры, которых нет локально и нет в кэше — кандидаты
-        на фоновую дозагрузку ради превью (инкремент 1b)."""
+        """Images without a thumbnail that aren't local and aren't cached --
+        candidates for a background fetch for the sake of a preview
+        (increment 1b)."""
         out: list[ExplorerFileItem] = []
         for row in self._file_rows:
             if row < 0 or row >= len(self._items):
@@ -437,9 +432,10 @@ class ExplorerGridModel(QAbstractListModel):
         return out
 
     def video_rows_needing_poster(self, max_items: int = 4) -> list[ExplorerFileItem]:
-        """Локальные видео без постера и без кэша — кандидаты на фоновое
-        построение кадра через ffmpeg (инкремент 4). В отличие от картинок,
-        строим только из СКАЧАННЫХ файлов (тянуть видео ради кадра дорого)."""
+        """Local videos without a poster and without a cache entry -- candidates
+        for a background frame build via ffmpeg (increment 4). Unlike images,
+        we only build from DOWNLOADED files (pulling a whole video just for a
+        frame is expensive)."""
         out: list[ExplorerFileItem] = []
         for row in self._file_rows:
             if row < 0 or row >= len(self._items):
@@ -464,9 +460,10 @@ class ExplorerGridModel(QAbstractListModel):
     def video_rows_needing_remote_poster(
         self, max_items: int = 2
     ) -> list[ExplorerFileItem]:
-        """Видео БЕЗ постера, которых нет локально и нет в кэше — кандидаты на
-        фоновое построение кадра по ПРЕФИКСУ (тянем только первую часть).
-        В отличие от video_rows_needing_poster — именно для НЕскачанных файлов."""
+        """Videos WITHOUT a poster that aren't local and aren't cached --
+        candidates for a background frame build from a PREFIX (only the first
+        part is pulled). Unlike video_rows_needing_poster, this is
+        specifically for NOT-yet-downloaded files."""
         out: list[ExplorerFileItem] = []
         for row in self._file_rows:
             if row < 0 or row >= len(self._items):
@@ -489,8 +486,8 @@ class ExplorerGridModel(QAbstractListModel):
         return out
 
     def refresh_thumbnails_step(self, max_items: int = 12) -> bool:
-        """Ленивый шаг построения миниатюр для видимых картинок (зеркало
-        refresh_local_presence_step). Строит только из локальных файлов/кэша."""
+        """Lazy step of building thumbnails for visible images (mirrors
+        refresh_local_presence_step). Builds only from local files/cache."""
         if not self._file_rows:
             self._thumb_cursor = 0
             return False
@@ -568,7 +565,7 @@ class ExplorerGridModel(QAbstractListModel):
             badge_kind = "not_downloaded"
 
         state = item.display_state or entry.status
-        auto_label = _DISPLAY_STATE_LABELS.get(state, "")
+        auto_label = self._display_state_label(state)
         minimark = (item.note or "").strip() or auto_label
 
         if role == Qt.ItemDataRole.DisplayRole:
@@ -589,7 +586,9 @@ class ExplorerGridModel(QAbstractListModel):
             progress = 0
             if entry.parts_total > 0:
                 progress = int((entry.have_parts / entry.parts_total) * 100)
-            note_line = f"Заметка: {item.note}\n" if (item.note or "").strip() else ""
+            note_line = (
+                f"{self.tr('Note')}: {item.note}\n" if (item.note or "").strip() else ""
+            )
             return (
                 f"Name: {entry.orig_name}\n"
                 f"Folder: {entry.folder_path}\n"
@@ -643,6 +642,16 @@ class ExplorerGridModel(QAbstractListModel):
             return "file"
 
         return None
+
+    def _display_state_label(self, state: str) -> str:
+        """Auto-caption shown under the file name for problematic states."""
+        if state == "incomplete":
+            return self.tr("⚠ not fully downloaded")
+        if state == "offline":
+            return self.tr("☁ account offline")
+        if state == "damaged":
+            return self.tr("✖ damaged")
+        return ""
 
     def _file_icon_for_state(
         self,

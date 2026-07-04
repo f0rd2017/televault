@@ -484,38 +484,39 @@ def _file_extension_token(file_name: str) -> str:
 
 
 def is_image_name(file_name: str) -> bool:
-    """Картинка ли это (по расширению) — для превью в гриде."""
+    """Whether this is an image (by extension) -- for the grid preview."""
     return _EXTENSION_GROUPS.get(_file_extension_token(file_name)) == "image"
 
 
 def is_video_name(file_name: str) -> bool:
-    """Видео ли это (по расширению) — для кадра-постера в гриде (инкремент 4)."""
+    """Whether this is a video (by extension) -- for the poster frame in the
+    grid (increment 4)."""
     return _EXTENSION_GROUPS.get(_file_extension_token(file_name)) == "video"
 
 
 def is_pdf_name(file_name: str) -> bool:
-    """PDF-документ (по расширению) — для встроенного просмотра."""
+    """PDF document (by extension) -- for the built-in viewer."""
     return _EXTENSION_GROUPS.get(_file_extension_token(file_name)) == "pdf"
 
 
 def is_text_editable_name(file_name: str) -> bool:
-    """Текстовые и кодовые файлы (а также файлы без расширения), которые можно
-    открыть в редакторе."""
+    """Text and code files (as well as files with no extension) that can be
+    opened in the editor."""
     token = _file_extension_token(file_name)
     if token == "file":
-        # Имя без расширения (напр. '1232113123123') — трактуем как текст,
-        # чтобы такой файл открывался по двойному клику.
+        # A name with no extension (e.g. '1232113123123') -- treat it as
+        # text so such a file opens on double-click.
         return True
     return _EXTENSION_GROUPS.get(token) in ("text", "code")
 
 
 def make_thumbnail_icon(path: str, size: int = 58) -> QIcon | None:
-    """Миниатюра из локального файла-картинки. `QImageReader.setScaledSize`
-    декодирует сразу уменьшенным — память не жрёт на больших картинках.
-    На ошибке возвращает None (фолбэк на типовую иконку)."""
+    """Thumbnail from a local image file. `QImageReader.setScaledSize`
+    decodes it already downscaled -- no memory hog on large images.
+    Returns None on error (fall back to a generic icon)."""
     try:
         reader = QImageReader(str(path))
-        reader.setAutoTransform(True)  # учесть EXIF-ориентацию
+        reader.setAutoTransform(True)  # honor EXIF orientation
         src = reader.size()
         if not src.isValid() or src.width() <= 0 or src.height() <= 0:
             return None
@@ -759,8 +760,8 @@ def _draw_extension_glyph(
 
 def _build_typed_file_icon(file_name: str, status: str, size: int = 58) -> QIcon:
     label, accent, border, _chip, glyph_kind = _extension_visual_style(file_name)
-    # Цвет акцента/угловой метки по состоянию: damaged=красный, offline=синий,
-    # прочие незавершённые=оранжевый.
+    # Accent/corner-mark color by state: damaged=red, offline=blue,
+    # other incomplete states=orange.
     warn_glyph = "!"
     if status == "damaged":
         accent = QColor("#fc8181")  # red

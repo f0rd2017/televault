@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 from app.core.types import JobEvent, JobStatus
 
 _CARD_H = 78
-# Максимум одновременно видимых карточек-уведомлений в оверлее.
+# Maximum number of notification cards simultaneously visible in the overlay.
 _MAX_VISIBLE_CARDS = 2
 
 
@@ -47,7 +47,7 @@ class JobToastCard(QWidget):
         )
 
         # Status label
-        self._status_label = QLabel("В очереди", self)
+        self._status_label = QLabel(self.tr("Queued"), self)
         self._status_label.setGeometry(12, 27, 228, 16)
         self._status_label.setStyleSheet(
             "color: #a1a1aa; font-size: 10px; background: transparent; border: none;"
@@ -90,12 +90,14 @@ class JobToastCard(QWidget):
             self.job_id = event.job_id
 
         status_text = {
-            JobStatus.QUEUED: "В очереди",
-            JobStatus.STARTED: "Запуск…",
-            JobStatus.RUNNING: event.message or "В процессе…",
-            JobStatus.DONE: "Завершено",
-            JobStatus.ERROR: f"Ошибка: {event.error or 'неизвестно'}",
-            JobStatus.CANCELLED: "Отменено",
+            JobStatus.QUEUED: self.tr("Queued"),
+            JobStatus.STARTED: self.tr("Starting…"),
+            JobStatus.RUNNING: event.message or self.tr("In progress…"),
+            JobStatus.DONE: self.tr("Done"),
+            JobStatus.ERROR: self.tr("Error: {0}").format(
+                event.error or self.tr("unknown")
+            ),
+            JobStatus.CANCELLED: self.tr("Cancelled"),
         }.get(event.status, str(event.status))
 
         self._status_label.setText(status_text)
@@ -167,12 +169,12 @@ class JobToastOverlay(QWidget):
 
         # Header with Clear button
         header_layout = QHBoxLayout()
-        header_label = QLabel("Процессы")
+        header_label = QLabel(self.tr("Processes"))
         header_label.setStyleSheet(
             "color: #e4e4e7; font-size: 13px; font-weight: bold; background: transparent;"
         )
 
-        self.clear_btn = QPushButton("Очистить завершённые")
+        self.clear_btn = QPushButton(self.tr("Clear completed"))
         self.clear_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.clear_btn.setStyleSheet("""
             QPushButton {
@@ -211,7 +213,7 @@ class JobToastOverlay(QWidget):
         self.scroll_layout.addWidget(card)
         self._cards.append(card)
 
-        # Ограничиваем число одновременно видимых карточек.
+        # Enforce the limit on simultaneously visible cards.
         self._enforce_visible_limit()
 
         # Scroll to bottom slightly after adding
@@ -228,11 +230,11 @@ class JobToastOverlay(QWidget):
 
     @staticmethod
     def is_card_alive(card: JobToastCard | None) -> bool:
-        """True, если карточка ещё существует (не была вытеснена/удалена).
+        """True if the card still exists (wasn't evicted/removed).
 
-        Карточку может вытеснить лимит видимых уведомлений, а внешний код
-        нередко хранит на неё ссылку в словарях job_id/request_id — обращение
-        к удалённому Qt-объекту привело бы к падению.
+        A card can be evicted by the visible-notifications limit, and
+        external code often keeps a reference to it in job_id/request_id
+        dicts -- touching a deleted Qt object would crash.
         """
         if card is None:
             return False
@@ -249,11 +251,11 @@ class JobToastOverlay(QWidget):
         card.deleteLater()
 
     def _enforce_visible_limit(self) -> None:
-        """Удерживаем не более ``_MAX_VISIBLE_CARDS`` карточек.
+        """Keep no more than ``_MAX_VISIBLE_CARDS`` cards.
 
-        Вытесняем в первую очередь самые старые завершённые уведомления,
-        чтобы активные процессы оставались на виду; если завершённых нет —
-        убираем самые старые карточки.
+        We evict the oldest completed notifications first, so active
+        processes stay visible; if there are no completed ones, we remove
+        the oldest cards.
         """
         while len(self._cards) > _MAX_VISIBLE_CARDS:
             terminal = next((c for c in self._cards if c.is_terminal), None)

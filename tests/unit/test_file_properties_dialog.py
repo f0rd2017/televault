@@ -61,7 +61,7 @@ def test_properties_dialog_builds_damaged_without_crash():
         connected_labels={"-100a": "Acc1"},
         expected_sha256=None,
     )
-    assert dlg.windowTitle().startswith("Свойства")
+    assert dlg.windowTitle().startswith("Properties")
 
 
 def test_properties_dialog_exposes_note():
@@ -90,7 +90,7 @@ def test_folder_properties_dialog_builds():
         total_subfolders=5,
         synced=True,
     )
-    assert dlg.windowTitle() == "Свойства папки — Cache"
+    assert dlg.windowTitle() == "Folder Properties — Cache"
 
 
 def test_folder_properties_dialog_handles_empty_folder():
@@ -108,4 +108,4 @@ def test_folder_properties_dialog_handles_empty_folder():
         total_subfolders=0,
         synced=False,
     )
-    assert dlg.windowTitle().startswith("Свойства папки")
+    assert dlg.windowTitle().startswith("Folder Properties")

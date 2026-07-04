@@ -21,8 +21,8 @@ class UploadDropMixin:
         if not self.current_folder and not has_dir:
             QMessageBox.warning(
                 self,
-                "Загрузка",
-                "Сначала откройте целевую папку, затем перетащите файлы",
+                self.tr("Upload"),
+                self.tr("Open a target folder first, then drop the files"),
             )
             return
 
@@ -136,10 +136,11 @@ class UploadDropMixin:
     def _coalesce_small_batches_into_session(
         self, jobs: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
-        """Слить все мелкие батчи/файлы одного дропа в одну upload-сессию, чтобы
-        фоновый архиватор готовил следующую пачку, пока текущая льётся (конвейер,
-        без простоя сети на zip-сборке). Крупные файлы остаются отдельными джобами.
-        При <2 мелких джобах ничего не меняем — конвейер не нужен."""
+        """Merge all small batches/files from one drop into a single upload
+        session, so the background archiver prepares the next batch while the
+        current one is being sent (a pipeline, with no network idle time for
+        zip assembly). Large files stay as separate jobs. With <2 small jobs,
+        nothing changes — no pipeline needed."""
         small_jobs = [j for j in jobs if str(j.get("_lane")) == "upload_small"]
         if len(small_jobs) < 2:
             return jobs
@@ -365,11 +366,11 @@ class UploadDropMixin:
 
     def _on_upload(self) -> None:
         if not self.current_folder:
-            QMessageBox.warning(self, "Загрузка", "Сначала откройте папку")
+            QMessageBox.warning(self, self.tr("Upload"), self.tr("Open a folder first"))
             return
 
         file_paths, _ = QFileDialog.getOpenFileNames(
-            self, "Выберите файлы для загрузки"
+            self, self.tr("Select files to upload")
         )
         if not file_paths:
             return

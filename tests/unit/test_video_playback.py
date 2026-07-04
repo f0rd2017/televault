@@ -163,11 +163,11 @@ def test_video_player_shows_buffering_indicator_on_stall(tmp_path):
 
         win._on_media_status(QMediaPlayer.MediaStatus.StalledMedia)
         assert win._buffering is True
-        assert "буферизация" in win._time_label.text()
+        assert "buffering" in win._time_label.text()
 
         win._on_media_status(QMediaPlayer.MediaStatus.BufferedMedia)
         assert win._buffering is False
-        assert "буферизация" not in win._time_label.text()
+        assert "buffering" not in win._time_label.text()
     finally:
         if win is not None:
             win.close()

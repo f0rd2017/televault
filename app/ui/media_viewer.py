@@ -1,15 +1,15 @@
-"""Нативные окна просмотра видео и фото (замена открытия превью в браузере).
+"""Native video/photo viewer windows (replaces opening previews in a browser).
 
-Видео/фото открываются в отдельном top-level окне на Qt и не зависят от
-браузера:
-  * видео — QMediaPlayer + QAudioOutput + QVideoWidget (play/pause/seek/volume,
-    горячие клавиши);
-  * фото — QGraphicsView + QPixmap (зум колесом, панорама перетаскиванием,
-    двойной клик — вписать).
+Video/photo open in a separate top-level Qt window and don't depend on a
+browser:
+  * video — QMediaPlayer + QAudioOutput + QVideoWidget (play/pause/seek/volume,
+    keyboard shortcuts);
+  * photo — QGraphicsView + QPixmap (wheel zoom, drag pan, double-click to
+    fit).
 
-Источник — тот же локальный стрим-сервер (HTTP Range), поэтому файл не
-скачивается целиком. При невозможности создать нативное окно (нет
-мультимедиа-бэкенда и т.п.) выполняется фолбэк на открытие в браузере.
+The source is the same local streaming server (HTTP Range), so the file
+isn't downloaded in full. If a native window can't be created (no
+multimedia backend, etc.) it falls back to opening in the browser.
 """
 
 from __future__ import annotations
@@ -36,8 +36,8 @@ from PySide6.QtWidgets import (
 
 logger = logging.getLogger(__name__)
 
-# Держим ссылки на открытые окна, иначе их соберёт сборщик мусора и окно
-# мгновенно закроется сразу после show().
+# Keep references to open windows, otherwise the garbage collector would
+# collect them and the window would close instantly right after show().
 _OPEN_VIEWERS: set[QWidget] = set()
 
 
@@ -58,10 +58,10 @@ def _format_time(ms: int) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Фото
+# Photo
 # --------------------------------------------------------------------------- #
 class _ImageView(QGraphicsView):
-    """QGraphicsView с зумом колеса и панорамой перетаскиванием."""
+    """QGraphicsView with wheel zoom and drag panning."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -138,7 +138,7 @@ class ImageViewerWindow(QWidget):
         self._view = _ImageView(self)
         layout.addWidget(self._view, 1)
 
-        self._status = QLabel("Загрузка…", self)
+        self._status = QLabel(self.tr("Loading…"), self)
         self._status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._status)
 
@@ -157,13 +157,15 @@ class ImageViewerWindow(QWidget):
             if reply.error() != QNetworkReply.NetworkError.NoError:
                 if self._retries < 5:
                     self._retries += 1
-                    self._status.setText("Буферизация…")
+                    self._status.setText(self.tr("Buffering…"))
                     from PySide6.QtCore import QTimer
 
                     QTimer.singleShot(1500, self._reload)
                     return
                 try:
-                    self._status.setText(f"Ошибка загрузки: {reply.errorString()}")
+                    self._status.setText(
+                        self.tr("Loading error: {0}").format(reply.errorString())
+                    )
                 except RuntimeError:
                     pass
                 return
@@ -175,12 +177,12 @@ class ImageViewerWindow(QWidget):
         from PySide6.QtGui import QImageReader
 
         if not raw:
-            self._show_open_external("Файл пуст.")
+            self._show_open_external(self.tr("The file is empty."))
             return
 
-        # Декодируем через QImageReader: задействуются все доступные Qt
-        # форматные плагины (png/webp/gif/bmp/ico/svg/tga/...) и учитывается
-        # EXIF-ориентация, чтобы фото с телефона не отображалось повёрнутым.
+        # Decode via QImageReader: this uses all available Qt format plugins
+        # (png/webp/gif/bmp/ico/svg/tga/...) and honors EXIF orientation, so a
+        # phone photo doesn't come out rotated.
         buffer = QBuffer(QByteArray(raw), self)
         buffer.open(QIODevice.OpenModeFlag.ReadOnly)
         reader = QImageReader(buffer)
@@ -189,13 +191,13 @@ class ImageViewerWindow(QWidget):
 
         pixmap = QPixmap.fromImage(image) if not image.isNull() else QPixmap()
         if pixmap.isNull():
-            # Последняя попытка — прямой разбор байтов средствами Qt.
+            # Last resort — parse the raw bytes directly via Qt.
             pixmap = QPixmap()
             pixmap.loadFromData(raw)
 
         if pixmap.isNull():
-            # Формат, который Qt декодировать не умеет (heic/avif/tiff/raw/psd
-            # и т.п.) — пробуем сконвертировать в PNG через ffmpeg в фоне.
+            # A format Qt can't decode itself (heic/avif/tiff/raw/psd, etc.) —
+            # try converting to PNG via ffmpeg in the background.
             self._decode_via_ffmpeg_async(raw)
             return
 
@@ -207,11 +209,11 @@ class ImageViewerWindow(QWidget):
         self._reply.finished.connect(self._on_finished)
 
     def _decode_via_ffmpeg_async(self, raw: bytes) -> None:
-        """Фолбэк для форматов, которые Qt не декодирует сам (heic/avif/tiff/
-        raw/psd…): конвертируем в PNG через ffmpeg в фоне."""
+        """Fallback for formats Qt can't decode itself (heic/avif/tiff/
+        raw/psd, etc.): convert to PNG via ffmpeg in the background."""
         import threading
 
-        self._status.setText("Конвертация формата...")
+        self._status.setText(self.tr("Converting format..."))
         self._status.show()
 
         def _worker() -> None:
@@ -249,11 +251,13 @@ class ImageViewerWindow(QWidget):
                     self._status.hide()
                 else:
                     self._show_open_external(
-                        "Не удалось загрузить сконвертированное изображение."
+                        self.tr("Failed to load the converted image.")
                     )
             else:
                 self._show_open_external(
-                    "Этот формат изображения не поддерживается встроенным просмотром."
+                    self.tr(
+                        "This image format is not supported by the built-in viewer."
+                    )
                 )
         finally:
             for path in (src, out_png):
@@ -274,7 +278,7 @@ class ImageViewerWindow(QWidget):
     def _show_open_external(self, message: str) -> None:
         self._status.setText(message)
         self._status.show()
-        btn = QPushButton("Открыть во внешнем приложении", self)
+        btn = QPushButton(self.tr("Open in external application"), self)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
 
         def _open_external() -> None:
@@ -288,10 +292,10 @@ class ImageViewerWindow(QWidget):
 
 
 # --------------------------------------------------------------------------- #
-# Видео
+# Video
 # --------------------------------------------------------------------------- #
 class ClickableSlider(QSlider):
-    """Слайдер, позволяющий кликнуть в любую точку для моментального перехода."""
+    """A slider that lets you click anywhere on it to jump there instantly."""
 
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
@@ -360,7 +364,7 @@ class VideoViewerWindow(QWidget):
         self._position.setCursor(Qt.CursorShape.PointingHandCursor)
         self._time_label = QLabel("0:00 / 0:00", self)
 
-        self._fallback_btn = QPushButton("Внешний плеер", self)
+        self._fallback_btn = QPushButton(self.tr("External player"), self)
         self._fallback_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._fallback_btn.setStyleSheet("color: #ffaa00; font-weight: bold;")
         self._fallback_btn.hide()
@@ -420,11 +424,12 @@ class VideoViewerWindow(QWidget):
         self._click_timer.timeout.connect(self._toggle)
 
         self._play_btn.clicked.connect(self._toggle)
-        # sliderMoved стреляет на КАЖДОЕ движение мыши при перетаскивании — если
-        # вешать на него player.setPosition напрямую, перемотка превращается в
-        # шквал сетевых Range-запросов к стрим-серверу (по одному на пиксель
-        # драга), отсюда лаги/подвисания при скрабе. Пока тянут ползунок — только
-        # превью времени в лейбле; реальный seek — один раз, на отпускании кнопки.
+        # sliderMoved fires on EVERY mouse move while dragging — if we hooked
+        # player.setPosition directly to it, scrubbing would turn into a flood
+        # of network Range requests to the streaming server (one per pixel of
+        # drag), causing lag/hangs while scrubbing. While the handle is being
+        # dragged we only preview the time in the label; the real seek happens
+        # once, on button release.
         self._position.sliderMoved.connect(self._on_slider_preview)
         self._position.sliderPressed.connect(self._on_slider_pressed)
         self._position.sliderReleased.connect(self._on_slider_released)
@@ -458,7 +463,7 @@ class VideoViewerWindow(QWidget):
         self._title = title
         self._buffering = False
         self._transcode_attempted = False
-        self._time_label.setText("Загрузка…")
+        self._time_label.setText(self.tr("Loading…"))
         self._player.setSource(QUrl(self._url))
         self._player.play()
 
@@ -512,8 +517,9 @@ class VideoViewerWindow(QWidget):
         self._seeking = True
 
     def _on_slider_preview(self, value: int) -> None:
-        # Только визуальное превью времени во время протяжки — сам seek не
-        # шлём на каждое движение мыши (см. коммент у sliderMoved.connect выше).
+        # Only a visual time preview while dragging — we don't send the seek
+        # itself on every mouse move (see the comment on sliderMoved.connect
+        # above).
         self._time_label.setText(
             f"{_format_time(value)} / {_format_time(self._duration)}"
         )
@@ -528,7 +534,7 @@ class VideoViewerWindow(QWidget):
         self._player.setPosition(new_pos)
 
     def _update_time(self) -> None:
-        suffix = " · буферизация…" if self._buffering else ""
+        suffix = self.tr(" · buffering…") if self._buffering else ""
         self._time_label.setText(
             f"{_format_time(self._player.position())} / "
             f"{_format_time(self._duration)}{suffix}"
@@ -537,9 +543,10 @@ class VideoViewerWindow(QWidget):
     def _on_media_status(self, status) -> None:
         from PySide6.QtMultimedia import QMediaPlayer
 
-        # Плеер не показывает ничего своё, пока сеть отстаёт (следующая часть
-        # стрим-окна ещё качается) — кадр просто замирает, и это выглядит как
-        # зависание/баг, а не буферизация. Явный индикатор снимает эту путаницу.
+        # The player shows nothing of its own while the network lags behind
+        # (the next chunk of the stream window is still downloading) — the
+        # frame just freezes, which looks like a hang/bug rather than
+        # buffering. An explicit indicator removes that confusion.
         self._buffering = status in (
             QMediaPlayer.MediaStatus.BufferingMedia,
             QMediaPlayer.MediaStatus.StalledMedia,
@@ -560,24 +567,24 @@ class VideoViewerWindow(QWidget):
         logger.warning("Video playback error for %s: %s", self._title, error_string)
         if self._try_transcode_fallback():
             return
-        self._time_label.setText(f"Ошибка: {error_string}")
+        self._time_label.setText(self.tr("Error: {0}").format(error_string))
         self._fallback_btn.show()
 
     def _try_transcode_fallback(self) -> bool:
-        """Не-нативный формат/кодек: один раз перезапускаем воспроизведение
-        через серверный транскод (``?transcode=1`` — ffmpeg пересобирает в
-        fragmented MP4 на лету, см. app.core.transcode). True = перезапущено."""
+        """Non-native format/codec: restart playback once via server-side
+        transcode (``?transcode=1`` — ffmpeg repackages into fragmented MP4
+        on the fly, see app.core.transcode). True = playback was restarted."""
         if self._transcode_attempted or "transcode=" in self._url:
             return False
         if "/api/media" not in self._url:
-            return False  # не наш локальный стрим-сервер — фолбэк не про него
+            return False  # not our local streaming server — this fallback doesn't apply
         from app.core.transcode import transcode_available
 
         if not transcode_available():
             return False
         self._transcode_attempted = True
         self._url = f"{self._url}&transcode=1"
-        self._time_label.setText("Формат не поддерживается — транскодирую…")
+        self._time_label.setText(self.tr("Format not supported — transcoding…"))
         logger.info("Retrying playback via server-side transcode: %s", self._title)
         self._player.setSource(QUrl(self._url))
         self._player.play()
@@ -612,7 +619,7 @@ class PdfViewerWindow(QWidget):
         self._view.setPageMode(QPdfView.PageMode.MultiPage)
         layout.addWidget(self._view, 1)
 
-        self._status = QLabel("Загрузка PDF…", self)
+        self._status = QLabel(self.tr("Loading PDF…"), self)
         self._status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._status)
 
@@ -634,7 +641,9 @@ class PdfViewerWindow(QWidget):
         try:
             if reply.error() != QNetworkReply.NetworkError.NoError:
                 try:
-                    self._status.setText(f"Ошибка загрузки: {reply.errorString()}")
+                    self._status.setText(
+                        self.tr("Loading error: {0}").format(reply.errorString())
+                    )
                 except RuntimeError:
                     pass
                 return
@@ -643,21 +652,22 @@ class PdfViewerWindow(QWidget):
             reply.deleteLater()
 
         if not raw:
-            self._status.setText("Файл пуст.")
+            self._status.setText(self.tr("The file is empty."))
             return
 
         from PySide6.QtCore import QBuffer, QByteArray, QIODevice
         from PySide6.QtPdf import QPdfDocument
 
-        # Ссылку на QByteArray ДЕРЖИМ в self: QBuffer не владеет данными, и с
-        # временным массивом документ молча грузился в Status.Error (пустое окно).
+        # We KEEP a reference to the QByteArray on self: QBuffer doesn't own the
+        # data, and with a temporary array the document silently loaded into
+        # Status.Error (blank window).
         self._data = QByteArray(raw)
         self._buffer = QBuffer(self._data, self)
         self._buffer.open(QIODevice.OpenModeFlag.ReadOnly)
         self._doc.load(self._buffer)
 
         if self._doc.status() == QPdfDocument.Status.Error:
-            self._status.setText("Не удалось открыть PDF (файл повреждён?)")
+            self._status.setText(self.tr("Failed to open the PDF (file corrupted?)"))
             return
 
         self._view.setDocument(self._doc)
@@ -673,7 +683,7 @@ class PdfViewerWindow(QWidget):
 
 
 # --------------------------------------------------------------------------- #
-# Точка входа
+# Entry point
 # --------------------------------------------------------------------------- #
 def open_media_viewer(
     parent: QWidget | None,
@@ -682,10 +692,10 @@ def open_media_viewer(
     title: str,
     viewer_type: str = "image",
 ) -> QWidget | None:
-    """Открыть фото/видео/pdf в отдельном нативном окне.
+    """Open a photo/video/pdf in a separate native window.
 
-    При невозможности создать окно (например, нет мультимедиа-бэкенда) —
-    фолбэк на открытие во внешнем браузере.
+    If the window can't be created (e.g. no multimedia backend) — falls back
+    to opening in the external browser.
     """
     try:
         if viewer_type == "video":

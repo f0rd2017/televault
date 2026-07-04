@@ -32,7 +32,7 @@ class ProgressLogWidget(QWidget):
         self.progress.setFormat("%p%")
         self.progress.setObjectName("globalProgressBar")
 
-        self.cancel_button = QPushButton("Отмена", self)
+        self.cancel_button = QPushButton(self.tr("Cancel"), self)
         self.cancel_button.setEnabled(False)
         self.cancel_button.setObjectName("cancelJobButton")
 
@@ -43,7 +43,7 @@ class ProgressLogWidget(QWidget):
 
         self._spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
         self._spinner_index = 0
-        self._spinner_activity = "Обработка"
+        self._spinner_activity = self.tr("Working")
         self._spinner_timer = QTimer(self)
         self._spinner_timer.setInterval(80)
         self._spinner_timer.timeout.connect(self._tick_spinner)
@@ -76,7 +76,7 @@ class ProgressLogWidget(QWidget):
         self.logs.setReadOnly(True)
         self.logs.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
         self.logs.setMinimumHeight(126)
-        self.logs.setPlaceholderText("Журнал событий")
+        self.logs.setPlaceholderText(self.tr("Event log"))
         self.logs.document().setMaximumBlockCount(500)
         self.logs.setObjectName("eventsLog")
         log_layout.addWidget(self.logs)
@@ -118,10 +118,12 @@ class ProgressLogWidget(QWidget):
             return
         self.progress.setFormat("%p%")
 
-    def set_busy(self, busy: bool, activity: str = "Обработка") -> None:
+    def set_busy(self, busy: bool, activity: str | None = None) -> None:
         self.cancel_button.setEnabled(busy)
         if busy:
-            self._spinner_activity = activity
+            self._spinner_activity = (
+                activity if activity is not None else self.tr("Working")
+            )
             self._spinner_index = 0
             self._tick_spinner()
             self.spinner_label.show()
@@ -156,7 +158,7 @@ class ProgressLogWidget(QWidget):
 
 
 class _ArcSpinner(QWidget):
-    """Плавный круговой спиннер, нарисованный кодом (без ассетов)."""
+    """Smooth circular spinner drawn in code (no assets)."""
 
     def __init__(self, parent=None, *, diameter: int = 56) -> None:
         super().__init__(parent)
@@ -197,8 +199,8 @@ class _ArcSpinner(QWidget):
 
 
 class StartupLoadingOverlay(QWidget):
-    """Полноэкранный оверлей загрузки: видно, когда программа ещё подключается
-    и когда ей уже можно пользоваться. Привязывается к сигналам воркера."""
+    """Full-screen loading overlay: visible while the app is still connecting
+    and while it's already usable. Wired to the worker's signals."""
 
     retry_requested = Signal()
     accounts_requested = Signal()
@@ -237,7 +239,7 @@ class StartupLoadingOverlay(QWidget):
         self._title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         root.addWidget(self._title)
 
-        self._status = QLabel("Запуск…", self)
+        self._status = QLabel(self.tr("Starting…"), self)
         self._status.setObjectName("startupStatus")
         self._status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._status.setWordWrap(True)
@@ -248,11 +250,11 @@ class StartupLoadingOverlay(QWidget):
         btn_row.setContentsMargins(0, 8, 0, 0)
         btn_row.setSpacing(10)
         btn_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._retry_btn = QPushButton("Повторить", self._buttons)
+        self._retry_btn = QPushButton(self.tr("Retry"), self._buttons)
         self._retry_btn.setObjectName("startupBtnPrimary")
         self._retry_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._retry_btn.clicked.connect(self.retry_requested.emit)
-        self._accounts_btn = QPushButton("Аккаунты", self._buttons)
+        self._accounts_btn = QPushButton(self.tr("Accounts"), self._buttons)
         self._accounts_btn.setObjectName("startupBtn")
         self._accounts_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._accounts_btn.clicked.connect(self.accounts_requested.emit)
@@ -264,11 +266,13 @@ class StartupLoadingOverlay(QWidget):
     def set_status(self, text: str) -> None:
         self._status.setText(str(text))
 
-    def show_loading(self, text: str = "Подключение к Telegram…") -> None:
+    def show_loading(self, text: str | None = None) -> None:
         self._buttons.hide()
         self._spinner.show()
         self._spinner.start()
-        self.set_status(text)
+        self.set_status(
+            text if text is not None else self.tr("Connecting to Telegram…")
+        )
         self.setGraphicsEffect(None)
         self.show()
         self.raise_()
@@ -276,14 +280,14 @@ class StartupLoadingOverlay(QWidget):
     def show_error(self, message: str) -> None:
         self._spinner.stop()
         self._spinner.hide()
-        self.set_status(f"Не удалось подключиться:\n{message}")
+        self.set_status(self.tr("Could not connect:\n{0}").format(message))
         self._buttons.show()
         self.setGraphicsEffect(None)
         self.show()
         self.raise_()
 
     def finish(self) -> None:
-        """Плавно скрыть оверлей — программа готова к работе."""
+        """Smoothly hide the overlay -- the app is ready to use."""
         self._spinner.stop()
         effect = QGraphicsOpacityEffect(self)
         self.setGraphicsEffect(effect)

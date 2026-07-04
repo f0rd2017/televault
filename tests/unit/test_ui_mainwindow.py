@@ -2112,8 +2112,8 @@ def test_error_dialogs_are_grouped(tmp_path, monkeypatch) -> None:
         window._queue_error_dialog(2, "upload", "err-b")
         window._flush_error_dialogs()
         assert called["count"] == 1
-        assert "Множественные ошибки" in called["title"]
-        assert "2 операций завершились с ошибкой" in called["text"]
+        assert "Multiple errors" in called["title"]
+        assert "2 operations failed" in called["text"]
     finally:
         window.close()
 
@@ -2952,9 +2952,9 @@ def test_reconnect_action_requests_restart_and_keeps_ui_responsive(
         assert called["count"] == 1
         assert not window.action_reconnect.isEnabled()
         assert (
-            "Перезапуск подключения Telegram"
+            "Restarting Telegram connection"
             in window.progress_widget.logs.toPlainText()
         )
-        assert "Перезапуск подключения Telegram" in window.statusBar().currentMessage()
+        assert "Restarting Telegram connection" in window.statusBar().currentMessage()
     finally:
         window.close()

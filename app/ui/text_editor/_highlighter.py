@@ -12,7 +12,7 @@ from PySide6.QtGui import (
 
 
 class CodeHighlighter(QSyntaxHighlighter):
-    """Универсальный подсветчик синтаксиса для популярных языков программирования."""
+    """Universal syntax highlighter for popular programming languages."""
 
     def __init__(self, document: QTextDocument, lang: str = "text") -> None:
         super().__init__(document)

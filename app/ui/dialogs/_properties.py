@@ -22,7 +22,7 @@ from app.ui.dialogs._style import _DIALOG_STYLESHEET
 
 
 # ═══════════════════════════════════════════════════════
-#  Управление аккаунтами Telegram
+#  Telegram account management
 # ═══════════════════════════════════════════════════════
 
 _ACCOUNT_TABLE_STYLESHEET = """
@@ -74,30 +74,35 @@ _ACCOUNT_TABLE_STYLESHEET = """
 
 
 # ═══════════════════════════════════════════════════════
-#  Свойства файла — «что где лежит»
+#  File properties — "what's stored where"
 # ═══════════════════════════════════════════════════════
 
-_OBJECT_STATE_LABELS = {
-    "complete": ("Полный", "#7fd88f"),
-    "incomplete": ("Не дозалит", "#ffcf66"),
-    "offline": ("Аккаунт оффлайн", "#8fb8ff"),
-    "damaged": ("Повреждён (часть потеряна)", "#ff7b72"),
-}
+
+def _object_state_labels() -> dict[str, tuple[str, str]]:
+    from PySide6.QtCore import QCoreApplication
+
+    tr = lambda s: QCoreApplication.translate("FilePropertiesDialog", s)  # noqa: E731
+    return {
+        "complete": (tr("Complete"), "#7fd88f"),
+        "incomplete": (tr("Not fully uploaded"), "#ffcf66"),
+        "offline": (tr("Account offline"), "#8fb8ff"),
+        "damaged": (tr("Damaged (a part was lost)"), "#ff7b72"),
+    }
 
 
 def _format_size(num_bytes: int | None) -> str:
     if num_bytes is None:
         return "—"
     size = float(num_bytes)
-    for unit in ("Б", "КБ", "МБ", "ГБ", "ТБ"):
-        if size < 1024.0 or unit == "ТБ":
-            return f"{size:.0f} {unit}" if unit == "Б" else f"{size:.2f} {unit}"
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if size < 1024.0 or unit == "TB":
+            return f"{size:.0f} {unit}" if unit == "B" else f"{size:.2f} {unit}"
         size /= 1024.0
-    return f"{num_bytes} Б"
+    return f"{num_bytes} B"
 
 
 class FilePropertiesDialog(QDialog):
-    """Полные свойства объекта: какие части на каких аккаунтах/чатах лежат."""
+    """Full object properties: which parts live on which accounts/chats."""
 
     def __init__(
         self,
@@ -112,7 +117,7 @@ class FilePropertiesDialog(QDialog):
         super().__init__(parent)
         from app.core.object_state import classify_object_state
 
-        self.setWindowTitle(f"Свойства — {entry.orig_name}")
+        self.setWindowTitle(self.tr("Properties — {0}").format(entry.orig_name))
         self.setStyleSheet(_DIALOG_STYLESHEET + _ACCOUNT_TABLE_STYLESHEET)
         self.setMinimumWidth(620)
 
@@ -122,28 +127,37 @@ class FilePropertiesDialog(QDialog):
             parts_total=int(entry.parts_total),
             connected_chat_ids=connected_ids,
         )
-        state_text, state_color = _OBJECT_STATE_LABELS.get(state, (state, "#d8d0f5"))
+        object_state_labels = _object_state_labels()
+        state_text, state_color = object_state_labels.get(state, (state, "#d8d0f5"))
 
         form = QFormLayout()
-        form.addRow("Имя:", QLabel(str(entry.orig_name)))
-        form.addRow("Папка:", QLabel(str(entry.folder_path)))
-        form.addRow("Ключ:", QLabel(str(entry.file_key)))
-        form.addRow("Размер:", QLabel(_format_size(entry.total_size)))
+        form.addRow(self.tr("Name:"), QLabel(str(entry.orig_name)))
+        form.addRow(self.tr("Folder:"), QLabel(str(entry.folder_path)))
+        form.addRow(self.tr("Key:"), QLabel(str(entry.file_key)))
+        form.addRow(self.tr("Size:"), QLabel(_format_size(entry.total_size)))
         have_parts = len({int(p.part_index) for p in parts})
-        form.addRow("Части:", QLabel(f"{have_parts} / {int(entry.parts_total)}"))
+        form.addRow(
+            self.tr("Parts:"), QLabel(f"{have_parts} / {int(entry.parts_total)}")
+        )
         status_label = QLabel(state_text)
         status_label.setStyleSheet(f"color: {state_color}; font-weight: 700;")
-        form.addRow("Состояние:", status_label)
+        form.addRow(self.tr("Status:"), status_label)
         if expected_sha256:
             sha_label = QLabel(str(expected_sha256))
             sha_label.setTextInteractionFlags(
                 Qt.TextInteractionFlag.TextSelectableByMouse
             )
-            form.addRow("SHA-256:", sha_label)
+            form.addRow(self.tr("SHA-256:"), sha_label)
 
         table = QTableWidget(len(parts), 5, self)
         table.setHorizontalHeaderLabels(
-            ["Часть", "Размер", "Аккаунт / чат", "msg_id", "Состояние"]
+            [
+                self.tr("Part"),
+                self.tr("Size"),
+                self.tr("Account / chat"),
+                self.tr("msg_id"),
+                self.tr("Status"),
+            ]
         )
         table.verticalHeader().setVisible(False)
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -158,11 +172,11 @@ class FilePropertiesDialog(QDialog):
             chat_id = str(part.chat_id)
             account = connected_labels.get(chat_id, chat_id)
             if part.lost_ts:
-                part_state, color = "потеряна", "#ff7b72"
+                part_state, color = self.tr("lost"), "#ff7b72"
             elif connected_ids and chat_id not in connected_ids:
-                part_state, color = "оффлайн", "#8fb8ff"
+                part_state, color = self.tr("offline"), "#8fb8ff"
             else:
-                part_state, color = "ок", "#7fd88f"
+                part_state, color = self.tr("ok"), "#7fd88f"
             cells = [
                 str(int(part.part_index) + 1),
                 _format_size(part.file_size),
@@ -176,17 +190,17 @@ class FilePropertiesDialog(QDialog):
                     cell.setForeground(QColor(color))
                 table.setItem(row, col, cell)
 
-        # Минипометка — ручной комментарий пользователя.
+        # Mini-note — a manual user comment.
         self._note_edit = QLineEdit(str(note or ""))
-        self._note_edit.setPlaceholderText("Заметка к файлу (минипометка)…")
+        self._note_edit.setPlaceholderText(self.tr("Note about this file…"))
         note_form = QFormLayout()
-        note_form.addRow("Заметка:", self._note_edit)
+        note_form.addRow(self.tr("Note:"), self._note_edit)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Close
         )
         buttons.button(QDialogButtonBox.StandardButton.Save).setText(
-            "Сохранить заметку"
+            self.tr("Save note")
         )
         buttons.rejected.connect(self.reject)
         buttons.accepted.connect(self.accept)
@@ -203,30 +217,31 @@ class FilePropertiesDialog(QDialog):
 
 
 class ShareLinkDialog(QDialog):
-    """Создать публичную шар-ссылку на файл: опциональные пароль и срок,
-    показ итогового URL с копированием. Запись создаётся напрямую в БД; чтобы
-    ссылка реально работала, нужен включённый REST API (см. Настройки)."""
-
-    _EXPIRY_OPTIONS = [
-        ("Без срока", 0),
-        ("1 час", 3600),
-        ("1 день", 86400),
-        ("7 дней", 7 * 86400),
-        ("30 дней", 30 * 86400),
-    ]
+    """Create a public share link for a file: optional password and expiry,
+    shows the resulting URL with a copy button. The record is created
+    directly in the DB; for the link to actually work, the REST API must be
+    enabled (see Settings)."""
 
     def __init__(self, entry, repo, config, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Поделиться ссылкой")
+        self.setWindowTitle(self.tr("Share Link"))
         self._entry = entry
         self._repo = repo
         self._config = config
+
+        self._expiry_options = [
+            (self.tr("No expiry"), 0),
+            (self.tr("1 hour"), 3600),
+            (self.tr("1 day"), 86400),
+            (self.tr("7 days"), 7 * 86400),
+            (self.tr("30 days"), 30 * 86400),
+        ]
 
         root = QVBoxLayout(self)
         root.setContentsMargins(16, 16, 16, 12)
         root.setSpacing(10)
 
-        title = QLabel(f"Файл: {entry.orig_name}")
+        title = QLabel(self.tr("File: {0}").format(entry.orig_name))
         title.setWordWrap(True)
         title.setStyleSheet("font-weight: 600;")
         root.addWidget(title)
@@ -235,9 +250,11 @@ class ShareLinkDialog(QDialog):
         api_enabled = bool(getattr(api, "enabled", False)) if api is not None else False
         if not api_enabled:
             warn = QLabel(
-                "⚠ REST API выключен — ссылку можно создать, но она заработает "
-                "только после включения API в Настройках (вкладка «Расширенные») "
-                "и перезапуска."
+                self.tr(
+                    "⚠ REST API is disabled — the link can be created, but it "
+                    "will only work after enabling the API in Settings ("
+                    "'Advanced' tab) and restarting."
+                )
             )
             warn.setWordWrap(True)
             warn.setStyleSheet("color: #ffcf66; font-size: 11px;")
@@ -246,24 +263,24 @@ class ShareLinkDialog(QDialog):
         form = QFormLayout()
         form.setSpacing(8)
         self._password_edit = QLineEdit()
-        self._password_edit.setPlaceholderText("необязательно")
+        self._password_edit.setPlaceholderText(self.tr("optional"))
         self._password_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        form.addRow("Пароль", self._password_edit)
+        form.addRow(self.tr("Password"), self._password_edit)
 
         self._expiry_combo = QComboBox()
-        for label, secs in self._EXPIRY_OPTIONS:
+        for label, secs in self._expiry_options:
             self._expiry_combo.addItem(label, secs)
-        form.addRow("Срок действия", self._expiry_combo)
+        form.addRow(self.tr("Expires in"), self._expiry_combo)
         root.addLayout(form)
 
-        self._create_btn = QPushButton("Создать ссылку")
+        self._create_btn = QPushButton(self.tr("Create link"))
         self._create_btn.clicked.connect(self._on_create)
         root.addWidget(self._create_btn)
 
         self._url_edit = QLineEdit()
         self._url_edit.setReadOnly(True)
-        self._url_edit.setPlaceholderText("ссылка появится здесь")
-        self._copy_btn = QPushButton("Копировать")
+        self._url_edit.setPlaceholderText(self.tr("the link will appear here"))
+        self._copy_btn = QPushButton(self.tr("Copy"))
         self._copy_btn.setEnabled(False)
         self._copy_btn.clicked.connect(self._on_copy)
         url_row = QHBoxLayout()
@@ -309,11 +326,15 @@ class ShareLinkDialog(QDialog):
                 expires_ts=expires_ts,
             )
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "Ошибка", f"Не удалось создать ссылку: {exc}")
+            QMessageBox.warning(
+                self,
+                self.tr("Error"),
+                self.tr("Failed to create the link: {0}").format(exc),
+            )
             return
         self._url_edit.setText(self._share_url(token))
         self._copy_btn.setEnabled(True)
-        self._create_btn.setText("Создать ещё одну")
+        self._create_btn.setText(self.tr("Create another one"))
 
     def _on_copy(self) -> None:
         from PySide6.QtWidgets import QApplication
@@ -321,12 +342,12 @@ class ShareLinkDialog(QDialog):
         clipboard = QApplication.clipboard()
         if clipboard is not None:
             clipboard.setText(self._url_edit.text())
-            self._copy_btn.setText("Скопировано ✓")
+            self._copy_btn.setText(self.tr("Copied ✓"))
 
 
 class FolderPropertiesDialog(QDialog):
-    """Свойства папки: число файлов/подпапок, суммарный размер, разбивка по
-    состоянию и статус автосинхронизации (рекурсивно по поддереву)."""
+    """Folder properties: file/subfolder counts, total size, breakdown by
+    status, and auto-sync status (recursive over the subtree)."""
 
     def __init__(
         self,
@@ -342,40 +363,45 @@ class FolderPropertiesDialog(QDialog):
         parent=None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle(f"Свойства папки — {name}")
+        self.setWindowTitle(self.tr("Folder Properties — {0}").format(name))
         self.setStyleSheet(_DIALOG_STYLESHEET)
         self.setMinimumWidth(460)
 
         form = QFormLayout()
-        form.addRow("Имя:", QLabel(str(name)))
+        form.addRow(self.tr("Name:"), QLabel(str(name)))
         path_label = QLabel(str(folder_path))
         path_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         path_label.setWordWrap(True)
-        form.addRow("Путь:", path_label)
+        form.addRow(self.tr("Path:"), path_label)
         form.addRow(
-            "Подпапок:",
-            QLabel(f"{int(direct_subfolders)} (всего: {int(total_subfolders)})"),
+            self.tr("Subfolders:"),
+            QLabel(
+                self.tr("{0} (total: {1})").format(
+                    int(direct_subfolders), int(total_subfolders)
+                )
+            ),
         )
-        form.addRow("Файлов:", QLabel(str(int(file_count))))
-        form.addRow("Общий размер:", QLabel(_format_size(total_size)))
+        form.addRow(self.tr("Files:"), QLabel(str(int(file_count))))
+        form.addRow(self.tr("Total size:"), QLabel(_format_size(total_size)))
 
-        # Разбивка по состоянию — только непустые группы, в понятном порядке.
+        # Breakdown by status — only non-empty groups, in a sensible order.
         order = ["complete", "incomplete", "offline", "damaged"]
         seen = list(order) + [k for k in state_counts if k not in order]
+        object_state_labels = _object_state_labels()
         for key in seen:
             count = int(state_counts.get(key, 0))
             if count <= 0:
                 continue
-            text, color = _OBJECT_STATE_LABELS.get(key, (key, "#d8d0f5"))
+            text, color = object_state_labels.get(key, (key, "#d8d0f5"))
             label = QLabel(f"{count}")
             label.setStyleSheet(f"color: {color}; font-weight: 700;")
             form.addRow(f"{text}:", label)
 
-        sync_label = QLabel("Включена" if synced else "Выключена")
+        sync_label = QLabel(self.tr("Enabled") if synced else self.tr("Disabled"))
         sync_label.setStyleSheet(
             "color: #7fd88f; font-weight: 700;" if synced else "color: #a1a1aa;"
         )
-        form.addRow("Автосинхронизация:", sync_label)
+        form.addRow(self.tr("Auto-sync:"), sync_label)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         buttons.rejected.connect(self.reject)
