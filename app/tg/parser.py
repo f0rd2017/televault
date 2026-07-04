@@ -77,7 +77,9 @@ def _parse_json_meta(body: str) -> PartMeta | None:
     )
 
 
-def parse_batch_blob_caption(caption: str, prefix: str = "FC1|") -> BatchBlobCaption | None:
+def parse_batch_blob_caption(
+    caption: str, prefix: str = "FC1|"
+) -> BatchBlobCaption | None:
     if not caption:
         return None
 
@@ -180,7 +182,9 @@ def build_caption(
     if extra:
         payload.update(extra)
 
-    caption = f"{prefix}{json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}"
+    caption = (
+        f"{prefix}{json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}"
+    )
     if len(caption) <= max_len:
         return caption
 
@@ -189,7 +193,9 @@ def build_caption(
     overflow = len(caption) - max_len
     trimmed_len = max(8, len(name) - overflow)
     payload["orig_name"] = name[:trimmed_len]
-    caption = f"{prefix}{json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}"
+    caption = (
+        f"{prefix}{json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}"
+    )
     if len(caption) <= max_len:
         return caption
 
@@ -229,7 +235,9 @@ def build_batch_blob_caption(
     if meta.manifest_sha256:
         payload["manifest_sha256"] = str(meta.manifest_sha256).lower()
 
-    caption = f"{prefix}{json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}"
+    caption = (
+        f"{prefix}{json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}"
+    )
     if len(caption) <= max_len:
         return caption
 
@@ -237,7 +245,9 @@ def build_batch_blob_caption(
     overflow = len(caption) - max_len
     trimmed_len = max(8, len(name) - overflow)
     payload["orig_name"] = name[:trimmed_len]
-    caption = f"{prefix}{json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}"
+    caption = (
+        f"{prefix}{json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}"
+    )
     if len(caption) <= max_len:
         return caption
 

@@ -32,6 +32,7 @@ def _make_account(
 
 class FakeRepo:
     """Minimal fake DbRepo."""
+
     def __init__(self) -> None:
         self._accounts: list[TelegramAccount] = []
         self._updated: dict[int, dict] = {}
@@ -66,7 +67,9 @@ def _make_fake_client(authorized: bool = True, premium: bool = False, chat_obj=N
     if chat_obj is not None:
         client.get_entity = AsyncMock(return_value=chat_obj)
     else:
-        client.get_entity = AsyncMock(side_effect=ValueError("Could not find the entity"))
+        client.get_entity = AsyncMock(
+            side_effect=ValueError("Could not find the entity")
+        )
     return client
 
 

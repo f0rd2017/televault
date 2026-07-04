@@ -17,7 +17,9 @@ class CodeHighlighter(QSyntaxHighlighter):
     def __init__(self, document: QTextDocument, lang: str = "text") -> None:
         super().__init__(document)
         self._rules: list[tuple[re.Pattern, QTextCharFormat, int]] = []
-        self._multi_line_comment: tuple[re.Pattern, re.Pattern, QTextCharFormat] | None = None
+        self._multi_line_comment: (
+            tuple[re.Pattern, re.Pattern, QTextCharFormat] | None
+        ) = None
         self.set_language(lang)
 
     def set_language(self, lang: str) -> None:
@@ -36,11 +38,41 @@ class CodeHighlighter(QSyntaxHighlighter):
 
         if lang in ("python", "py"):
             keywords = [
-                "and", "as", "assert", "async", "await", "break", "class", "continue",
-                "def", "del", "elif", "else", "except", "finally", "for", "from",
-                "global", "if", "import", "in", "is", "lambda", "nonlocal", "not",
-                "or", "pass", "raise", "return", "try", "while", "with", "yield",
-                "True", "False", "None"
+                "and",
+                "as",
+                "assert",
+                "async",
+                "await",
+                "break",
+                "class",
+                "continue",
+                "def",
+                "del",
+                "elif",
+                "else",
+                "except",
+                "finally",
+                "for",
+                "from",
+                "global",
+                "if",
+                "import",
+                "in",
+                "is",
+                "lambda",
+                "nonlocal",
+                "not",
+                "or",
+                "pass",
+                "raise",
+                "return",
+                "try",
+                "while",
+                "with",
+                "yield",
+                "True",
+                "False",
+                "None",
             ]
             self._add_keywords(keywords, fmt_kw)
             self._add_rule(r"\bself\b", self._fmt("#569cd6", italic=True))
@@ -60,14 +92,62 @@ class CodeHighlighter(QSyntaxHighlighter):
 
         elif lang in ("javascript", "typescript", "js", "ts", "jsx", "tsx"):
             keywords = [
-                "abstract", "any", "as", "async", "await", "boolean", "break", "case",
-                "catch", "class", "const", "continue", "debugger", "default", "delete",
-                "do", "else", "enum", "export", "extends", "false", "finally", "for",
-                "from", "function", "if", "implements", "import", "in", "instanceof",
-                "interface", "let", "new", "null", "number", "of", "package", "private",
-                "protected", "public", "return", "static", "string", "super", "switch",
-                "this", "throw", "true", "try", "typeof", "undefined", "var", "void",
-                "while", "with", "yield"
+                "abstract",
+                "any",
+                "as",
+                "async",
+                "await",
+                "boolean",
+                "break",
+                "case",
+                "catch",
+                "class",
+                "const",
+                "continue",
+                "debugger",
+                "default",
+                "delete",
+                "do",
+                "else",
+                "enum",
+                "export",
+                "extends",
+                "false",
+                "finally",
+                "for",
+                "from",
+                "function",
+                "if",
+                "implements",
+                "import",
+                "in",
+                "instanceof",
+                "interface",
+                "let",
+                "new",
+                "null",
+                "number",
+                "of",
+                "package",
+                "private",
+                "protected",
+                "public",
+                "return",
+                "static",
+                "string",
+                "super",
+                "switch",
+                "this",
+                "throw",
+                "true",
+                "try",
+                "typeof",
+                "undefined",
+                "var",
+                "void",
+                "while",
+                "with",
+                "yield",
             ]
             self._add_keywords(keywords, fmt_kw)
             self._add_rule(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(", fmt_fn, group=1)
@@ -76,7 +156,11 @@ class CodeHighlighter(QSyntaxHighlighter):
             self._add_rule(r"'[^'\\]*(\\.[^'\\]*)*'", fmt_str)
             self._add_rule(r"`[^`\\]*(\\.[^`\\]*)*`", fmt_str)
             self._add_rule(r"\b\d+(\.\d+)?\b", fmt_num)
-            self._multi_line_comment = (re.compile(r"/\*"), re.compile(r"\*/"), fmt_comment)
+            self._multi_line_comment = (
+                re.compile(r"/\*"),
+                re.compile(r"\*/"),
+                fmt_comment,
+            )
 
         elif lang in ("html", "xml", "svg"):
             self._add_rule(r"</?[a-zA-Z0-9_-]+", fmt_tag)
@@ -95,11 +179,45 @@ class CodeHighlighter(QSyntaxHighlighter):
 
         elif lang in ("sql",):
             keywords = [
-                "SELECT", "FROM", "WHERE", "INSERT", "INTO", "UPDATE", "DELETE",
-                "CREATE", "TABLE", "DROP", "ALTER", "JOIN", "LEFT", "RIGHT", "INNER",
-                "OUTER", "ON", "GROUP", "BY", "ORDER", "HAVING", "LIMIT", "OFFSET",
-                "AND", "OR", "NOT", "NULL", "AS", "SET", "VALUES", "INTEGER", "TEXT",
-                "REAL", "BLOB", "PRIMARY", "KEY", "FOREIGN", "REFERENCES", "UNION"
+                "SELECT",
+                "FROM",
+                "WHERE",
+                "INSERT",
+                "INTO",
+                "UPDATE",
+                "DELETE",
+                "CREATE",
+                "TABLE",
+                "DROP",
+                "ALTER",
+                "JOIN",
+                "LEFT",
+                "RIGHT",
+                "INNER",
+                "OUTER",
+                "ON",
+                "GROUP",
+                "BY",
+                "ORDER",
+                "HAVING",
+                "LIMIT",
+                "OFFSET",
+                "AND",
+                "OR",
+                "NOT",
+                "NULL",
+                "AS",
+                "SET",
+                "VALUES",
+                "INTEGER",
+                "TEXT",
+                "REAL",
+                "BLOB",
+                "PRIMARY",
+                "KEY",
+                "FOREIGN",
+                "REFERENCES",
+                "UNION",
             ]
             self._add_keywords(keywords, fmt_kw, case_insensitive=True)
             self._add_rule(r"--.*$", fmt_comment)
@@ -124,8 +242,23 @@ class CodeHighlighter(QSyntaxHighlighter):
 
         elif lang in ("shell", "bash", "sh", "zsh", "ps1"):
             keywords = [
-                "if", "then", "else", "fi", "for", "in", "do", "done", "while",
-                "case", "esac", "function", "return", "exit", "echo", "local", "export"
+                "if",
+                "then",
+                "else",
+                "fi",
+                "for",
+                "in",
+                "do",
+                "done",
+                "while",
+                "case",
+                "esac",
+                "function",
+                "return",
+                "exit",
+                "echo",
+                "local",
+                "export",
             ]
             self._add_keywords(keywords, fmt_kw)
             self._add_rule(r"#.*$", fmt_comment)
@@ -135,7 +268,9 @@ class CodeHighlighter(QSyntaxHighlighter):
 
         self.rehighlight()
 
-    def _fmt(self, color: str, bold: bool = False, italic: bool = False) -> QTextCharFormat:
+    def _fmt(
+        self, color: str, bold: bool = False, italic: bool = False
+    ) -> QTextCharFormat:
         f = QTextCharFormat()
         f.setForeground(QColor(color))
         if bold:
@@ -147,7 +282,9 @@ class CodeHighlighter(QSyntaxHighlighter):
     def _add_rule(self, pattern: str, fmt: QTextCharFormat, group: int = 0) -> None:
         self._rules.append((re.compile(pattern, re.MULTILINE), fmt, group))
 
-    def _add_keywords(self, keywords: list[str], fmt: QTextCharFormat, case_insensitive: bool = False) -> None:
+    def _add_keywords(
+        self, keywords: list[str], fmt: QTextCharFormat, case_insensitive: bool = False
+    ) -> None:
         flags = re.IGNORECASE if case_insensitive else 0
         pattern = r"\b(" + "|".join(re.escape(k) for k in keywords) + r")\b"
         self._rules.append((re.compile(pattern, flags), fmt, 0))

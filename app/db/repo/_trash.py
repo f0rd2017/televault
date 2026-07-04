@@ -282,4 +282,3 @@ class _TrashShareSyncMixin:
         if row is None:
             return []
         return self.get_parts_for_object(str(row["folder_path"]), str(blob_key))
-

@@ -66,17 +66,18 @@ class MiscMixin:
             if self.explorer_view.iconSize().width() != new_icon_sz:
                 import dataclasses
                 from PySide6.QtCore import QSize
+
                 self.config = dataclasses.replace(self.config, ui_icon_size=new_icon_sz)
                 # Обновляем модель — она пересоздаёт иконки и обновляет SizeHintRole
                 self.explorer_model.set_icon_size(new_icon_sz)
                 # Обновляем вид
-                self.explorer_view.setGridSize(QSize(new_icon_sz + 44, new_icon_sz + 54))
+                self.explorer_view.setGridSize(
+                    QSize(new_icon_sz + 44, new_icon_sz + 54)
+                )
                 self.explorer_view.setIconSize(QSize(new_icon_sz, new_icon_sz))
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Настройки", str(exc))
             return
-
-
 
     def _on_accounts(self) -> None:
         """Открыть окно управления аккаунтами."""

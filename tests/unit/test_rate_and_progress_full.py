@@ -12,6 +12,7 @@ from app.core.transfer_progress import TransferProgressAggregator
 
 # ── AdaptiveRateLimiter ─────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_acquire_succeeds_with_tokens() -> None:
     limiter = AdaptiveRateLimiter(initial_rate=10.0, min_rate=1.0, max_rate=20.0)
@@ -73,10 +74,9 @@ def test_flood_wait_tracks_count() -> None:
 
 # ── TransferProgressAggregator ──────────────────────────────────────
 
+
 def test_human_speed_boundaries() -> None:
     assert TransferProgressAggregator._human_speed(500) == "500 B/s"
     assert TransferProgressAggregator._human_speed(1500) == "1.5 KB/s"
     result = TransferProgressAggregator._human_speed(5 * 1024 * 1024)
     assert "MB/s" in result
-
-

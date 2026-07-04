@@ -83,7 +83,9 @@ def test_submit_job_returns_true_only_when_accepting(tmp_path, monkeypatch) -> N
     assert called["count"] == 1
 
 
-def test_request_restart_is_non_blocking_and_sets_restart_flag(tmp_path, monkeypatch) -> None:
+def test_request_restart_is_non_blocking_and_sets_restart_flag(
+    tmp_path, monkeypatch
+) -> None:
     worker = _build_worker(tmp_path)
     loop = _RunningLoop()
     stop_event = _StopEvent()
@@ -110,7 +112,9 @@ def test_finished_hook_restarts_when_requested(tmp_path, monkeypatch) -> None:
     worker = _build_worker(tmp_path)
     started = {"count": 0}
 
-    monkeypatch.setattr(worker, "start", lambda: started.__setitem__("count", started["count"] + 1))
+    monkeypatch.setattr(
+        worker, "start", lambda: started.__setitem__("count", started["count"] + 1)
+    )
     with worker._state_lock:
         worker._restart_requested = True
         worker._accepting_jobs = True

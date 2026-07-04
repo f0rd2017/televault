@@ -41,7 +41,9 @@ def _fake_resolver(working: set[str]):
 
 
 def test_chain_uses_primary_when_it_works(monkeypatch):
-    monkeypatch.setattr(proxy_mod, "resolve_working_proxy", _fake_resolver({"p1", "p2"}))
+    monkeypatch.setattr(
+        proxy_mod, "resolve_working_proxy", _fake_resolver({"p1", "p2"})
+    )
     proxy, label, tier = utils.select_working_proxy_from_chain(["p1", "p2"])
     assert proxy is _PROXY_TUPLE
     assert tier == 0

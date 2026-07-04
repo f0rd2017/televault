@@ -3,7 +3,9 @@ from __future__ import annotations
 from app.tg.upload import _AdaptiveUploadController
 
 
-def test_adaptive_upload_controller_ignores_short_low_speed_spikes_when_ema_is_high() -> None:
+def test_adaptive_upload_controller_ignores_short_low_speed_spikes_when_ema_is_high() -> (
+    None
+):
     controller = _AdaptiveUploadController(
         initial_concurrency=8,
         max_concurrency=8,
@@ -47,4 +49,3 @@ def test_adaptive_upload_controller_downscales_when_sustained_speed_is_low() -> 
         )
 
     assert int(controller.summary()["final_concurrency"]) == 5
-

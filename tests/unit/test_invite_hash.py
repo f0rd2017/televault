@@ -4,7 +4,7 @@ from app.core.accounts import _parse_invite_hash
 
 
 def test_parses_plus_invite_link():
-    assert _parse_invite_hash("https://t.me/+4GlhQFIW3tQ5Mjdi") == "4GlhQFIW3tQ5Mjdi"
+    assert _parse_invite_hash("https://t.me/+AbCdEfGh12345678") == "AbCdEfGh12345678"
 
 
 def test_parses_joinchat_link():
@@ -12,11 +12,11 @@ def test_parses_joinchat_link():
 
 
 def test_parses_bare_plus_hash():
-    assert _parse_invite_hash("+T_5bzFvJJflmY2Qy") == "T_5bzFvJJflmY2Qy"
+    assert _parse_invite_hash("+X_9yZwVuTs87654r") == "X_9yZwVuTs87654r"
 
 
 def test_parses_without_scheme():
-    assert _parse_invite_hash("t.me/+LS2E4_-jAu85NzM6") == "LS2E4_-jAu85NzM6"
+    assert _parse_invite_hash("t.me/+Qq7W3_-eRt12YuI9") == "Qq7W3_-eRt12YuI9"
 
 
 def test_public_username_has_no_invite_hash():

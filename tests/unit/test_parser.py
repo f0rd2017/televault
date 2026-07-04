@@ -1,5 +1,10 @@
 from app.core.types import PartMeta
-from app.tg.parser import build_batch_blob_caption, build_caption, parse_batch_blob_caption, parse_caption
+from app.tg.parser import (
+    build_batch_blob_caption,
+    build_caption,
+    parse_batch_blob_caption,
+    parse_caption,
+)
 
 
 def test_parse_caption_valid_roundtrip() -> None:

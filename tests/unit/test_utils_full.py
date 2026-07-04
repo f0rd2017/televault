@@ -18,6 +18,7 @@ from app.core.utils import (
 
 # ── sanitize_filename ──────────────────────────────────────────────
 
+
 def test_sanitize_filename_basic() -> None:
     assert sanitize_filename("hello world.txt") == "hello world.txt"
 
@@ -46,8 +47,8 @@ def test_sanitize_filename_empty() -> None:
     assert len(result) > 0  # should fallback to something non-empty
 
 
-
 # ── sha256_file ────────────────────────────────────────────────────
+
 
 def test_sha256_file_small_file(tmp_path: Path) -> None:
     f = tmp_path / "small.bin"
@@ -102,6 +103,7 @@ def test_to_human_size_tb() -> None:
 
 # ── random_file_key ────────────────────────────────────────────────
 
+
 def test_random_file_key_format() -> None:
     key = random_file_key()
     assert isinstance(key, str)
@@ -116,6 +118,7 @@ def test_random_file_key_unique() -> None:
 
 # ── now_ts ─────────────────────────────────────────────────────────
 
+
 def test_now_ts_returns_int() -> None:
     ts = now_ts()
     assert isinstance(ts, int)
@@ -123,6 +126,7 @@ def test_now_ts_returns_int() -> None:
 
 
 # ── ensure_dir ─────────────────────────────────────────────────────
+
 
 def test_ensure_dir_creates_nested(tmp_path: Path) -> None:
     d = tmp_path / "a" / "b" / "c"
@@ -139,6 +143,7 @@ def test_ensure_dir_existing(tmp_path: Path) -> None:
 
 
 # ── iter_file_chunks ───────────────────────────────────────────────
+
 
 def test_iter_file_chunks_small(tmp_path: Path) -> None:
     f = tmp_path / "data.bin"
@@ -162,6 +167,7 @@ def test_iter_file_chunks_empty(tmp_path: Path) -> None:
 
 
 # ── _normalize_text ────────────────────────────────────────────────
+
 
 def test_normalize_text_strips_control_chars() -> None:
     result = _normalize_text("hello\x00world")

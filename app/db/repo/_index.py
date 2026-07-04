@@ -286,4 +286,3 @@ class _IndexMixin:
                 """,
                 (chat_id, scan_ts),
             )
-

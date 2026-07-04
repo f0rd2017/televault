@@ -77,9 +77,9 @@ def test_short_proxy_and_proxy_guard() -> None:
     assert AccountsDialog._short_proxy("") == "Без прокси"
     assert AccountsDialog._short_proxy("socks5://h:9050") == "h:9050"
     # Защита канала от прокси: канал НЕ прокси, прокси — прокси.
-    assert AccountsDialog._looks_like_proxy("https://t.me/+4GlhQFIW3tQ5Mjdi") is False
-    assert AccountsDialog._looks_like_proxy("@reyn_bow") is False
-    assert AccountsDialog._looks_like_proxy("194.104.238.225:63819:u:p") is True
+    assert AccountsDialog._looks_like_proxy("https://t.me/+AbCdEfGh12345678") is False
+    assert AccountsDialog._looks_like_proxy("@example_channel") is False
+    assert AccountsDialog._looks_like_proxy("203.0.113.10:1080:u:p") is True
 
 
 def test_probe_fills_status_cells(tmp_path, monkeypatch) -> None:

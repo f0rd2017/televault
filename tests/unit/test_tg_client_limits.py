@@ -6,7 +6,9 @@ from app.tg.client import _build_transfer_limits
 
 
 def test_build_transfer_limits_regular_account() -> None:
-    cfg = SimpleNamespace(upload_max_fileparts_default=4000, upload_max_fileparts_premium=8000)
+    cfg = SimpleNamespace(
+        upload_max_fileparts_default=4000, upload_max_fileparts_premium=8000
+    )
     limits = _build_transfer_limits(cfg, is_premium=False)
 
     assert limits.is_premium is False
@@ -16,7 +18,9 @@ def test_build_transfer_limits_regular_account() -> None:
 
 
 def test_build_transfer_limits_premium_account() -> None:
-    cfg = SimpleNamespace(upload_max_fileparts_default=4000, upload_max_fileparts_premium=8000)
+    cfg = SimpleNamespace(
+        upload_max_fileparts_default=4000, upload_max_fileparts_premium=8000
+    )
     limits = _build_transfer_limits(cfg, is_premium=True)
 
     assert limits.is_premium is True

@@ -48,6 +48,7 @@ Subscriber = Callable[[JobEvent], Any]
 
 class JobManager:
     """Manages job execution with lane-based scheduling and resource management."""
+
     def __init__(
         self,
         parallelism: int = 1,
@@ -56,7 +57,9 @@ class JobManager:
         lane_weights: dict[str, int] | None = None,
     ) -> None:
         self._parallelism = max(1, int(parallelism))
-        self._queue: asyncio.Queue[tuple[int, str, dict[str, Any], Runner]] = asyncio.Queue()
+        self._queue: asyncio.Queue[tuple[int, str, dict[str, Any], Runner]] = (
+            asyncio.Queue()
+        )
         self._subscribers: list[Subscriber] = []
         self._tokens: dict[int, CancelToken] = {}
         self._active_job_tasks: dict[int, asyncio.Task[Any]] = {}
@@ -141,7 +144,9 @@ class JobManager:
                     )
                 )
                 self._tokens.pop(job_id, None)
-                self._lane_pending[lane] = max(0, int(self._lane_pending.get(lane, 0)) - 1)
+                self._lane_pending[lane] = max(
+                    0, int(self._lane_pending.get(lane, 0)) - 1
+                )
                 self._queue.task_done()
 
             for task in self._worker_tasks:
@@ -249,7 +254,16 @@ class JobManager:
         self._callback_tasks.add(task)
         task.add_done_callback(self._callback_tasks.discard)
 
-    async def _handle_job_execution(self, job_id: int, job_type: str, payload: dict[str, Any], runner: Runner, token: CancelToken, lane: str, worker_idx: int) -> None:
+    async def _handle_job_execution(
+        self,
+        job_id: int,
+        job_type: str,
+        payload: dict[str, Any],
+        runner: Runner,
+        token: CancelToken,
+        lane: str,
+        worker_idx: int,
+    ) -> None:
         """Handle the execution of a single job."""
         current_progress = 0.0
 
@@ -332,7 +346,9 @@ class JobManager:
                 )
             )
             if self._stopped:
-                logger.info("Job cancelled by worker shutdown: id=%d type=%s", job_id, job_type)
+                logger.info(
+                    "Job cancelled by worker shutdown: id=%d type=%s", job_id, job_type
+                )
                 raise
             logger.info("Job cancelled: id=%d type=%s", job_id, job_type)
         except JobCancelledError:
@@ -360,12 +376,16 @@ class JobManager:
                     payload=payload,
                 )
             )
-            logger.exception("Job failed: id=%d type=%s error=%s", job_id, job_type, exc)
+            logger.exception(
+                "Job failed: id=%d type=%s error=%s", job_id, job_type, exc
+            )
         finally:
             with self._state_lock:
                 self._active_job_tasks.pop(job_id, None)
                 self._tokens.pop(job_id, None)
-                self._lane_active[lane] = max(0, int(self._lane_active.get(lane, 0)) - 1)
+                self._lane_active[lane] = max(
+                    0, int(self._lane_active.get(lane, 0)) - 1
+                )
             self._queue.task_done()
 
     async def _worker(self, worker_idx: int) -> None:
@@ -373,30 +393,38 @@ class JobManager:
         while True:
             job_id, job_type, payload, runner = await self._queue.get()
             lane = str(payload.get("_lane") or "default").strip() or "default"
-            
+
             # Check if job can be processed
             with self._state_lock:
                 token = self._tokens.get(job_id)
-                can_start = token is not None and self._try_acquire_lane_slot_locked(lane)
-                
+                can_start = token is not None and self._try_acquire_lane_slot_locked(
+                    lane
+                )
+
             if token is None:
                 with self._state_lock:
-                    self._lane_pending[lane] = max(0, int(self._lane_pending.get(lane, 0)) - 1)
+                    self._lane_pending[lane] = max(
+                        0, int(self._lane_pending.get(lane, 0)) - 1
+                    )
                 self._queue.task_done()
                 continue
-                
+
             if not can_start:
                 self._queue.put_nowait((job_id, job_type, payload, runner))
                 self._queue.task_done()
                 await asyncio.sleep(0.01)
                 continue
-                
+
             # Decrement pending count
             with self._state_lock:
-                self._lane_pending[lane] = max(0, int(self._lane_pending.get(lane, 0)) - 1)
-                
+                self._lane_pending[lane] = max(
+                    0, int(self._lane_pending.get(lane, 0)) - 1
+                )
+
             # Execute the job
-            await self._handle_job_execution(job_id, job_type, payload, runner, token, lane, worker_idx)
+            await self._handle_job_execution(
+                job_id, job_type, payload, runner, token, lane, worker_idx
+            )
 
     def _try_acquire_lane_slot_locked(self, lane: str) -> bool:
         normalized_lane = str(lane or "default").strip() or "default"
@@ -414,14 +442,16 @@ class JobManager:
 
         available_other_lanes = any(
             int(self._lane_pending.get(name, 0)) > 0
-            and int(self._lane_active.get(name, 0)) < int(self._lane_caps.get(name, self._parallelism))
+            and int(self._lane_active.get(name, 0))
+            < int(self._lane_caps.get(name, self._parallelism))
             for name in self._lane_weights
             if name != normalized_lane
         )
         lane_credit = int(self._lane_credits.get(normalized_lane, 0))
         if lane_credit <= 0 and available_other_lanes:
             has_pending_credit = any(
-                int(self._lane_pending.get(name, 0)) > 0 and int(self._lane_credits.get(name, 0)) > 0
+                int(self._lane_pending.get(name, 0)) > 0
+                and int(self._lane_credits.get(name, 0)) > 0
                 for name in self._lane_weights
             )
             if not has_pending_credit:
@@ -432,7 +462,8 @@ class JobManager:
 
         self._lane_credits[normalized_lane] = max(0, lane_credit - 1)
         has_pending_credit = any(
-            int(self._lane_pending.get(name, 0)) > 0 and int(self._lane_credits.get(name, 0)) > 0
+            int(self._lane_pending.get(name, 0)) > 0
+            and int(self._lane_credits.get(name, 0)) > 0
             for name in self._lane_weights
         )
         if not has_pending_credit:

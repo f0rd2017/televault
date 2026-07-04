@@ -15,6 +15,7 @@ from app.config.config import (
 
 # ── _deep_merge ─────────────────────────────────────────────────────
 
+
 def test_deep_merge_simple() -> None:
     a = {"x": 1, "y": 2}
     b = {"y": 3, "z": 4}
@@ -47,6 +48,7 @@ def test_deep_merge_empty() -> None:
 
 # ── _normalize_string_list ──────────────────────────────────────────
 
+
 def test_normalize_comma_separated() -> None:
     assert _normalize_string_list("a,b,c") == ["a", "b", "c"]
 
@@ -65,6 +67,7 @@ def test_normalize_empty() -> None:
 
 # ── config_exists ───────────────────────────────────────────────────
 
+
 def test_config_exists_true(tmp_path: Path) -> None:
     p = tmp_path / "config.json"
     p.write_text("{}")
@@ -76,6 +79,7 @@ def test_config_exists_false(tmp_path: Path) -> None:
 
 
 # ── load_public_config / save_public_config ─────────────────────────
+
 
 def test_public_config_roundtrip(tmp_path: Path) -> None:
     cfg_path = tmp_path / "config.json"

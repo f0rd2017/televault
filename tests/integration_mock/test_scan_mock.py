@@ -59,7 +59,12 @@ async def test_refresh_incremental_indexes_parts(tmp_path) -> None:
                     orig_name="file.bin",
                 ),
                 prefix="FC1|",
-                extra={"sha256": "x" * 64, "orig_size": 42, "part_size": 42, "enc": False},
+                extra={
+                    "sha256": "x" * 64,
+                    "orig_size": 42,
+                    "part_size": 42,
+                    "enc": False,
+                },
             ),
             date=datetime.fromtimestamp(100),
             file=FakeFile(size=42),

@@ -51,7 +51,9 @@ async def test_job_manager_cancel() -> None:
 
 
 @pytest.mark.asyncio
-async def test_job_manager_cancel_interrupts_blocking_runner_and_keeps_worker_alive() -> None:
+async def test_job_manager_cancel_interrupts_blocking_runner_and_keeps_worker_alive() -> (
+    None
+):
     manager = JobManager(parallelism=1)
     events = []
     manager.subscribe(events.append)

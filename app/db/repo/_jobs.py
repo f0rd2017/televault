@@ -129,4 +129,3 @@ class _JobsMixin:
                 }
             )
         return result
-

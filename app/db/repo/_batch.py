@@ -308,4 +308,3 @@ class _BatchMixin:
                 (now_ts(), str(blob_key)),
             )
         return max(0, int(cursor.rowcount))
-

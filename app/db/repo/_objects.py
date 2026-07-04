@@ -295,4 +295,3 @@ class _ObjectsMixin:
             (normalized,),
         ).fetchall()
         return {str(row["file_key"]): str(row["note"]) for row in rows}
-

@@ -16,7 +16,9 @@ class ExplorerListView(QListView):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.export_paths_provider: Callable[[QModelIndex | None], list[str] | None] | None = None
+        self.export_paths_provider: (
+            Callable[[QModelIndex | None], list[str] | None] | None
+        ) = None
         self.export_success_notifier: Callable[[QModelIndex], None] | None = None
         self._drag_start_pos = QPoint()
         self._drag_start_index = QModelIndex()
@@ -45,7 +47,9 @@ class ExplorerListView(QListView):
             if event_type == QEvent.Type.Drop:
                 mime = event.mimeData()
                 if mime.hasUrls():
-                    paths = [url.toLocalFile() for url in mime.urls() if url.isLocalFile()]
+                    paths = [
+                        url.toLocalFile() for url in mime.urls() if url.isLocalFile()
+                    ]
                     if paths:
                         self.drag_state_changed.emit(False)
                         self.files_dropped.emit(paths)
@@ -55,7 +59,9 @@ class ExplorerListView(QListView):
         return super().eventFilter(watched, event)
 
     def dragEnterEvent(self, event) -> None:
-        if event.mimeData().hasUrls() and any(url.isLocalFile() for url in event.mimeData().urls()):
+        if event.mimeData().hasUrls() and any(
+            url.isLocalFile() for url in event.mimeData().urls()
+        ):
             self.drag_state_changed.emit(True)
             event.setDropAction(Qt.DropAction.CopyAction)
             event.accept()
@@ -63,7 +69,9 @@ class ExplorerListView(QListView):
         super().dragEnterEvent(event)
 
     def dragMoveEvent(self, event) -> None:
-        if event.mimeData().hasUrls() and any(url.isLocalFile() for url in event.mimeData().urls()):
+        if event.mimeData().hasUrls() and any(
+            url.isLocalFile() for url in event.mimeData().urls()
+        ):
             self.drag_state_changed.emit(True)
             event.setDropAction(Qt.DropAction.CopyAction)
             event.accept()
@@ -73,7 +81,11 @@ class ExplorerListView(QListView):
     def dropEvent(self, event) -> None:
         self.drag_state_changed.emit(False)
         if event.mimeData().hasUrls():
-            paths = [url.toLocalFile() for url in event.mimeData().urls() if url.isLocalFile()]
+            paths = [
+                url.toLocalFile()
+                for url in event.mimeData().urls()
+                if url.isLocalFile()
+            ]
             if paths:
                 self.files_dropped.emit(paths)
                 event.setDropAction(Qt.DropAction.CopyAction)
@@ -89,14 +101,11 @@ class ExplorerListView(QListView):
             click_pos = event.position().toPoint()
             self._drag_start_pos = click_pos
             self._drag_start_index = self.indexAt(self._drag_start_pos)
-            if (
-                not self._drag_start_index.isValid()
-                and not (
-                    event.modifiers()
-                    & (
-                        Qt.KeyboardModifier.ControlModifier
-                        | Qt.KeyboardModifier.ShiftModifier
-                    )
+            if not self._drag_start_index.isValid() and not (
+                event.modifiers()
+                & (
+                    Qt.KeyboardModifier.ControlModifier
+                    | Qt.KeyboardModifier.ShiftModifier
                 )
             ):
                 self.clearSelection()
@@ -110,7 +119,9 @@ class ExplorerListView(QListView):
         if event.buttons() & Qt.MouseButton.LeftButton:
             if (
                 self._drag_start_index.isValid()
-                and (event.position().toPoint() - self._drag_start_pos).manhattanLength()
+                and (
+                    event.position().toPoint() - self._drag_start_pos
+                ).manhattanLength()
                 >= QApplication.startDragDistance()
             ):
                 if self._start_export_drag(self._drag_start_index):
@@ -126,12 +137,16 @@ class ExplorerListView(QListView):
         if self.export_paths_provider is None:
             return False
 
-        drag_index = preferred_index if preferred_index is not None else self.currentIndex()
+        drag_index = (
+            preferred_index if preferred_index is not None else self.currentIndex()
+        )
         selected = self.selectedIndexes()
         if selected:
             drag_index = selected[0]
         elif not drag_index.isValid():
-            idx_under_cursor = self.indexAt(self.viewport().mapFromGlobal(QCursor.pos()))
+            idx_under_cursor = self.indexAt(
+                self.viewport().mapFromGlobal(QCursor.pos())
+            )
             if idx_under_cursor.isValid():
                 drag_index = idx_under_cursor
 
@@ -163,7 +178,11 @@ class ExplorerListView(QListView):
             Qt.DropAction.CopyAction | Qt.DropAction.MoveAction,
             Qt.DropAction.CopyAction,
         )
-        if result != Qt.DropAction.IgnoreAction and self.export_success_notifier and drag_index.isValid():
+        if (
+            result != Qt.DropAction.IgnoreAction
+            and self.export_success_notifier
+            and drag_index.isValid()
+        ):
             self.export_success_notifier(drag_index)
             return True
         return result != Qt.DropAction.IgnoreAction
@@ -187,7 +206,9 @@ class ExplorerDropFrame(QFrame):
         self.update()
 
     def dragEnterEvent(self, event) -> None:
-        if event.mimeData().hasUrls() and any(url.isLocalFile() for url in event.mimeData().urls()):
+        if event.mimeData().hasUrls() and any(
+            url.isLocalFile() for url in event.mimeData().urls()
+        ):
             self._set_drop_active(True)
             event.setDropAction(Qt.DropAction.CopyAction)
             event.accept()
@@ -195,7 +216,9 @@ class ExplorerDropFrame(QFrame):
         super().dragEnterEvent(event)
 
     def dragMoveEvent(self, event) -> None:
-        if event.mimeData().hasUrls() and any(url.isLocalFile() for url in event.mimeData().urls()):
+        if event.mimeData().hasUrls() and any(
+            url.isLocalFile() for url in event.mimeData().urls()
+        ):
             self._set_drop_active(True)
             event.setDropAction(Qt.DropAction.CopyAction)
             event.accept()
@@ -209,7 +232,11 @@ class ExplorerDropFrame(QFrame):
     def dropEvent(self, event) -> None:
         self._set_drop_active(False)
         if event.mimeData().hasUrls():
-            paths = [url.toLocalFile() for url in event.mimeData().urls() if url.isLocalFile()]
+            paths = [
+                url.toLocalFile()
+                for url in event.mimeData().urls()
+                if url.isLocalFile()
+            ]
             if paths:
                 self.files_dropped.emit(paths)
                 event.setDropAction(Qt.DropAction.CopyAction)
