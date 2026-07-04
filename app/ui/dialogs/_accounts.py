@@ -1,6 +1,6 @@
 """
-Простое окно управления Telegram аккаунтами.
-Только таблица + кнопки управления. Авторизация через терминал.
+Simple window for managing Telegram accounts.
+Just a table + management buttons. Authorization happens via the terminal.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import QCoreApplication, Qt, QThread, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QInputDialog,
@@ -32,26 +32,26 @@ from app.db.repo import DbRepo
 
 logger = logging.getLogger(__name__)
 
-# Держим живые потоки-проберы, чтобы их не собрал GC, если диалог закроют
-# до завершения проверки (поток не запарентен к диалогу).
+# Keep live prober threads alive so GC doesn't collect them if the dialog is
+# closed before the check finishes (the thread isn't parented to the dialog).
 _ACTIVE_PROBES: set[QThread] = set()
 
 
 class _StatusProbe(QThread):
-    """Фоновая проверка живости прокси и аккаунтов.
+    """Background liveness check for proxies and accounts.
 
-    Для каждого аккаунта:
-      - прокси: реальный TCP-коннект через python_socks до Telegram DC
-        (resolve_working_proxy) — сессию не трогает;
-      - аккаунт: реальный connect + is_user_authorized через Telethon.
-    Результат по каждой строке отдаётся сигналом row_status в GUI-поток.
+    For each account:
+      - proxy: a real TCP connect via python_socks to the Telegram DC
+        (resolve_working_proxy) — doesn't touch the session;
+      - account: a real connect + is_user_authorized via Telethon.
+    The result for each row is delivered to the GUI thread via the row_status signal.
     """
 
-    # Шлём по account_id (а не по индексу строки): если во время проверки
-    # список аккаунтов изменится, результат всё равно ляжет на нужную строку.
+    # Sent by account_id (not row index): if the account list changes while the
+    # check is running, the result still lands on the correct row.
     row_status = Signal(int, str, str)  # account_id, proxy_status, account_status
-    # Завершение сигнализируется встроенным QThread.finished — отдельный сигнал
-    # не нужен (и имя "done" путалось бы с QDialog.done).
+    # Completion is signaled via the built-in QThread.finished — no separate signal
+    # is needed (and a "done" name would be confused with QDialog.done).
 
     _CONNECT_TIMEOUT = 12.0
 
@@ -73,7 +73,7 @@ class _StatusProbe(QThread):
                     )
                 except Exception as exc:  # noqa: BLE001
                     logger.debug("Account probe crashed for %s: %s", acc.label, exc)
-                    acc_status = "❌ ошибка"
+                    acc_status = self.tr("❌ error")
                 if self.isInterruptionRequested():
                     break
                 self.row_status.emit(int(acc.id), proxy_status, acc_status)
@@ -88,19 +88,22 @@ class _StatusProbe(QThread):
         from app.core.utils import select_working_proxy_from_chain
 
         chain = [p for p in (acc.proxy, acc.proxy_backup) if str(p or "").strip()]
-        # Основной аккаунт всегда подключается напрямую.
+        # The primary account always connects directly.
         if acc.is_primary or not chain:
-            return ("— прямое", None)
+            return (QCoreApplication.translate("_StatusProbe", "— direct"), None)
         proxy, _label, tier = select_working_proxy_from_chain(chain)
         if proxy is None:
-            return ("❌ мёртв → direct", None)
+            return (
+                QCoreApplication.translate("_StatusProbe", "❌ dead → direct"),
+                None,
+            )
         if tier > 0:
-            return ("✅ резервный", proxy)
-        return ("✅ работает", proxy)
+            return (QCoreApplication.translate("_StatusProbe", "✅ backup"), proxy)
+        return (QCoreApplication.translate("_StatusProbe", "✅ working"), proxy)
 
     @staticmethod
     def _session_disk_path(session_path: str) -> str:
-        """Реальный путь .session-файла (Telethon добавляет расширение сам)."""
+        """Actual path to the .session file (Telethon appends the extension itself)."""
         p = str(session_path or "")
         return p if p.endswith(".session") else p + ".session"
 
@@ -110,8 +113,9 @@ class _StatusProbe(QThread):
     ) -> str:
         from telethon import TelegramClient
 
-        # Проверяем на КОПИИ сессии: auth_key тот же, но запись идёт во временный
-        # файл — реальную сессию работающего приложения не трогаем (нет гонок/локов).
+        # Check against a COPY of the session: same auth_key, but writes go to a
+        # temporary file — we don't touch the real session of the running app
+        # (no races/locks).
         tmp_dir = tempfile.mkdtemp(prefix="tgprobe_")
         tmp_session = os.path.join(tmp_dir, "probe.session")
         disk = cls._session_disk_path(acc.session_path)
@@ -124,7 +128,7 @@ class _StatusProbe(QThread):
                 logger.debug("Cannot copy session for '%s': %s", acc.label, exc)
         if not authorized_possible:
             shutil.rmtree(tmp_dir, ignore_errors=True)
-            return "⚠️ нет сессии"
+            return cls.tr("⚠️ no session")
 
         client = TelegramClient(
             tmp_session,
@@ -135,17 +139,17 @@ class _StatusProbe(QThread):
         try:
             await asyncio.wait_for(client.connect(), timeout=cls._CONNECT_TIMEOUT)
             if not await client.is_user_authorized():
-                return "⚠️ не авторизован"
+                return cls.tr("⚠️ not authorized")
             me = await client.get_me()
             uname = getattr(me, "username", None)
             premium = " ⭐" if getattr(me, "premium", False) else ""
             tail = f" @{uname}" if uname else ""
-            return f"✅ онлайн{premium}{tail}"
+            return f"{cls.tr('✅ online')}{premium}{tail}"
         except asyncio.TimeoutError:
-            return "❌ таймаут"
+            return cls.tr("❌ timeout")
         except Exception as exc:  # noqa: BLE001
             logger.debug("Account '%s' unreachable: %s", acc.label, exc)
-            return "❌ недоступен"
+            return cls.tr("❌ unreachable")
         finally:
             try:
                 await client.disconnect()
@@ -155,7 +159,7 @@ class _StatusProbe(QThread):
 
 
 class AccountsDialog(QDialog):
-    """Окно управления аккаунтами."""
+    """Account management window."""
 
     COL_ID = 0
     COL_LABEL = 1
@@ -173,7 +177,7 @@ class AccountsDialog(QDialog):
         self.repo = repo
         self._accounts: list[TelegramAccount] = []
         self._probe: _StatusProbe | None = None
-        self.setWindowTitle("Telegram Аккаунты")
+        self.setWindowTitle(self.tr("Telegram Accounts"))
         self.setMinimumSize(980, 520)
         self.resize(1080, 560)
 
@@ -264,39 +268,43 @@ class AccountsDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(16)
 
-        # Заголовок
-        header = QLabel("Telegram Аккаунты")
+        # Title
+        header = QLabel(self.tr("Telegram Accounts"))
         header.setStyleSheet("font-size: 18px; font-weight: bold; color: #ffffff;")
         layout.addWidget(header)
 
         desc = QLabel(
-            "Для добавления нового аккаунта запустите команду: python scripts/manage_accounts.py\n"
-            "Здесь можно выбрать основной аккаунт, изменить целевой канал, настроить прокси или отключить аккаунт."
+            self.tr(
+                "To add a new account, run: python scripts/manage_accounts.py\n"
+                "Here you can choose the primary account, change the target channel, "
+                "configure a proxy, or disable an account."
+            )
         )
         desc.setWordWrap(True)
         desc.setStyleSheet("color: #a1a1aa; font-size: 13px; line-height: 1.4;")
         layout.addWidget(desc)
 
-        # Таблица
+        # Table
         self.table = QTableWidget()
         self.table.setColumnCount(10)
         self.table.setHorizontalHeaderLabels(
             [
-                "ID",
-                "Метка",
-                "Телефон",
-                "Username",
-                "Канал",
-                "Основной",
-                "Активен",
-                "Прокси",
-                "Статус прокси",
-                "Статус акк",
+                self.tr("ID"),
+                self.tr("Label"),
+                self.tr("Phone"),
+                self.tr("Username"),
+                self.tr("Channel"),
+                self.tr("Primary"),
+                self.tr("Active"),
+                self.tr("Proxy"),
+                self.tr("Proxy status"),
+                self.tr("Account status"),
             ]
         )
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        # Статус аккаунта тянется на остаток ширины — там самый длинный текст.
+        # Account status stretches to fill the remaining width — it has the
+        # longest text.
         header.setSectionResizeMode(self.COL_ACC_STATUS, QHeaderView.ResizeMode.Stretch)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -305,57 +313,59 @@ class AccountsDialog(QDialog):
         self.table.verticalHeader().setVisible(False)
         layout.addWidget(self.table)
 
-        # Кнопки
+        # Buttons
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(8)
 
-        self.primary_btn = QPushButton("Сделать основным")
+        self.primary_btn = QPushButton(self.tr("Set as primary"))
         self.primary_btn.setObjectName("primaryBtn")
         self.primary_btn.clicked.connect(self._on_set_primary)
         self.primary_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_layout.addWidget(self.primary_btn)
 
-        self.toggle_btn = QPushButton("Вкл / Выкл")
+        self.toggle_btn = QPushButton(self.tr("On / Off"))
         self.toggle_btn.clicked.connect(self._on_toggle)
         self.toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_layout.addWidget(self.toggle_btn)
 
-        self.channel_btn = QPushButton("Изменить канал")
+        self.channel_btn = QPushButton(self.tr("Change channel"))
         self.channel_btn.clicked.connect(self._on_change_channel)
         self.channel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_layout.addWidget(self.channel_btn)
 
-        self.proxy_btn = QPushButton("Прокси")
+        self.proxy_btn = QPushButton(self.tr("Proxy"))
         self.proxy_btn.clicked.connect(self._on_change_proxy)
         self.proxy_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_layout.addWidget(self.proxy_btn)
 
-        self.remove_btn = QPushButton("Удалить")
+        self.remove_btn = QPushButton(self.tr("Remove"))
         self.remove_btn.setObjectName("removeBtn")
         self.remove_btn.clicked.connect(self._on_remove)
         self.remove_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_layout.addWidget(self.remove_btn)
 
-        self.check_btn = QPushButton("Проверить живость")
+        self.check_btn = QPushButton(self.tr("Check liveness"))
         self.check_btn.clicked.connect(self._start_probe)
         self.check_btn.setToolTip(
-            "Проверить, какой прокси и какой аккаунт реально живые "
-            "(реальный коннект к Telegram)"
+            self.tr(
+                "Check which proxy and which account are actually alive "
+                "(a real connection to Telegram)"
+            )
         )
         self.check_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_layout.addWidget(self.check_btn)
 
         btn_layout.addStretch()
 
-        self.copy_cmd_btn = QPushButton("Копировать команду добавления")
+        self.copy_cmd_btn = QPushButton(self.tr("Copy add-account command"))
         self.copy_cmd_btn.clicked.connect(self._on_copy_command)
         self.copy_cmd_btn.setToolTip(
-            "Скопировать в буфер обмена команду для добавления аккаунта"
+            self.tr("Copy the add-account command to the clipboard")
         )
         self.copy_cmd_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_layout.addWidget(self.copy_cmd_btn)
 
-        self.close_btn = QPushButton("Закрыть")
+        self.close_btn = QPushButton(self.tr("Close"))
         self.close_btn.clicked.connect(self.accept)
         self.close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_layout.addWidget(self.close_btn)
@@ -375,54 +385,58 @@ class AccountsDialog(QDialog):
                 QTableWidgetItem(acc.label),
                 QTableWidgetItem(acc.phone_masked or "—"),
                 QTableWidgetItem(acc.username or "—"),
-                QTableWidgetItem(""),  # Канал — заменяется кнопкой ниже
-                QTableWidgetItem("Да" if acc.is_primary else "Нет"),
-                QTableWidgetItem("Да" if acc.is_active else "Нет"),
+                QTableWidgetItem(""),  # Channel — replaced by the button below
+                QTableWidgetItem(self.tr("Yes") if acc.is_primary else self.tr("No")),
+                QTableWidgetItem(self.tr("Yes") if acc.is_active else self.tr("No")),
                 QTableWidgetItem(self._short_proxy(acc.proxy)),
-                QTableWidgetItem("—"),  # Статус прокси (заполняется проверкой)
-                QTableWidgetItem("—"),  # Статус акк
+                QTableWidgetItem("—"),  # Proxy status (filled in by the check)
+                QTableWidgetItem("—"),  # Account status
             ]
             for col, item in enumerate(items):
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.table.setItem(row, col, item)
 
-            # Канал — кнопка «скопировать ссылку» вместо длинного URL.
+            # Channel — a "copy link" button instead of a long URL.
             self.table.setCellWidget(
                 row, self.COL_CHANNEL, self._make_channel_button(acc.chat_target)
             )
-            # Полная строка прокси — в подсказке (логин/пароль скрыты в таблице).
+            # Full proxy string goes in the tooltip (login/password are hidden
+            # in the table).
             if acc.proxy:
                 self.table.item(row, self.COL_PROXY).setToolTip(acc.proxy)
 
-            # Подсветка основного
+            # Highlight the primary row
             if acc.is_primary:
                 from PySide6.QtGui import QColor
 
                 for col in range(self.table.columnCount()):
                     cell = self.table.item(row, col)
-                    if cell is not None:  # у колонки «Канал» виджет, а не item
+                    if (
+                        cell is not None
+                    ):  # the "Channel" column has a widget, not an item
                         cell.setBackground(QColor("#2e1065"))
 
-        # Автоматически проверяем живость при открытии/обновлении.
+        # Automatically check liveness on open/refresh.
         self._start_probe()
 
     def _start_probe(self) -> None:
-        """Запустить фоновую проверку живости прокси и аккаунтов."""
+        """Start the background liveness check for proxies and accounts."""
         if not self._accounts:
             return
         if self._probe is not None and self._probe.isRunning():
-            return  # проверка уже идёт
+            return  # a check is already running
 
         for row in range(self.table.rowCount()):
             self._set_status_cell(row, self.COL_PROXY_STATUS, "…")
-            self._set_status_cell(row, self.COL_ACC_STATUS, "проверка…")
+            self._set_status_cell(row, self.COL_ACC_STATUS, self.tr("checking…"))
         self.check_btn.setEnabled(False)
-        self.check_btn.setText("Проверяю…")
+        self.check_btn.setText(self.tr("Checking…"))
 
         probe = _StatusProbe(self._accounts)
         probe.row_status.connect(self._on_row_status)
-        # Порядок важен: сначала наш слот (сбрасывает self._probe), потом
-        # deleteLater удаляет C++-объект. Иначе done() обратится к удалённому.
+        # Order matters: our slot runs first (resets self._probe), then
+        # deleteLater destroys the C++ object. Otherwise done() would touch a
+        # deleted object.
         probe.finished.connect(self._on_probe_done)
         probe.finished.connect(probe.deleteLater)
         self._probe = probe
@@ -434,7 +448,7 @@ class AccountsDialog(QDialog):
     ) -> None:
         row = self._row_for_account(account_id)
         if row is None:
-            return  # аккаунт удалён/список изменился, пока шла проверка
+            return  # account was deleted / list changed while the check was running
         self._set_status_cell(row, self.COL_PROXY_STATUS, proxy_status)
         self._set_status_cell(row, self.COL_ACC_STATUS, acc_status)
 
@@ -447,11 +461,11 @@ class AccountsDialog(QDialog):
 
     def _on_probe_done(self) -> None:
         _ACTIVE_PROBES.discard(self._probe)
-        # Сбрасываем ссылку до того, как deleteLater уничтожит C++-объект,
-        # чтобы done()/повторный _start_probe не трогали удалённый поток.
+        # Reset the reference before deleteLater destroys the C++ object, so
+        # that done()/a repeated _start_probe don't touch a deleted thread.
         self._probe = None
         self.check_btn.setEnabled(True)
-        self.check_btn.setText("Проверить живость")
+        self.check_btn.setText(self.tr("Check liveness"))
 
     def _set_status_cell(self, row: int, col: int, text: str) -> None:
         from PySide6.QtGui import QColor
@@ -459,20 +473,21 @@ class AccountsDialog(QDialog):
         item = QTableWidgetItem(text)
         item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         if text.startswith("✅"):
-            item.setForeground(QColor("#4ade80"))  # зелёный — живой
+            item.setForeground(QColor("#4ade80"))  # green — alive
         elif text.startswith(("❌", "⚠")):
-            item.setForeground(QColor("#fca5a5"))  # красный — проблема
+            item.setForeground(QColor("#fca5a5"))  # red — problem
         elif text.startswith("🔒"):
-            item.setForeground(QColor("#fcd34d"))  # жёлтый — занят/живой
-        # Сохраняем подсветку строки основного аккаунта при замене ячейки.
+            item.setForeground(QColor("#fcd34d"))  # yellow — busy/alive
+        # Preserve the primary-account row highlight when replacing the cell.
         primary_item = self.table.item(row, self.COL_PRIMARY)
-        if primary_item is not None and primary_item.text() == "Да":
+        if primary_item is not None and primary_item.text() == self.tr("Yes"):
             item.setBackground(QColor("#2e1065"))
         self.table.setItem(row, col, item)
 
     def done(self, result: int) -> None:
-        # Останавливаем фоновую проверку при закрытии окна. Защищаемся от случая,
-        # когда C++-объект потока уже удалён (deleteLater), а Python-ссылка ещё жива.
+        # Stop the background check when the window closes. Guard against the
+        # case where the thread's C++ object is already deleted (deleteLater)
+        # but the Python reference is still alive.
         probe = self._probe
         if probe is not None:
             try:
@@ -486,10 +501,10 @@ class AccountsDialog(QDialog):
 
     @staticmethod
     def _short_proxy(raw: str) -> str:
-        """Короткое отображение прокси: только host:port (без логина/пароля)."""
+        """Short proxy display: host:port only (no login/password)."""
         raw = str(raw or "").strip()
         if not raw:
-            return "Без прокси"
+            return QCoreApplication.translate("AccountsDialog", "No proxy")
         try:
             from app.core.utils import is_mtproxy, parse_mtproxy, parse_proxy
 
@@ -502,9 +517,9 @@ class AccountsDialog(QDialog):
             return raw
 
     def _make_channel_button(self, chat_target: str) -> QPushButton:
-        btn = QPushButton("📋 Ссылка")
+        btn = QPushButton(self.tr("📋 Link"))
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn.setToolTip(chat_target or "Канал не задан")
+        btn.setToolTip(chat_target or self.tr("Channel not set"))
         btn.setEnabled(bool(chat_target))
         btn.clicked.connect(lambda _=False, t=chat_target: self._copy_channel(t))
         return btn
@@ -516,13 +531,17 @@ class AccountsDialog(QDialog):
             return
         QApplication.clipboard().setText(chat_target)
         QMessageBox.information(
-            self, "Скопировано", f"Ссылка на канал скопирована:\n\n{chat_target}"
+            self,
+            self.tr("Copied"),
+            self.tr("Channel link copied:\n\n{0}").format(chat_target),
         )
 
     def _get_selected_id(self) -> int | None:
         row = self.table.currentRow()
         if row < 0:
-            QMessageBox.warning(self, "Ошибка", "Выберите аккаунт в таблице")
+            QMessageBox.warning(
+                self, self.tr("Error"), self.tr("Select an account in the table")
+            )
             return None
         item = self.table.item(row, 0)
         if item:
@@ -537,13 +556,15 @@ class AccountsDialog(QDialog):
         if acc_id is None:
             return
 
-        # Снять primary со всех
+        # Clear primary from all accounts
         for acc in self.repo.list_accounts():
             self.repo.update_account(acc.id, is_primary=0)
 
         self.repo.update_account(acc_id, is_primary=1)
         self._load_accounts()
-        QMessageBox.information(self, "Готово", "Аккаунт теперь основной! ✨")
+        QMessageBox.information(
+            self, self.tr("Done"), self.tr("The account is now primary! ✨")
+        )
 
     def _on_toggle(self):
         acc_id = self._get_selected_id()
@@ -555,9 +576,11 @@ class AccountsDialog(QDialog):
             new_state = not acc.is_active
             self.repo.update_account(acc_id, is_active=1 if new_state else 0)
             self._load_accounts()
-            state_text = "включён" if new_state else "выключен"
+            state_text = self.tr("enabled") if new_state else self.tr("disabled")
             QMessageBox.information(
-                self, "Готово", f"Аккаунт '{acc.label}' {state_text}"
+                self,
+                self.tr("Done"),
+                self.tr("Account '{0}' {1}").format(acc.label, state_text),
             )
 
     def _on_change_channel(self):
@@ -571,28 +594,35 @@ class AccountsDialog(QDialog):
 
         channel, ok = QInputDialog.getText(
             self,
-            "Изменить канал",
-            f"Текущий канал: {acc.chat_target}\n\nНовый канал:",
+            self.tr("Change channel"),
+            self.tr("Current channel: {0}\n\nNew channel:").format(acc.chat_target),
             text=acc.chat_target,
         )
         if ok and channel.strip():
             new_channel = channel.strip()
-            # Защита: не дать случайно сохранить прокси в поле канала.
+            # Guard: don't let a proxy accidentally get saved into the channel field.
             if self._looks_like_proxy(new_channel):
                 QMessageBox.warning(
                     self,
-                    "Ошибка",
-                    "Это похоже на прокси (host:port:user:pass), а не на ссылку на канал.\n"
-                    "Канал: https://t.me/+xxxxx, @username или username.",
+                    self.tr("Error"),
+                    self.tr(
+                        "This looks like a proxy (host:port:user:pass), not a "
+                        "channel link.\n"
+                        "Channel: https://t.me/+xxxxx, @username or username."
+                    ),
                 )
                 return
             self.repo.update_account(acc_id, chat_target=new_channel)
             self._load_accounts()
-            QMessageBox.information(self, "Готово", f"Канал обновлён: {new_channel}")
+            QMessageBox.information(
+                self,
+                self.tr("Done"),
+                self.tr("Channel updated: {0}").format(new_channel),
+            )
 
     @staticmethod
     def _looks_like_proxy(value: str) -> bool:
-        """True, если строка парсится как прокси (socks/http/mtproto)."""
+        """True if the string parses as a proxy (socks/http/mtproto)."""
         from app.core.utils import is_mtproxy, parse_mtproxy, parse_proxy
 
         try:
@@ -615,11 +645,13 @@ class AccountsDialog(QDialog):
 
         proxy, ok = QInputDialog.getText(
             self,
-            "Изменить прокси",
-            f"Текущий прокси: {acc.proxy or 'Без прокси'}\n\n"
-            "Форматы: IP:PORT:USER:PASS, socks5://…, http://…,\n"
-            "MTProto: mtproto://HOST:PORT:SECRET или tg://proxy?…\n"
-            "(пусто = без прокси):",
+            self.tr("Change proxy"),
+            self.tr(
+                "Current proxy: {0}\n\n"
+                "Formats: IP:PORT:USER:PASS, socks5://…, http://…,\n"
+                "MTProto: mtproto://HOST:PORT:SECRET or tg://proxy?…\n"
+                "(empty = no proxy):"
+            ).format(acc.proxy or self.tr("No proxy")),
             text=acc.proxy,
         )
         if not ok:
@@ -627,25 +659,27 @@ class AccountsDialog(QDialog):
 
         backup, ok_backup = QInputDialog.getText(
             self,
-            "Резервный прокси",
-            f"Текущий резервный: {acc.proxy_backup or 'Без резервного'}\n\n"
-            "Используется, если основной недоступен (затем — напрямую).\n"
-            "Форматы: IP:PORT:USER:PASS, socks5://…, http://…, mtproto://…\n"
-            "(пусто = без резервного):",
+            self.tr("Backup proxy"),
+            self.tr(
+                "Current backup: {0}\n\n"
+                "Used if the primary is unavailable (then falls back to direct).\n"
+                "Formats: IP:PORT:USER:PASS, socks5://…, http://…, mtproto://…\n"
+                "(empty = no backup):"
+            ).format(acc.proxy_backup or self.tr("No backup")),
             text=acc.proxy_backup,
         )
         self.repo.update_account(acc_id, proxy=proxy.strip())
         if ok_backup:
             self.repo.update_account(acc_id, proxy_backup=backup.strip())
         self._load_accounts()
-        proxy_text = proxy.strip() if proxy.strip() else "Без прокси"
+        proxy_text = proxy.strip() if proxy.strip() else self.tr("No proxy")
         backup_text = (
             backup.strip() if ok_backup and backup.strip() else acc.proxy_backup
-        ) or "Без резервного"
+        ) or self.tr("No backup")
         QMessageBox.information(
             self,
-            "Готово",
-            f"Прокси обновлён: {proxy_text}\nРезервный: {backup_text}",
+            self.tr("Done"),
+            self.tr("Proxy updated: {0}\nBackup: {1}").format(proxy_text, backup_text),
         )
 
     def _on_remove(self):
@@ -660,22 +694,26 @@ class AccountsDialog(QDialog):
         from app.ui.dialogs import ConfirmDialog
 
         dialog = ConfirmDialog(
-            title="Удалить аккаунт?",
-            message=f"Удалить аккаунт '{acc.label}'?\nСессия будет удалена.",
+            title=self.tr("Delete account?"),
+            message=self.tr(
+                "Delete account '{0}'?\nThe session will be deleted."
+            ).format(acc.label),
             parent=self,
             is_destructive=True,
         )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
 
-        # Удалить session
+        # Delete the session
         session_path = Path(acc.session_path)
         if session_path.exists():
             session_path.unlink(missing_ok=True)
 
         self.repo.delete_account(acc_id)
         self._load_accounts()
-        QMessageBox.information(self, "Готово", f"Аккаунт '{acc.label}' удалён")
+        QMessageBox.information(
+            self, self.tr("Done"), self.tr("Account '{0}' deleted").format(acc.label)
+        )
 
     def _on_copy_command(self):
         from PySide6.QtWidgets import QApplication
@@ -683,4 +721,6 @@ class AccountsDialog(QDialog):
         cmd = "python scripts/manage_accounts.py"
         clipboard = QApplication.clipboard()
         clipboard.setText(cmd)
-        QMessageBox.information(self, "Скопировано", f"Команда скопирована:\n\n{cmd}")
+        QMessageBox.information(
+            self, self.tr("Copied"), self.tr("Command copied:\n\n{0}").format(cmd)
+        )

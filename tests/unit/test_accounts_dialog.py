@@ -55,8 +55,8 @@ def test_dialog_builds_status_columns(tmp_path, monkeypatch) -> None:
     dlg = AccountsDialog(repo)
     try:
         assert dlg.table.columnCount() == 10
-        assert dlg.table.horizontalHeaderItem(8).text() == "Статус прокси"
-        assert dlg.table.horizontalHeaderItem(9).text() == "Статус акк"
+        assert dlg.table.horizontalHeaderItem(8).text() == "Proxy status"
+        assert dlg.table.horizontalHeaderItem(9).text() == "Account status"
         assert dlg.table.rowCount() == 2
         # Колонки статуса инициализированы плейсхолдером.
         assert dlg.table.item(0, AccountsDialog.COL_ACC_STATUS).text() == "—"
@@ -74,7 +74,7 @@ def test_dialog_builds_status_columns(tmp_path, monkeypatch) -> None:
 def test_short_proxy_and_proxy_guard() -> None:
     # Короткий прокси скрывает креды.
     assert AccountsDialog._short_proxy("1.2.3.4:1080:u:p") == "1.2.3.4:1080"
-    assert AccountsDialog._short_proxy("") == "Без прокси"
+    assert AccountsDialog._short_proxy("") == "No proxy"
     assert AccountsDialog._short_proxy("socks5://h:9050") == "h:9050"
     # Защита канала от прокси: канал НЕ прокси, прокси — прокси.
     assert AccountsDialog._looks_like_proxy("https://t.me/+AbCdEfGh12345678") is False
@@ -216,4 +216,4 @@ def test_session_disk_path_and_missing_session() -> None:
         chat_target="@x",
     )
     result = asyncio.run(_StatusProbe._probe_account(acc, None))
-    assert result == "⚠️ нет сессии"
+    assert result == "⚠️ no session"

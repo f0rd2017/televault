@@ -36,7 +36,7 @@ def test_two_tabs_present():
     tabs = dlg.findChild(QTabWidget)
     assert tabs is not None
     labels = [tabs.tabText(i) for i in range(tabs.count())]
-    assert labels == ["Основные", "Расширенные"]
+    assert labels == ["Basic", "Advanced"]
 
 
 def test_advanced_widgets_reflect_initial():
@@ -94,4 +94,4 @@ def test_empty_key_env_falls_back_to_default():
 def test_settings_dialog_title():
     _app()
     dlg = SettingsDialog(initial=_initial())
-    assert dlg.windowTitle() == "Настройки"
+    assert dlg.windowTitle() == "Settings"

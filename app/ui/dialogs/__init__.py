@@ -4,6 +4,7 @@ from typing import Any
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -29,7 +30,7 @@ class SetupDialog(QDialog):
 
     def __init__(self, initial: dict[str, Any] | None = None, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Начальная настройка")
+        self.setWindowTitle(self.tr("Initial Setup"))
         initial = initial or {}
 
         # ── Preserve hidden fields (passed through unchanged on save) ──────
@@ -93,16 +94,22 @@ class SetupDialog(QDialog):
         # ── Visible widgets ────────────────────────────────────────────────
         initial_api_id = int(initial.get("tg_api_id", 0) or 0)
         self.api_id_edit = QLineEdit(str(initial_api_id) if initial_api_id > 0 else "")
-        self.api_id_edit.setPlaceholderText("число с my.telegram.org/apps")
+        self.api_id_edit.setPlaceholderText(self.tr("number from my.telegram.org/apps"))
         self.api_id_edit.setToolTip(
-            "API ID приложения Telegram (my.telegram.org/apps).\n"
-            "Если задан в .env (TG_API_ID) — приоритет у .env."
+            self.tr(
+                "Telegram app API ID (my.telegram.org/apps).\n"
+                "If set in .env (TG_API_ID) — .env takes priority."
+            )
         )
         self.api_hash_edit = QLineEdit(str(initial.get("tg_api_hash", "") or ""))
-        self.api_hash_edit.setPlaceholderText("32 hex-символа с my.telegram.org/apps")
+        self.api_hash_edit.setPlaceholderText(
+            self.tr("32 hex characters from my.telegram.org/apps")
+        )
         self.api_hash_edit.setToolTip(
-            "API Hash приложения Telegram (my.telegram.org/apps).\n"
-            "Если задан в .env (TG_API_HASH) — приоритет у .env."
+            self.tr(
+                "Telegram app API Hash (my.telegram.org/apps).\n"
+                "If set in .env (TG_API_HASH) — .env takes priority."
+            )
         )
 
         self.session_edit = QLineEdit(
@@ -110,54 +117,68 @@ class SetupDialog(QDialog):
         )
 
         self.channels_label = QLabel(
-            ", ".join(account_channels) if account_channels else "Аккаунты не настроены"
+            ", ".join(account_channels)
+            if account_channels
+            else self.tr("No accounts configured")
         )
         self.channels_label.setWordWrap(True)
         self.channels_label.setStyleSheet("color: #7a6fa0; font-size: 11px;")
         self.channels_label.setToolTip(
-            "Каналы настраиваются для каждого аккаунта в диалоге Аккаунты.\n"
-            "Откройте Настройки > Аккаунты для добавления/редактирования."
+            self.tr(
+                "Channels are configured per account in the Accounts dialog.\n"
+                "Open Settings > Accounts to add/edit them."
+            )
         )
 
         self.main_route_spin = QSpinBox()
         self.main_route_spin.setRange(1, 4)
         self.main_route_spin.setValue(initial_main_channel_index + 1)
         self.main_route_spin.setToolTip(
-            "Номер основного канала из списка выше (начиная с 1)."
+            self.tr("Number of the main channel from the list above (starting at 1).")
         )
 
         self.tg_proxy_edit = QLineEdit(str(initial.get("tg_proxy", "")))
         self.tg_proxy_edit.setPlaceholderText(
-            "host:port:user:pass  (оставьте пустым если не нужен)"
+            self.tr("host:port:user:pass  (leave empty if not needed)")
         )
         self.tg_proxy_edit.setToolTip(
-            "Прокси для основной сессии Telegram (необязательно).\n"
-            "SOCKS5/HTTP: host:port[:user:pass] или socks5://… / http://…\n"
-            "MTProto: mtproto://HOST:PORT:SECRET или tg://proxy?server=…&secret=…"
+            self.tr(
+                "Proxy for the main Telegram session (optional).\n"
+                "SOCKS5/HTTP: host:port[:user:pass] or socks5://… / http://…\n"
+                "MTProto: mtproto://HOST:PORT:SECRET or tg://proxy?server=…&secret=…"
+            )
         )
 
         self.cache_edit = QLineEdit(str(initial.get("cache_dir", "./var/cache")))
-        self.cache_edit.setToolTip("Директория для временных файлов кэша скачивания.")
+        self.cache_edit.setToolTip(
+            self.tr("Directory for temporary download cache files.")
+        )
 
         self.download_edit = QLineEdit(str(initial.get("download_dir", "")))
         self.download_edit.setPlaceholderText(
-            "Пусто = сохранять в директорию кэша (как сейчас)"
+            self.tr("Empty = save to the cache directory (as now)")
         )
         self.download_edit.setToolTip(
-            "Куда сохранять скачанные файлы.\n"
-            "Если поле пустое — файлы кладутся в директорию кэша."
+            self.tr(
+                "Where to save downloaded files.\n"
+                "If empty, files are placed in the cache directory."
+            )
         )
 
-        self.show_thumbs_chk = QCheckBox("Превью картинок в гриде")
+        self.show_thumbs_chk = QCheckBox(self.tr("Image previews in the grid"))
         self.show_thumbs_chk.setChecked(bool(initial.get("show_thumbnails", True)))
         self.show_thumbs_chk.setToolTip(
-            "Показывать миниатюры вместо иконок для картинок."
+            self.tr("Show thumbnails instead of icons for images.")
         )
-        self.fetch_thumbs_chk = QCheckBox("Тянуть превью для нескачанных")
+        self.fetch_thumbs_chk = QCheckBox(
+            self.tr("Fetch previews for not-yet-downloaded files")
+        )
         self.fetch_thumbs_chk.setChecked(bool(initial.get("fetch_thumbnails", True)))
         self.fetch_thumbs_chk.setToolTip(
-            "Фоном дозагружать ещё не скачанные картинки ради превью "
-            "(использует трафик)."
+            self.tr(
+                "Fetch not-yet-downloaded images in the background for previews "
+                "(uses network traffic)."
+            )
         )
         self.show_thumbs_chk.toggled.connect(self.fetch_thumbs_chk.setEnabled)
         self.fetch_thumbs_chk.setEnabled(self.show_thumbs_chk.isChecked())
@@ -168,7 +189,9 @@ class SetupDialog(QDialog):
         self.ui_icon_size_slider = QSlider(Qt.Orientation.Horizontal)
         self.ui_icon_size_slider.setRange(32, 256)
         self.ui_icon_size_slider.setValue(int(initial.get("ui_icon_size", 56)))
-        self.ui_icon_size_slider.setToolTip("Размер иконок файлов и папок в пикселях.")
+        self.ui_icon_size_slider.setToolTip(
+            self.tr("Size of file and folder icons in pixels.")
+        )
 
         self.ui_icon_size_label = QLabel(f"{self.ui_icon_size_slider.value()} px")
         self.ui_icon_size_label.setFixedWidth(50)
@@ -187,26 +210,30 @@ class SetupDialog(QDialog):
         self.icon_size_widget.setLayout(icon_size_layout)
         icon_size_layout.setContentsMargins(0, 0, 0, 0)
 
-        # ── REST API (инкремент 5) ─────────────────────────────────────────
+        # ── REST API (increment 5) ─────────────────────────────────────────
         api_initial = initial.get("api", {}) or {}
-        self.api_enabled_chk = QCheckBox("Включить локальный REST API")
+        self.api_enabled_chk = QCheckBox(self.tr("Enable local REST API"))
         self.api_enabled_chk.setChecked(bool(api_initial.get("enabled", False)))
         self.api_enabled_chk.setToolTip(
-            "Локальный HTTP-сервер поверх ядра (список/загрузка/скачивание/джобы).\n"
-            "Применяется после перезапуска приложения."
+            self.tr(
+                "Local HTTP server on top of the core (list/upload/download/jobs).\n"
+                "Applied after the application restarts."
+            )
         )
         self.api_host_edit = QLineEdit(str(api_initial.get("host", "127.0.0.1")))
         self.api_host_edit.setToolTip(
-            "127.0.0.1 — доступ только с этого компьютера (рекомендуется)."
+            self.tr("127.0.0.1 — access only from this computer (recommended).")
         )
         self.api_port_spin = QSpinBox()
         self.api_port_spin.setRange(1, 65535)
         self.api_port_spin.setValue(int(api_initial.get("port", 20451)))
         self.api_token_edit = QLineEdit(str(api_initial.get("token", "")))
-        self.api_token_edit.setPlaceholderText("пусто = без авторизации")
+        self.api_token_edit.setPlaceholderText(self.tr("empty = no authorization"))
         self.api_token_edit.setToolTip(
-            "Если задан — нужен заголовок Authorization: Bearer <токен>.\n"
-            "Пусто = авторизация отключена (полагается на привязку к 127.0.0.1)."
+            self.tr(
+                "If set, requires the header Authorization: Bearer <token>.\n"
+                "Empty = authorization disabled (relies on binding to 127.0.0.1)."
+            )
         )
         for _w in (self.api_host_edit, self.api_port_spin, self.api_token_edit):
             _w.setEnabled(self.api_enabled_chk.isChecked())
@@ -218,14 +245,14 @@ class SetupDialog(QDialog):
         self.conc_spin.setRange(1, 16)
         self.conc_spin.setValue(int(initial.get("concurrency", 3)))
         self.conc_spin.setToolTip(
-            "Параллельные потоки Telegram на задачу (рекомендуется 2–4)."
+            self.tr("Parallel Telegram threads per task (2–4 recommended).")
         )
 
         self.max_jobs_spin = QSpinBox()
         self.max_jobs_spin.setRange(1, 16)
         self.max_jobs_spin.setValue(int(initial.get("max_active_jobs", 3)))
         self.max_jobs_spin.setToolTip(
-            "Максимум одновременных задач загрузки/скачивания."
+            self.tr("Maximum number of simultaneous upload/download tasks.")
         )
 
         initial_part_size = max(
@@ -234,81 +261,96 @@ class SetupDialog(QDialog):
         )
         self.part_size_spin = QSpinBox()
         self.part_size_spin.setRange(64, 4096)
-        self.part_size_spin.setSuffix(" МБ")
+        self.part_size_spin.setSuffix(self.tr(" MB"))
         self.part_size_spin.setValue(initial_part_size)
         self.part_size_spin.setToolTip(
-            "Размер каждой части файла в Telegram.\n"
-            "Меньше = больше частей, лучше параллелизм.\n"
-            "256 МБ — хорошее значение для 3 каналов."
+            self.tr(
+                "Size of each file part in Telegram.\n"
+                "Smaller = more parts, better parallelism.\n"
+                "256 MB is a good value for 3 channels."
+            )
         )
 
-        # ── Расширенные виджеты (вкладка «Расширенные») ─────────────────────
+        # ── Advanced widgets (the "Advanced" tab) ─────────────────────
         self.integrity_combo = QComboBox()
-        self.integrity_combo.addItem("Строгая (проверять sha256)", "strict")
-        self.integrity_combo.addItem("Быстрая (без полной сверки)", "fast")
+        self.integrity_combo.addItem(self.tr("Strict (verify sha256)"), "strict")
+        self.integrity_combo.addItem(self.tr("Fast (no full verification)"), "fast")
         self._select_combo_data(self.integrity_combo, self._download_integrity_mode)
         self.integrity_combo.setToolTip(
-            "Строгая надёжнее (сверяет контрольную сумму), быстрая — быстрее."
+            self.tr("Strict is more reliable (verifies the checksum); fast is quicker.")
         )
 
         self.compression_combo = QComboBox()
-        self.compression_combo.addItem("Авто (сжимать сжимаемое)", "auto")
-        self.compression_combo.addItem("Выключено", "off")
-        self.compression_combo.addItem("Принудительно", "force")
+        self.compression_combo.addItem(
+            self.tr("Auto (compress what compresses)"), "auto"
+        )
+        self.compression_combo.addItem(self.tr("Off"), "off")
+        self.compression_combo.addItem(self.tr("Force"), "force")
         self._select_combo_data(self.compression_combo, self._upload_compression_mode)
         self.compression_combo.setToolTip(
-            "Сжатие перед загрузкой. «Авто» — сжимать только то, что сжимается."
+            self.tr(
+                'Compression before upload. "Auto" compresses only what '
+                "benefits from it."
+            )
         )
 
         self.upload_safety_spin = QSpinBox()
         self.upload_safety_spin.setRange(0, 1024)
-        self.upload_safety_spin.setSuffix(" МБ")
+        self.upload_safety_spin.setSuffix(self.tr(" MB"))
         self.upload_safety_spin.setValue(self._upload_limit_safety_mb)
         self.upload_safety_spin.setToolTip(
-            "Запас от лимита Telegram на размер файла (чтобы не упереться в потолок)."
+            self.tr(
+                "Margin below Telegram's file size limit "
+                "(to avoid hitting the ceiling)."
+            )
         )
 
         self.chunk_size_spin = QSpinBox()
         self.chunk_size_spin.setRange(1, 2048)
-        self.chunk_size_spin.setSuffix(" МБ")
+        self.chunk_size_spin.setSuffix(self.tr(" MB"))
         self.chunk_size_spin.setValue(self._chunk_size_mb)
         self.chunk_size_spin.setToolTip(
-            "Размер чанка чтения/шифрования при загрузке. Влияет на память."
+            self.tr("Read/encryption chunk size during upload. Affects memory usage.")
         )
 
         self.cache_limit_spin = QSpinBox()
         self.cache_limit_spin.setRange(0, 8_388_608)
-        self.cache_limit_spin.setSuffix(" МБ")
-        self.cache_limit_spin.setSpecialValueText("0 — без лимита")
+        self.cache_limit_spin.setSuffix(self.tr(" MB"))
+        self.cache_limit_spin.setSpecialValueText(self.tr("0 — no limit"))
         self.cache_limit_spin.setValue(self._cache_max_size_mb)
         self.cache_limit_spin.setToolTip(
-            "Максимальный размер кэша скачивания. 0 — без ограничения."
+            self.tr("Maximum download cache size. 0 — no limit.")
         )
 
         self.stream_cache_limit_spin = QSpinBox()
         self.stream_cache_limit_spin.setRange(0, 1_048_576)
-        self.stream_cache_limit_spin.setSuffix(" МБ")
-        self.stream_cache_limit_spin.setSpecialValueText("0 — без лимита")
+        self.stream_cache_limit_spin.setSuffix(self.tr(" MB"))
+        self.stream_cache_limit_spin.setSpecialValueText(self.tr("0 — no limit"))
         self.stream_cache_limit_spin.setValue(self._stream_cache_max_mb)
         self.stream_cache_limit_spin.setToolTip(
-            "Максимальный размер кэша частей стриминга (просмотр/шар-ссылки).\n"
-            "Старые части вытесняются по LRU. 0 — без ограничения."
+            self.tr(
+                "Maximum size of the streaming parts cache (preview/share links).\n"
+                "Old parts are evicted via LRU. 0 — no limit."
+            )
         )
 
         self.small_threshold_spin = QSpinBox()
         self.small_threshold_spin.setRange(1, 65536)
-        self.small_threshold_spin.setSuffix(" КБ")
+        self.small_threshold_spin.setSuffix(self.tr(" KB"))
         self.small_threshold_spin.setValue(self._small_file_threshold_kb)
         self.small_threshold_spin.setToolTip(
-            "Файлы меньше этого порога пакуются в общий архив (батчинг)."
+            self.tr(
+                "Files below this threshold are packed into a shared archive "
+                "(batching)."
+            )
         )
 
         self.small_batch_target_spin = QSpinBox()
         self.small_batch_target_spin.setRange(1, 512)
-        self.small_batch_target_spin.setSuffix(" МБ")
+        self.small_batch_target_spin.setSuffix(self.tr(" MB"))
         self.small_batch_target_spin.setValue(self._small_file_batch_target_mb)
         self.small_batch_target_spin.setToolTip(
-            "Целевой размер одного архива с мелкими файлами."
+            self.tr("Target size of a single archive containing small files.")
         )
 
         self.send_rate_spin = QDoubleSpinBox()
@@ -317,7 +359,10 @@ class SetupDialog(QDialog):
         self.send_rate_spin.setSingleStep(0.5)
         self.send_rate_spin.setValue(self._send_media_rate_limit)
         self.send_rate_spin.setToolTip(
-            "Лимит запросов отправки в Telegram (выше = быстрее, но риск flood-wait)."
+            self.tr(
+                "Telegram send request rate limit "
+                "(higher = faster, but risk of flood-wait)."
+            )
         )
 
         self.get_rate_spin = QDoubleSpinBox()
@@ -326,61 +371,73 @@ class SetupDialog(QDialog):
         self.get_rate_spin.setSingleStep(0.5)
         self.get_rate_spin.setValue(self._get_file_rate_limit)
         self.get_rate_spin.setToolTip(
-            "Лимит запросов скачивания из Telegram (выше = быстрее, но риск flood-wait)."
+            self.tr(
+                "Telegram download request rate limit "
+                "(higher = faster, but risk of flood-wait)."
+            )
         )
 
         self.upload_throttle_spin = QDoubleSpinBox()
         self.upload_throttle_spin.setRange(0.0, 10000.0)
         self.upload_throttle_spin.setDecimals(1)
         self.upload_throttle_spin.setSingleStep(1.0)
-        self.upload_throttle_spin.setSuffix(" МБ/с")
-        self.upload_throttle_spin.setSpecialValueText("0 — без лимита")
+        self.upload_throttle_spin.setSuffix(self.tr(" MB/s"))
+        self.upload_throttle_spin.setSpecialValueText(self.tr("0 — no limit"))
         self.upload_throttle_spin.setValue(
             float(initial.get("upload_throttle_mbps", 0.0))
         )
         self.upload_throttle_spin.setToolTip(
-            "Ограничение полосы загрузки (отдачи). 0 — без лимита."
+            self.tr("Upload bandwidth limit (outbound). 0 — no limit.")
         )
 
         self.download_throttle_spin = QDoubleSpinBox()
         self.download_throttle_spin.setRange(0.0, 10000.0)
         self.download_throttle_spin.setDecimals(1)
         self.download_throttle_spin.setSingleStep(1.0)
-        self.download_throttle_spin.setSuffix(" МБ/с")
-        self.download_throttle_spin.setSpecialValueText("0 — без лимита")
+        self.download_throttle_spin.setSuffix(self.tr(" MB/s"))
+        self.download_throttle_spin.setSpecialValueText(self.tr("0 — no limit"))
         self.download_throttle_spin.setValue(
             float(initial.get("download_throttle_mbps", 0.0))
         )
         self.download_throttle_spin.setToolTip(
-            "Ограничение полосы скачивания. 0 — без лимита."
+            self.tr("Download bandwidth limit. 0 — no limit.")
         )
 
         self.retry_attempts_spin = QSpinBox()
         self.retry_attempts_spin.setRange(1, 20)
         self.retry_attempts_spin.setValue(self._retry_max_attempts)
         self.retry_attempts_spin.setToolTip(
-            "Сколько раз повторять операцию при временной ошибке сети/Telegram."
+            self.tr(
+                "How many times to retry an operation on a transient "
+                "network/Telegram error."
+            )
         )
 
         self.retry_delay_spin = QDoubleSpinBox()
         self.retry_delay_spin.setRange(0.1, 60.0)
         self.retry_delay_spin.setDecimals(1)
         self.retry_delay_spin.setSingleStep(0.5)
-        self.retry_delay_spin.setSuffix(" с")
+        self.retry_delay_spin.setSuffix(self.tr(" s"))
         self.retry_delay_spin.setValue(self._retry_base_delay)
         self.retry_delay_spin.setToolTip(
-            "Базовая задержка перед повтором (растёт экспоненциально)."
+            self.tr("Base delay before retrying (grows exponentially).")
         )
 
-        self.crypto_enabled_chk = QCheckBox("Шифровать содержимое (AES-GCM)")
+        self.crypto_enabled_chk = QCheckBox(self.tr("Encrypt content (AES-GCM)"))
         self.crypto_enabled_chk.setChecked(self._crypto_enabled)
         self.crypto_enabled_chk.setToolTip(
-            "Шифровать чанки перед загрузкой ключом из переменной окружения.\n"
-            "Менять при наличии уже загруженных данных НЕ рекомендуется."
+            self.tr(
+                "Encrypt chunks before upload using a key from an environment "
+                "variable.\n"
+                "Changing this is NOT recommended once data has already been "
+                "uploaded."
+            )
         )
         self.crypto_key_env_edit = QLineEdit(self._crypto_key_env)
         self.crypto_key_env_edit.setToolTip(
-            "Имя переменной окружения с base64-ключом (32 байта)."
+            self.tr(
+                "Name of the environment variable holding the base64 key (32 bytes)."
+            )
         )
         self.crypto_key_env_edit.setEnabled(self.crypto_enabled_chk.isChecked())
         self.crypto_enabled_chk.toggled.connect(self.crypto_key_env_edit.setEnabled)
@@ -410,59 +467,59 @@ class SetupDialog(QDialog):
         download_row.addWidget(self.download_edit)
         download_row.addWidget(browse_download)
 
-        # Вкладка «Основные» — то, что нужно настроить большинству.
+        # The "Basic" tab — what most people need to configure.
         basic_form = self._new_form()
         basic_form.addRow(self._section("TELEGRAM"))
-        basic_form.addRow("API ID", self.api_id_edit)
-        basic_form.addRow("API Hash", self.api_hash_edit)
-        basic_form.addRow("Файл сессии", session_row)
-        basic_form.addRow("Каналы", self.channels_label)
-        basic_form.addRow("Основной канал №", self.main_route_spin)
-        basic_form.addRow("Основной прокси", self.tg_proxy_edit)
-        basic_form.addRow(self._section("ХРАНИЛИЩЕ"))
-        basic_form.addRow("Директория кэша", cache_row)
-        basic_form.addRow("Папка скачивания", download_row)
-        basic_form.addRow(self._section("ИНТЕРФЕЙС"))
-        basic_form.addRow("Размер значков", self.icon_size_widget)
+        basic_form.addRow(self.tr("API ID"), self.api_id_edit)
+        basic_form.addRow(self.tr("API Hash"), self.api_hash_edit)
+        basic_form.addRow(self.tr("Session file"), session_row)
+        basic_form.addRow(self.tr("Channels"), self.channels_label)
+        basic_form.addRow(self.tr("Main channel #"), self.main_route_spin)
+        basic_form.addRow(self.tr("Main proxy"), self.tg_proxy_edit)
+        basic_form.addRow(self._section(self.tr("STORAGE")))
+        basic_form.addRow(self.tr("Cache directory"), cache_row)
+        basic_form.addRow(self.tr("Download folder"), download_row)
+        basic_form.addRow(self._section(self.tr("INTERFACE")))
+        basic_form.addRow(self.tr("Icon size"), self.icon_size_widget)
         basic_form.addRow("", self.show_thumbs_chk)
         basic_form.addRow("", self.fetch_thumbs_chk)
-        basic_form.addRow(self._section("ПРОИЗВОДИТЕЛЬНОСТЬ"))
-        basic_form.addRow("Параллельность", self.conc_spin)
-        basic_form.addRow("Макс. задач", self.max_jobs_spin)
-        basic_form.addRow("Размер частей", self.part_size_spin)
+        basic_form.addRow(self._section(self.tr("PERFORMANCE")))
+        basic_form.addRow(self.tr("Concurrency"), self.conc_spin)
+        basic_form.addRow(self.tr("Max tasks"), self.max_jobs_spin)
+        basic_form.addRow(self.tr("Part size"), self.part_size_spin)
 
-        # Вкладка «Расширенные» — тонкая настройка для тех, кому надо.
+        # The "Advanced" tab — fine-tuning for those who need it.
         adv_form = self._new_form()
         adv_form.addRow(self._section("REST API"))
         adv_form.addRow("", self.api_enabled_chk)
-        adv_form.addRow("Хост", self.api_host_edit)
-        adv_form.addRow("Порт", self.api_port_spin)
-        adv_form.addRow("Токен", self.api_token_edit)
-        adv_form.addRow(self._section("НАДЁЖНОСТЬ"))
-        adv_form.addRow("Целостность скачивания", self.integrity_combo)
-        adv_form.addRow("Повторов при ошибке", self.retry_attempts_spin)
-        adv_form.addRow("Задержка повтора", self.retry_delay_spin)
-        adv_form.addRow(self._section("ЗАГРУЗКА / СКАЧИВАНИЕ"))
-        adv_form.addRow("Сжатие при загрузке", self.compression_combo)
-        adv_form.addRow("Запас от лимита", self.upload_safety_spin)
-        adv_form.addRow("Лимит отправки (rps)", self.send_rate_spin)
-        adv_form.addRow("Лимит скачивания (rps)", self.get_rate_spin)
-        adv_form.addRow("Полоса загрузки", self.upload_throttle_spin)
-        adv_form.addRow("Полоса скачивания", self.download_throttle_spin)
-        adv_form.addRow(self._section("ХРАНИЛИЩЕ / ЧАНКИ"))
-        adv_form.addRow("Размер чанка", self.chunk_size_spin)
-        adv_form.addRow("Лимит кэша", self.cache_limit_spin)
-        adv_form.addRow("Лимит кэша стриминга", self.stream_cache_limit_spin)
-        adv_form.addRow(self._section("МЕЛКИЕ ФАЙЛЫ (батчинг)"))
-        adv_form.addRow("Порог мелкого файла", self.small_threshold_spin)
-        adv_form.addRow("Размер архива батча", self.small_batch_target_spin)
-        adv_form.addRow(self._section("ШИФРОВАНИЕ"))
+        adv_form.addRow(self.tr("Host"), self.api_host_edit)
+        adv_form.addRow(self.tr("Port"), self.api_port_spin)
+        adv_form.addRow(self.tr("Token"), self.api_token_edit)
+        adv_form.addRow(self._section(self.tr("RELIABILITY")))
+        adv_form.addRow(self.tr("Download integrity"), self.integrity_combo)
+        adv_form.addRow(self.tr("Retries on error"), self.retry_attempts_spin)
+        adv_form.addRow(self.tr("Retry delay"), self.retry_delay_spin)
+        adv_form.addRow(self._section(self.tr("UPLOAD / DOWNLOAD")))
+        adv_form.addRow(self.tr("Compression on upload"), self.compression_combo)
+        adv_form.addRow(self.tr("Limit margin"), self.upload_safety_spin)
+        adv_form.addRow(self.tr("Send limit (rps)"), self.send_rate_spin)
+        adv_form.addRow(self.tr("Download limit (rps)"), self.get_rate_spin)
+        adv_form.addRow(self.tr("Upload bandwidth"), self.upload_throttle_spin)
+        adv_form.addRow(self.tr("Download bandwidth"), self.download_throttle_spin)
+        adv_form.addRow(self._section(self.tr("STORAGE / CHUNKS")))
+        adv_form.addRow(self.tr("Chunk size"), self.chunk_size_spin)
+        adv_form.addRow(self.tr("Cache limit"), self.cache_limit_spin)
+        adv_form.addRow(self.tr("Streaming cache limit"), self.stream_cache_limit_spin)
+        adv_form.addRow(self._section(self.tr("SMALL FILES (batching)")))
+        adv_form.addRow(self.tr("Small file threshold"), self.small_threshold_spin)
+        adv_form.addRow(self.tr("Batch archive size"), self.small_batch_target_spin)
+        adv_form.addRow(self._section(self.tr("ENCRYPTION")))
         adv_form.addRow("", self.crypto_enabled_chk)
-        adv_form.addRow("Переменная ключа", self.crypto_key_env_edit)
+        adv_form.addRow(self.tr("Key variable"), self.crypto_key_env_edit)
 
         tabs = QTabWidget()
-        tabs.addTab(self._wrap_scroll(basic_form), "Основные")
-        tabs.addTab(self._wrap_scroll(adv_form), "Расширенные")
+        tabs.addTab(self._wrap_scroll(basic_form), self.tr("Basic"))
+        tabs.addTab(self._wrap_scroll(adv_form), self.tr("Advanced"))
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -603,14 +660,14 @@ class SetupDialog(QDialog):
 
     def _choose_session(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
-            self, "Выберите файл сессии", self.session_edit.text()
+            self, self.tr("Choose session file"), self.session_edit.text()
         )
         if path:
             self.session_edit.setText(path)
 
     def _choose_cache_dir(self) -> None:
         path = QFileDialog.getExistingDirectory(
-            self, "Выберите директорию кэша", self.cache_edit.text()
+            self, self.tr("Choose cache directory"), self.cache_edit.text()
         )
         if path:
             self.cache_edit.setText(path)
@@ -618,7 +675,7 @@ class SetupDialog(QDialog):
     def _choose_download_dir(self) -> None:
         start_dir = self.download_edit.text().strip() or self.cache_edit.text()
         path = QFileDialog.getExistingDirectory(
-            self, "Выберите папку для скачанных файлов", start_dir
+            self, self.tr("Choose folder for downloaded files"), start_dir
         )
         if path:
             self.download_edit.setText(path)
@@ -641,19 +698,19 @@ class SetupDialog(QDialog):
 class SettingsDialog(SetupDialog):
     def __init__(self, initial: dict[str, Any] | None = None, parent=None) -> None:
         super().__init__(initial=initial, parent=parent)
-        self.setWindowTitle("Настройки")
+        self.setWindowTitle(self.tr("Settings"))
 
 
 class CreateFolderDialog(QDialog):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Создать папку")
+        self.setWindowTitle(self.tr("Create Folder"))
 
         self.name_edit = QLineEdit()
-        self.name_edit.setPlaceholderText("Новая папка")
+        self.name_edit.setPlaceholderText(self.tr("New folder"))
 
         form = QFormLayout()
-        form.addRow("Имя", self.name_edit)
+        form.addRow(self.tr("Name"), self.name_edit)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -675,13 +732,13 @@ class CreateFolderDialog(QDialog):
 class RenameDialog(QDialog):
     def __init__(self, current_name: str, parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Переименовать")
+        self.setWindowTitle(self.tr("Rename"))
 
         self.name_edit = QLineEdit(current_name)
         self.name_edit.selectAll()
 
         form = QFormLayout()
-        form.addRow("Новое имя", self.name_edit)
+        form.addRow(self.tr("New name"), self.name_edit)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -701,7 +758,7 @@ class RenameDialog(QDialog):
 
 
 class ConfirmDialog(QDialog):
-    """Красивое кастомное диалоговое окно для подтверждения действий."""
+    """A polished custom dialog for confirming actions."""
 
     def __init__(
         self, title: str, message: str, parent=None, is_destructive: bool = False
@@ -763,12 +820,12 @@ class ConfirmDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
-        self.btn_cancel = QPushButton("Отмена")
+        self.btn_cancel = QPushButton(self.tr("Cancel"))
         self.btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_cancel.clicked.connect(self.reject)
         btn_layout.addWidget(self.btn_cancel)
 
-        self.btn_confirm = QPushButton("Да")
+        self.btn_confirm = QPushButton(self.tr("Yes"))
         self.btn_confirm.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_confirm.setDefault(True)
         self.btn_confirm.setAutoDefault(True)
@@ -784,8 +841,12 @@ class ConfirmDialog(QDialog):
 
 def ask_confirm_incomplete_download(parent) -> bool:
     dialog = ConfirmDialog(
-        title="Неполный файл",
-        message="Файл загружен не полностью. Скачать доступные части всё равно?",
+        title=QApplication.translate("ConfirmDialog", "Incomplete File"),
+        message=QApplication.translate(
+            "ConfirmDialog",
+            "The file was not downloaded completely. "
+            "Download the available parts anyway?",
+        ),
         parent=parent,
         is_destructive=False,
     )
