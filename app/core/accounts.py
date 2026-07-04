@@ -1,6 +1,6 @@
 """
-AccountManager — управляет несколькими Telegram user аккаунтами для upload.
-Каждый аккаунт = отдельная сессия + свой канал = независимый поток ~12 MB/s.
+AccountManager — manages multiple Telegram user accounts for uploads.
+Each account = a separate session + its own channel = an independent ~12 MB/s stream.
 """
 
 from __future__ import annotations
@@ -41,11 +41,11 @@ def _is_connect_retryable(exc: BaseException) -> bool:
 
 
 def _parse_invite_hash(chat_target: str) -> str | None:
-    """Извлечь invite-хэш из приглашения в приватный канал.
+    """Extract the invite hash from a private channel invite.
 
-    Поддерживает ``t.me/+HASH``, ``t.me/joinchat/HASH`` (с любой схемой/доменом)
-    и «голый» ``+HASH``. Для публичных ссылок/юзернеймов возвращает None —
-    в них вступать через ImportChatInvite нельзя.
+    Supports ``t.me/+HASH``, ``t.me/joinchat/HASH`` (with any scheme/domain)
+    and a bare ``+HASH``. Returns None for public links/usernames — those
+    cannot be joined via ImportChatInvite.
     """
     raw = str(chat_target or "").strip()
     if not raw:
@@ -62,7 +62,7 @@ def _parse_invite_hash(chat_target: str) -> str | None:
 
 @dataclass
 class ConnectedAccount:
-    """Подключённый аккаунт с клиентом."""
+    """A connected account with its client."""
 
     account: TelegramAccount
     client: TelegramClient
@@ -78,7 +78,7 @@ class ConnectedAccount:
 
 
 class AccountManager:
-    """Управление несколькими Telegram аккаунтами."""
+    """Manages multiple Telegram accounts."""
 
     def __init__(self, config: AppConfig, repo: DbRepo) -> None:
         self.config = config
@@ -87,7 +87,7 @@ class AccountManager:
         self._escalate_lock = asyncio.Lock()
 
     async def load_and_connect_all(self) -> list[ConnectedAccount]:
-        """Загрузить все аккаунты из БД и подключить их."""
+        """Load all accounts from the DB and connect them."""
         accounts = self.repo.list_accounts()
         if not accounts:
             logger.info("No multi-accounts configured, using main session only")
@@ -113,7 +113,7 @@ class AccountManager:
     async def connect_account(
         self, account: TelegramAccount
     ) -> ConnectedAccount | None:
-        """Подключить один аккаунт."""
+        """Connect a single account."""
         session_path = Path(account.session_path)
         ensure_parent_dir(session_path)
 
@@ -204,7 +204,7 @@ class AccountManager:
             try:
                 me = await client.get_me()
                 is_premium = bool(getattr(me, "premium", False))
-                # Обновить инфу в БД
+                # Update the info in the DB
                 self.repo.update_account(
                     account.id,
                     user_id=getattr(me, "id", 0),
@@ -216,7 +216,7 @@ class AccountManager:
                     "Failed to get account info for %s (%s)", account.label, str(e)
                 )
 
-            # Разрешить чат — пробуем несколькими способами с retry
+            # Resolve the chat — try several approaches with retry
             chat_resolve_attempts = 0
             max_chat_resolve_attempts = 3
             invite_hash = _parse_invite_hash(account.chat_target)
@@ -233,8 +233,9 @@ class AccountManager:
                     )
                     break
                 except Exception as exc:
-                    # Авто-join: если это инвайт-ссылка и аккаунт ещё не в канале —
-                    # вступаем по хэшу и сразу повторяем резолв (одна попытка).
+                    # Auto-join: if this is an invite link and the account isn't
+                    # in the channel yet — join via the hash and immediately retry
+                    # the resolve (one attempt).
                     if invite_hash and not join_attempted:
                         join_attempted = True
                         if await self._try_join_via_invite(
@@ -243,8 +244,9 @@ class AccountManager:
                             continue
                     chat_resolve_attempts += 1
                     if chat_resolve_attempts >= max_chat_resolve_attempts:
-                        # Через invite link не получилось — пробуем по chat_id из БД
-                        # (если аккаунт раньше уже подключался к этому каналу)
+                        # Couldn't resolve via the invite link — falling back to
+                        # the chat_id from the DB (if the account has connected
+                        # to this channel before)
                         logger.warning(
                             "Cannot resolve chat '%s' for '%s' after %d attempts — account stays in pool but may fail delete operations (%s)",
                             account.chat_target,
@@ -293,8 +295,8 @@ class AccountManager:
     async def _try_join_via_invite(
         self, client: TelegramClient, invite_hash: str, label: str
     ) -> bool:
-        """Вступить в приватный канал по invite-хэшу. True — если после этого
-        аккаунт точно участник (вступил сейчас либо уже состоял)."""
+        """Join a private channel via an invite hash. Returns True if the account
+        is now definitely a member (just joined, or was already a participant)."""
         from telethon.errors import UserAlreadyParticipantError
         from telethon.tl.functions.messages import ImportChatInviteRequest
 
@@ -312,12 +314,12 @@ class AccountManager:
             return False
 
     async def add_account(self, account: TelegramAccount) -> int | None:
-        """Добавить новый аккаунт в БД и подключить. Возвращает ID или None."""
+        """Add a new account to the DB and connect it. Returns its ID or None."""
         data = asdict(account)
         data["id"] = 0  # AUTOINCREMENT
         new_account = TelegramAccount(**data)
         account_id = self.repo.insert_account(new_account)
-        # Перечитываем с правильным ID
+        # Re-read with the correct ID
         saved_account = self.repo.get_account(account_id)
         if saved_account is None:
             return None
@@ -325,7 +327,7 @@ class AccountManager:
         return account_id if ca else None
 
     async def remove_account(self, account_id: int) -> None:
-        """Удалить аккаунт и отключить."""
+        """Delete an account and disconnect it."""
         ca = self._connected.pop(account_id, None)
         if ca:
             try:
@@ -339,7 +341,7 @@ class AccountManager:
         self.repo.delete_account(account_id)
 
     async def disconnect_all(self) -> None:
-        """Отключить все аккаунты."""
+        """Disconnect all accounts."""
         for ca in list(self._connected.values()):
             try:
                 await ca.client.disconnect()
@@ -355,12 +357,13 @@ class AccountManager:
         return list(self._connected.values())
 
     async def escalate_proxy(self, client) -> str:
-        """Переключить клиент на следующий уровень proxy-цепочки на лету.
+        """Switch the client to the next tier of the proxy chain on the fly.
 
-        Вызывается, когда соединение через текущий прокси устойчиво падает в
-        середине сессии: пробуем следующий кандидат в цепочке (резервный прокси),
-        затем direct. Применяется через ``client.set_proxy`` + переподключение.
-        Возвращает метку нового уровня; на ``direct`` дальше не двигается.
+        Called when the connection through the current proxy keeps failing
+        mid-session: we try the next candidate in the chain (backup proxy),
+        then direct. Applied via ``client.set_proxy`` plus a reconnect.
+        Returns the label of the new tier; once at ``direct`` it won't move
+        any further.
         """
         ca = next((c for c in self._connected.values() if c.client is client), None)
         if ca is None:
@@ -405,8 +408,8 @@ class AccountManager:
             return new_label
 
     def get_active_endpoints(self) -> list[ConnectedAccount]:
-        """Вернуть авторизованные аккаунты с разрешённым чатом.
-        chat_obj должен быть не None для корректной загрузки."""
+        """Return authorized accounts with a resolved chat.
+        chat_obj must not be None for the upload to work correctly."""
         return [
             ca
             for ca in self._connected.values()

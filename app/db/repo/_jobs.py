@@ -1,4 +1,4 @@
-"""DbRepo: фоновые задания jobs (вынесено из repo.py)."""
+"""DbRepo: background jobs (split out of repo.py)."""
 
 from __future__ import annotations
 
@@ -71,7 +71,7 @@ class _JobsMixin:
         return result
 
     def get_job(self, job_id: int) -> dict[str, Any] | None:
-        """Одна джоба по id (для REST API). None, если не найдена."""
+        """A single job by id (for the REST API). None if not found."""
         row = self.conn.execute(
             """
             SELECT id, type, payload_json, status, progress, created_ts, updated_ts, error_text

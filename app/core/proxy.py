@@ -1,4 +1,4 @@
-"""Парсинг и подбор прокси (SOCKS5/HTTP/MTProto) для Telethon."""
+"""Parsing and selecting proxies (SOCKS5/HTTP/MTProto) for Telethon."""
 
 from __future__ import annotations
 
@@ -11,15 +11,15 @@ logger = logging.getLogger(__name__)
 
 def parse_proxy(raw: str) -> tuple[str, int, str | None, str | None, bool, str]:
     """
-    Парсит прокси строку с автоопределением типа.
-    Поддерживаемые форматы:
-      - socks5://host:port  или  socks5://user:pass@host:port
-      - http://host:port  или  http://user:pass@host:port
-      - host:port:user:pass  (автоопределение — по умолчанию SOCKS5)
-      - host:port  (автоопределение — по умолчанию SOCKS5)
+    Parses a proxy string with automatic type detection.
+    Supported formats:
+      - socks5://host:port  or  socks5://user:pass@host:port
+      - http://host:port  or  http://user:pass@host:port
+      - host:port:user:pass  (auto-detected — defaults to SOCKS5)
+      - host:port  (auto-detected — defaults to SOCKS5)
 
-    Возвращает: (host, port, username, password, rdns, proxy_type)
-    proxy_type: 'socks5' или 'http'
+    Returns: (host, port, username, password, rdns, proxy_type)
+    proxy_type: 'socks5' or 'http'
     """
     value = str(raw or "").strip()
     if not value:
@@ -73,27 +73,28 @@ def parse_proxy(raw: str) -> tuple[str, int, str | None, str | None, bool, str]:
         if not username or not password:
             raise ValueError("Both proxy username and password are required")
 
-    # По умолчанию SOCKS5 с удалённым DNS
+    # Defaults to SOCKS5 with remote DNS
     return host, port, username, password, True, "socks5"
 
 
 def parse_socks5_proxy(raw: str) -> tuple[str, int, str | None, str | None, bool]:
-    """Обратная совместимость — делегирует parse_proxy."""
+    """Kept for backward compatibility — delegates to parse_proxy."""
     host, port, username, password, rdns, _ = parse_proxy(raw)
     return host, port, username, password, rdns
 
 
-# ── MTProto-прокси (в дополнение к SOCKS5/HTTP) ──────────────────────────────
-# MTProto-прокси телеграма устроен иначе: вместо логина/пароля — hex-секрет, и
-# Telethon требует особый класс соединения (ConnectionTcpMTProxy*). Внутри проги
-# такой прокси представляем кортежем-с-маркером ('mtproxy', host, port, secret),
-# чтобы он проходил по той же цепочке выбора, что и socks/http.
+# ── MTProto proxies (in addition to SOCKS5/HTTP) ─────────────────────────────
+# Telegram's MTProto proxy works differently: instead of a login/password it
+# uses a hex secret, and Telethon requires a special connection class
+# (ConnectionTcpMTProxy*). Internally we represent such a proxy as a
+# marker tuple ('mtproxy', host, port, secret), so it can flow through the
+# same selection chain as socks/http.
 
 _MTPROXY_SCHEMES = {"mtproto", "mtproxy", "mtp"}
 
 
 def is_mtproxy(raw: str | None) -> bool:
-    """Похоже ли на MTProto-прокси (по схеме/ссылке), а не socks/http."""
+    """Whether this looks like an MTProto proxy (by scheme/link), not socks/http."""
     value = str(raw or "").strip()
     if not value:
         return False
@@ -112,9 +113,9 @@ def is_mtproxy(raw: str | None) -> bool:
 
 
 def parse_mtproxy(raw: str) -> tuple[str, int, str]:
-    """Парсит MTProto-прокси в (host, port, secret_hex).
+    """Parses an MTProto proxy into (host, port, secret_hex).
 
-    Форматы:
+    Formats:
       - tg://proxy?server=H&port=P&secret=S
       - https://t.me/proxy?server=H&port=P&secret=S
       - mtproto://H:P:S  /  mtproxy://H:P:S
@@ -136,7 +137,7 @@ def parse_mtproxy(raw: str) -> tuple[str, int, str]:
             vals = params.get(name)
             return str(vals[0]).strip() if vals else ""
 
-        # tg://proxy?... и t.me/proxy?... — параметры в query.
+        # tg://proxy?... and t.me/proxy?... — parameters are in the query string.
         secret = _q("secret")
         host = _q("server")
         port_q = _q("port")
@@ -146,8 +147,9 @@ def parse_mtproxy(raw: str) -> tuple[str, int, str]:
             except ValueError as exc:
                 raise ValueError("Proxy port must be integer") from exc
 
-        # mtproto://host:port[:secret] — host:port:secret в netloc, поэтому
-        # parsed.port/hostname ненадёжны (бросают на трёх сегментах); парсим вручную.
+        # mtproto://host:port[:secret] — host:port:secret ends up in netloc, so
+        # parsed.port/hostname are unreliable (they raise on three segments);
+        # parse it manually.
         if not host or not port or not secret:
             segs = parsed.netloc.split(":")
             if not host and segs and segs[0]:
@@ -160,7 +162,7 @@ def parse_mtproxy(raw: str) -> tuple[str, int, str]:
             if not secret and len(segs) >= 3 and segs[2]:
                 secret = segs[2].strip()
     else:
-        # Короткая форма host:port:secret
+        # Short form host:port:secret
         parts = [p.strip() for p in value.split(":")]
         if len(parts) != 3:
             raise ValueError(
@@ -191,10 +193,10 @@ def _telethon_proxy_tuple(
     username: str | None,
     password: str | None,
 ) -> tuple:
-    """Кортеж в формате, который принимает Telethon (через python_socks).
+    """A tuple in the format Telethon accepts (via python_socks).
 
-    proxy_type — 'socks5' | 'socks4' | 'http'. Telethon 1.36+ с python_socks
-    поддерживает все три.
+    proxy_type — 'socks5' | 'socks4' | 'http'. Telethon 1.36+ with python_socks
+    supports all three.
     """
     if username is not None or password is not None:
         return (proxy_type, host, int(port), bool(rdns), username, password)
@@ -203,11 +205,12 @@ def _telethon_proxy_tuple(
 
 def build_telethon_proxy(raw: str | None) -> tuple | None:
     """
-    Создаёт прокси-кортеж для Telethon с автоопределением типа (SOCKS5/HTTP).
+    Builds a proxy tuple for Telethon with automatic type detection (SOCKS5/HTTP).
 
-    Telethon (через python_socks) поддерживает SOCKS5, SOCKS4 и HTTP. Тип
-    берётся из схемы (socks5:// / http://); для короткой формы host:port:user:pass
-    по умолчанию SOCKS5 — реальную проверку/выбор делает resolve_working_proxy.
+    Telethon (via python_socks) supports SOCKS5, SOCKS4 and HTTP. The type is
+    taken from the scheme (socks5:// / http://); for the short form
+    host:port:user:pass it defaults to SOCKS5 — the actual probing/selection
+    is done by resolve_working_proxy.
     """
     value = str(raw or "").strip()
     if not value:
@@ -222,9 +225,9 @@ def build_telethon_proxy(raw: str | None) -> tuple | None:
 
 
 def _probe_tcp(host: str, port: int, timeout: float) -> bool:
-    """Базовая TCP-проба достижимости (для MTProto-прокси: python_socks его не
-    умеет проверять как socks). Не гарантирует, что секрет верный — только что
-    хост:порт принимает соединение."""
+    """A basic TCP reachability probe (for MTProto proxies: python_socks can't
+    check them as a socks proxy). Doesn't guarantee the secret is correct —
+    only that host:port accepts a connection."""
     import socket
 
     try:
@@ -236,10 +239,11 @@ def _probe_tcp(host: str, port: int, timeout: float) -> bool:
 
 
 def telethon_client_kwargs(proxy: tuple | None) -> dict[str, Any]:
-    """По внутреннему прокси-кортежу собрать kwargs для ``TelegramClient``.
+    """Build ``TelegramClient`` kwargs from our internal proxy tuple.
 
-    MTProto-прокси (маркер 'mtproxy') требует особый класс соединения и формат
-    ``(host, port, secret)``; socks/http — обычный ``proxy=``. None → пусто.
+    An MTProto proxy (marked 'mtproxy') needs a special connection class and
+    the ``(host, port, secret)`` format; socks/http just need a plain
+    ``proxy=``. None → empty dict.
     """
     if proxy is None:
         return {}
@@ -255,12 +259,13 @@ def telethon_client_kwargs(proxy: tuple | None) -> dict[str, Any]:
 
 
 def proxy_for_set_proxy(proxy: tuple | None) -> tuple | None:
-    """Аргумент для ``client.set_proxy`` (эскалация на лету). MTProto-кортеж
-    приводим к ``(host, port, secret)``; остальные — без изменений.
+    """The argument for ``client.set_proxy`` (on-the-fly escalation). An MTProto
+    tuple is reduced to ``(host, port, secret)``; everything else is passed
+    through unchanged.
 
-    Замечание: ``set_proxy`` не меняет класс соединения, поэтому переключение
-    между MTProto и socks/http на лету — best-effort (полноценно режим задаётся
-    при конструировании клиента)."""
+    Note: ``set_proxy`` doesn't change the connection class, so switching
+    between MTProto and socks/http on the fly is best-effort (the mode is
+    fully set only when the client is constructed)."""
     if isinstance(proxy, tuple) and len(proxy) == 4 and proxy[0] == "mtproxy":
         _, host, port, secret = proxy
         return (host, int(port), secret)
@@ -278,14 +283,14 @@ def probe_proxy(
     dest_host: str = "149.154.167.51",  # Telegram DC2
     dest_port: int = 443,
 ) -> bool:
-    """Проверяет, что через прокси реально устанавливается соединение до Telegram.
+    """Checks that a connection to Telegram can actually be established through the proxy.
 
-    Блокирующая функция (python_socks.sync) — вызывать из потока/executor.
+    A blocking function (python_socks.sync) — call it from a thread/executor.
     """
     try:
         from python_socks import ProxyType
         from python_socks.sync import Proxy
-    except Exception as exc:  # python_socks недоступен
+    except Exception as exc:  # python_socks unavailable
         logger.debug("python_socks unavailable for proxy probe: %s", exc)
         return False
 
@@ -325,15 +330,16 @@ def resolve_working_proxy(
     *,
     timeout: float = 6.0,
 ) -> tuple[tuple | None, str]:
-    """Подбирает рабочий прокси для Telethon, проверяя доступность.
+    """Selects a working proxy for Telethon by probing reachability.
 
-    - Если схема задана явно (socks5://, http://) — проверяется только этот тип.
-    - Для короткой формы host:port[:user:pass] тип определяется автоматически:
-      сначала пробуется SOCKS5, затем HTTP.
-    - Если ни один тип не отвечает — возвращается (None, ...), и вызывающий код
-      может подключиться напрямую.
+    - If the scheme is given explicitly (socks5://, http://) — only that type
+      is probed.
+    - For the short form host:port[:user:pass] the type is auto-detected:
+      SOCKS5 is tried first, then HTTP.
+    - If neither type responds — returns (None, ...), and the caller can fall
+      back to connecting directly.
 
-    Возвращает: (telethon_proxy | None, человекочитаемая_метка).
+    Returns: (telethon_proxy | None, human_readable_label).
     """
     value = str(raw or "").strip()
     if not value:
@@ -375,11 +381,12 @@ def select_working_proxy_from_chain(
     *,
     timeout: float = 6.0,
 ) -> tuple[tuple | None, str, int]:
-    """Подобрать первый рабочий прокси из цепочки кандидатов.
+    """Pick the first working proxy from a chain of candidates.
 
-    Кандидаты пробуются по порядку (например, [основной, резервный]). Возвращает
-    ``(telethon_proxy | None, метка, tier)``, где ``tier`` — индекс выбранного
-    прокси в очищенном списке, либо его длина, если все недоступны (→ direct).
+    Candidates are probed in order (e.g. [primary, backup]). Returns
+    ``(telethon_proxy | None, label, tier)``, where ``tier`` is the index of
+    the chosen proxy in the cleaned list, or its length if none are reachable
+    (→ direct).
     """
     cleaned = [str(c).strip() for c in candidates if str(c or "").strip()]
     for idx, candidate in enumerate(cleaned):

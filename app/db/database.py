@@ -29,11 +29,11 @@ def connect_db(db_path: str | Path) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA busy_timeout=10000;")
     _apply_pragmas(conn)
-    # Инициализируем схему без создания лишних транзакций
+    # Initialize the schema without creating extra transactions
     try:
         init_schema(conn)
     except sqlite3.OperationalError:
-        pass  # Миграция может заблокироваться — это не критично
+        pass  # A migration may get blocked — this isn't critical
     return conn
 
 
@@ -48,7 +48,7 @@ def _apply_pragmas(conn: sqlite3.Connection) -> None:
 def init_schema(conn: sqlite3.Connection) -> None:
     current_version = int(conn.execute("PRAGMA user_version;").fetchone()[0])
 
-    # Всегда проверяем что таблица accounts существует (даже при актуальной версии)
+    # Always check that the accounts table exists (even if the version is current)
     accounts_exists = (
         conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='accounts'"
@@ -76,7 +76,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
             for sql in ALL_SCHEMA_SQL:
                 conn.execute(sql)
         if current_version < 5:
-            # Добавляем оптимизированные индексы
+            # Add optimized indexes
             for sql in [
                 CREATE_INDEX_OBJ_FILEKEY,
                 CREATE_INDEX_JOBS_STATUS,
@@ -84,32 +84,32 @@ def init_schema(conn: sqlite3.Connection) -> None:
             ]:
                 conn.execute(sql)
         if current_version < 6:
-            # Добавляем таблицу мультиаккаунтов
+            # Add the multi-account table
             for sql in [CREATE_ACCOUNTS_TABLE, CREATE_INDEX_ACCOUNTS_ACTIVE]:
                 conn.execute(sql)
         if current_version < 7:
-            # Резервный прокси для каждого аккаунта (fallback-цепочка)
+            # Backup proxy for each account (fallback chain)
             try:
                 conn.execute(MIGRATE_V7_ADD_PROXY_BACKUP)
             except sqlite3.OperationalError:
                 pass  # column already exists (fresh install ran CREATE_ACCOUNTS_TABLE)
         if current_version < 8:
-            # Метка времени, когда часть была обнаружена потерянной (lost_ts)
+            # Timestamp of when a part was found to be lost (lost_ts)
             try:
                 conn.execute(MIGRATE_V8_ADD_LOST_TS)
             except sqlite3.OperationalError:
                 pass  # column already exists (fresh install ran ALL_SCHEMA_SQL)
         if current_version < 9:
-            # Пользовательские заметки к объектам (минипометки)
+            # User notes on objects (mini-tags)
             conn.execute(CREATE_OBJECT_NOTES_TABLE)
         if current_version < 10:
-            # Папки, помеченные на авто-синхронизацию
+            # Folders marked for auto-sync
             conn.execute(CREATE_FOLDER_SYNC_TABLE)
         if current_version < 11:
-            # Корзина (soft-delete)
+            # Trash (soft-delete)
             conn.execute(CREATE_TRASH_TABLE)
         if current_version < 12:
-            # Шар-ссылки (публичный доступ к файлу по токену)
+            # Share links (public token-based access to a file)
             conn.execute(CREATE_SHARES_TABLE)
         conn.execute(f"PRAGMA user_version={SCHEMA_VERSION};")
 

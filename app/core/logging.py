@@ -28,8 +28,8 @@ def setup_logging(
     console.setFormatter(fmt)
     root.addHandler(console)
 
-    # Не cwd: frozen-приложение запускают из произвольной директории — логи
-    # должны лежать рядом с приложением (app_base_dir), а не где попало.
+    # Not cwd: a frozen app can be launched from an arbitrary directory — logs
+    # must live next to the app (app_base_dir), not wherever cwd happens to be.
     log_path = (
         Path(log_file)
         if log_file is not None

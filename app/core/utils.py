@@ -104,8 +104,8 @@ def ensure_dir(path: str | Path) -> Path:
 
 
 def clear_dir_files(path: str | Path) -> int:
-    """Best-effort: удалить все файлы в директории (не рекурсивно). Для очистки
-    эфемерных temp-папок (напр. .thumb_fetch). Возвращает число удалённых."""
+    """Best-effort: delete all files in a directory (non-recursive). For
+    clearing ephemeral temp folders (e.g. .thumb_fetch). Returns the count removed."""
     target = Path(path).expanduser()
     if not target.is_dir():
         return 0
@@ -121,8 +121,9 @@ def clear_dir_files(path: str | Path) -> int:
 
 
 def evict_dir_to_limit(path: str | Path, max_files: int) -> int:
-    """LRU-эвикция кэш-папки: если файлов больше max_files, удалить самые старые
-    по mtime до лимита. Best-effort. Возвращает число удалённых."""
+    """LRU eviction for a cache folder: if there are more files than max_files,
+    delete the oldest ones by mtime down to the limit. Best-effort. Returns
+    the count removed."""
     target = Path(path).expanduser()
     if not target.is_dir() or max_files < 0:
         return 0
@@ -142,7 +143,7 @@ def evict_dir_to_limit(path: str | Path, max_files: int) -> int:
 
 
 def ffmpeg_available() -> bool:
-    """Есть ли ffmpeg в PATH — для построения видео-постеров (инкремент 4)."""
+    """Whether ffmpeg is on PATH — used for building video posters (increment 4)."""
     return shutil.which("ffmpeg") is not None
 
 
@@ -154,13 +155,14 @@ def extract_video_poster_png(
     seek_sec: float = 1.0,
     timeout: float = 25.0,
 ) -> bool:
-    """Извлечь кадр-постер из локального видео в PNG через ffmpeg.
+    """Extract a poster frame from a local video into a PNG via ffmpeg.
 
-    Кадр масштабируется так, чтобы вписаться в квадрат ``box`` с сохранением
-    пропорций. Сперва пробуем кадр на ``seek_sec`` (репрезентативнее чёрного
-    первого кадра); если видео короче — фолбэк на самое начало. Блокирующая
-    функция (subprocess) — вызывать из потока/executor, не из UI/loop напрямую.
-    Возвращает True при успехе (PNG записан и непустой).
+    The frame is scaled to fit within a ``box``-sized square, preserving
+    aspect ratio. We first try the frame at ``seek_sec`` (more representative
+    than a black first frame); if the video is shorter, we fall back to the
+    very start. A blocking function (subprocess) — call it from a
+    thread/executor, not directly from the UI/event loop.
+    Returns True on success (PNG was written and is non-empty).
     """
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
@@ -219,13 +221,13 @@ def convert_image_to_png(
     *,
     timeout: float = 30.0,
 ) -> bool:
-    """Сконвертировать изображение в PNG через ffmpeg.
+    """Convert an image to PNG via ffmpeg.
 
-    Нужно для форматов, которые Qt не умеет декодировать сам (heic/avif/
-    tiff/raw/psd и т.п.). Берём первый кадр (для многослойных/анимированных)
-    и сохраняем в PNG без масштабирования. Блокирующая функция (subprocess);
-    для одиночного открытия по запросу пользователя это приемлемо.
-    Возвращает True при успехе (PNG записан и непустой).
+    Needed for formats Qt can't decode on its own (heic/avif/tiff/raw/psd,
+    etc.). We take the first frame (for multi-layer/animated files) and save
+    it as PNG without scaling. A blocking function (subprocess); acceptable
+    for a single on-demand open triggered by the user.
+    Returns True on success (PNG was written and is non-empty).
     """
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:

@@ -1,16 +1,16 @@
-"""Классификация состояния объекта (файла) по его частям и живым аккаунтам.
+"""Classifies an object's (file's) state based on its parts and the live accounts.
 
-Расширяет хранимый статус ``complete``/``incomplete`` двумя состояниями,
-которые зависят от того, какие аккаунты/чаты сейчас подключены:
+Extends the stored ``complete``/``incomplete`` status with two more states
+that depend on which accounts/chats are currently connected:
 
-- ``complete``   — все части на месте и их чаты доступны;
-- ``incomplete`` — часть(и) так и не дозалиты (нет в индексе);
-- ``offline``    — все части в индексе есть, но чат хотя бы одной части не
-  обслуживается ни одним подключённым аккаунтом → транзиентно, «ждать аккаунт»;
-- ``damaged``    — у части стоит ``lost_ts`` И её чат подключён → сообщение
-  реально пропало, «удалить или перезалить».
+- ``complete``   — all parts are present and their chats are reachable;
+- ``incomplete`` — some part(s) were never fully uploaded (missing from the index);
+- ``offline``    — every part is present in the index, but at least one part's
+  chat isn't served by any connected account → transient, "wait for an account";
+- ``damaged``    — a part has ``lost_ts`` set AND its chat is connected → the
+  message is really gone, "delete or re-upload".
 
-Чистая функция (без БД), легко тестируется.
+A pure function (no DB access), easy to test.
 """
 
 from __future__ import annotations
@@ -31,22 +31,23 @@ def classify_object_state(
     parts_total: int,
     connected_chat_ids: Iterable[str],
 ) -> str:
-    """Вернуть одно из ``complete|incomplete|offline|damaged``.
+    """Return one of ``complete|incomplete|offline|damaged``.
 
-    ``parts`` — НЕ удалённые строки части (как из ``get_parts_for_object``).
-    ``connected_chat_ids`` — chat_id подключённых сейчас аккаунтов.
+    ``parts`` — the non-deleted part rows (as from ``get_parts_for_object``).
+    ``connected_chat_ids`` — chat_id values of the currently connected accounts.
     """
     connected = {str(c).strip() for c in connected_chat_ids if str(c or "").strip()}
     have_indices = {int(p.part_index) for p in parts}
 
-    # damaged: часть помечена потерянной, но её аккаунт доступен — значит сообщение
-    # действительно пропало (а не просто аккаунт отключён).
+    # damaged: a part is marked as lost, but its account is reachable — meaning
+    # the message really is gone (not just that the account is disconnected).
     for part in parts:
         if part.lost_ts and str(part.chat_id).strip() in connected:
             return STATE_DAMAGED
 
-    # offline: чат хотя бы одной имеющейся части не обслуживается живым аккаунтом.
-    # (Если аккаунтов не передали вовсе — пропускаем эту проверку, не зная сети.)
+    # offline: at least one existing part's chat isn't served by a live account.
+    # (If no accounts were passed in at all — skip this check, since we don't
+    # know the network state.)
     if connected:
         for part in parts:
             if str(part.chat_id).strip() not in connected:
@@ -64,11 +65,11 @@ def display_state(
     has_lost_part: bool,
     connected_chat_ids: Iterable[str],
 ) -> str:
-    """Лёгкий вариант для сетки: считает offline/damaged из агрегатов.
+    """A lightweight variant for the grid: derives offline/damaged from aggregates.
 
-    Не требует полного списка ``PartRecord`` — достаточно набора chat_id частей,
-    флага «есть потерянная часть» и сохранённого статуса. Накладывает
-    damaged/offline поверх ``complete``/``incomplete``.
+    Doesn't need the full list of ``PartRecord``s — just the set of part chat_ids,
+    a "has a lost part" flag, and the stored status. Overlays damaged/offline on
+    top of ``complete``/``incomplete``.
     """
     connected = {str(c).strip() for c in connected_chat_ids if str(c or "").strip()}
     chat_ids = {str(c).strip() for c in part_chat_ids if str(c or "").strip()}

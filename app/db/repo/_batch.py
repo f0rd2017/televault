@@ -1,4 +1,4 @@
-"""DbRepo: батч-блобы и их участники (вынесено из repo.py)."""
+"""DbRepo: batch blobs and their members (split out of repo.py)."""
 
 from __future__ import annotations
 
@@ -223,12 +223,13 @@ class _BatchMixin:
     def supersede_batch_members_by_name(
         self, folder_path: str, orig_name: str, keep_file_key: str
     ) -> int:
-        """Логически удалить старые версии мелкого файла: те же папка+имя, но
-        другой ключ (другое содержимое или перекомпонованный батч). Оставляет
-        текущую версию (keep_file_key). Так обновлённый мелкий файл вытесняет
-        старую версию вместо появления дубля. Сообщение старого блоба не трогаем
-        — в нём могут быть живые члены; осиротевший блоб подчистится при удалении
-        папки/реконсиляции."""
+        """Logically delete older versions of a small file: same folder+name,
+        but a different key (different content, or the batch was recomposed).
+        Keeps the current version (keep_file_key). This way an updated small
+        file supersedes the old version instead of creating a duplicate. We
+        don't touch the old blob's message — it may still have live members;
+        an orphaned blob gets cleaned up when the folder is deleted or during
+        reconciliation."""
         normalized_folder = normalize_folder_path(folder_path)
         ts = now_ts()
         with self.conn:

@@ -1,8 +1,8 @@
-"""Утилиты для шар-ссылок (инкремент 8): токены и пароли.
+"""Utilities for share links (increment 8): tokens and passwords.
 
-Без новых зависимостей — пароль хэшируется stdlib PBKDF2-HMAC-SHA256. Формат
-строки в БД: ``pbkdf2_sha256$<iterations>$<salt_hex>$<hash_hex>``. Пустой
-password_hash → ссылка без пароля.
+No new dependencies — passwords are hashed with stdlib PBKDF2-HMAC-SHA256.
+DB string format: ``pbkdf2_sha256$<iterations>$<salt_hex>$<hash_hex>``. An
+empty password_hash → a link with no password.
 """
 
 from __future__ import annotations
@@ -16,12 +16,12 @@ _ALGO = "pbkdf2_sha256"
 
 
 def new_share_token(nbytes: int = 18) -> str:
-    """Криптостойкий url-safe токен (по умолчанию ~24 символа)."""
+    """A cryptographically strong url-safe token (~24 characters by default)."""
     return secrets.token_urlsafe(max(8, int(nbytes)))
 
 
 def hash_share_password(password: str) -> str:
-    """Хэш пароля для хранения. Пустой пароль → пустая строка (ссылка без пароля)."""
+    """Hash a password for storage. An empty password → an empty string (link with no password)."""
     pw = str(password or "")
     if not pw:
         return ""
@@ -31,10 +31,10 @@ def hash_share_password(password: str) -> str:
 
 
 def verify_share_password(password: str, stored: str) -> bool:
-    """Проверить пароль против сохранённого хэша.
+    """Verify a password against the stored hash.
 
-    Пустой ``stored`` → пароль не требуется → True. Непустой ``stored`` с пустым
-    ``password`` → False. Сравнение в постоянном времени.
+    An empty ``stored`` → no password required → True. A non-empty ``stored``
+    with an empty ``password`` → False. Compared in constant time.
     """
     stored = str(stored or "")
     if not stored:

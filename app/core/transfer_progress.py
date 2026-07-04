@@ -22,9 +22,9 @@ class TransferProgressAggregator:
         self._activity = str(activity or "Progress")
 
         hint = max(0, int(total_bytes_hint or 0))
-        # effective/wire ratio: насколько исходный объём данных больше того,
-        # что реально уходит по проводу (сжатие/дедуп). 1.0 = без выигрыша,
-        # тогда вторая метрика не показывается (например, при скачивании).
+        # effective/wire ratio: how much bigger the source data volume is than
+        # what actually goes over the wire (compression/dedup). 1.0 = no gain,
+        # in which case the second metric isn't shown (e.g. during downloads).
         source_hint = max(0, int(source_bytes_hint or 0))
         self._effective_ratio = (
             (source_hint / hint) if (source_hint > hint > 0) else 1.0

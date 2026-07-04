@@ -1,4 +1,4 @@
-"""DbRepo: состояние сканов, папки, индекс сообщений (вынесено из repo.py)."""
+"""DbRepo: scan state, folders, message index (split out of repo.py)."""
 
 from __future__ import annotations
 
@@ -205,12 +205,13 @@ class _IndexMixin:
         return total_deleted
 
     def mark_messages_lost_refs(self, refs: list[tuple[str, int]]) -> int:
-        """Пометить части потерянными (lost_ts), не скрывая строки.
+        """Mark parts as lost (lost_ts), without hiding their rows.
 
-        В отличие от ``mark_messages_deleted_refs`` строка остаётся видимой
-        (is_deleted=0), чтобы знать, где часть ДОЛЖНА быть — это позволяет
-        отличить «битый» файл от «недозалитого». Успешная переиндексация
-        сообщения (upsert) сбрасывает lost_ts обратно в NULL.
+        Unlike ``mark_messages_deleted_refs``, the row stays visible
+        (is_deleted=0), so we still know where the part is SUPPOSED to be —
+        this lets us tell a "damaged" file apart from an "incomplete" one. A
+        successful re-index of the message (upsert) resets lost_ts back to
+        NULL.
         """
         if not refs:
             return 0

@@ -1,20 +1,21 @@
-"""Поблочный стрим без полного скачивания (инкремент 9/10 roadmap).
+"""Chunked streaming without a full download (increment 9/10 roadmap).
 
-Наш файл — это набор частей (чанков), каждая лежит отдельным telegram-сообщением
-и (опционально) зашифрована AES-GCM. Чтобы отдать **диапазон** исходного файла
-(HTTP Range от плеера), нужно знать, какие части его покрывают, и скачать ТОЛЬКО
-их — а не весь файл.
+Our file is a set of parts (chunks), each stored as a separate Telegram
+message and (optionally) encrypted with AES-GCM. To serve a **range** of the
+original file (an HTTP Range request from a player), we need to know which
+parts cover it, and download ONLY those — not the whole file.
 
-Ключевое наблюдение: размер расшифрованной (plaintext) части выводится из БД без
-скачивания. Зашифрованная часть хранит ``len(payload)`` байт, где
-``payload = b"ENC1" + nonce(12) + ciphertext+tag``. Накладные расходы фиксированы:
-``ENC1``(4) + nonce(12) + GCM tag(16) = :data:`GCM_OVERHEAD` байт. Значит
-``plain_size = file_size - GCM_OVERHEAD`` для зашифрованных частей и
-``plain_size = file_size`` для незашифрованных (диск-слайсы, ``enc:false``).
+Key insight: the size of the decrypted (plaintext) part can be derived from
+the DB without downloading. An encrypted part stores ``len(payload)`` bytes,
+where ``payload = b"ENC1" + nonce(12) + ciphertext+tag``. The overhead is
+fixed: ``ENC1``(4) + nonce(12) + GCM tag(16) = :data:`GCM_OVERHEAD` bytes.
+So ``plain_size = file_size - GCM_OVERHEAD`` for encrypted parts, and
+``plain_size = file_size`` for unencrypted ones (disk slices, ``enc:false``).
 
-Этот модуль — чистая логика (без сети/сокетов): построение раскладки частей с
-кумулятивными plaintext-смещениями, выбор частей по диапазону и нарезка байтов из
-уже расшифрованных part-файлов. Скачивание делает downloader, раздачу — api-сервер.
+This module is pure logic (no network/sockets): building the part layout
+with cumulative plaintext offsets, selecting parts for a range, and slicing
+bytes out of already-decrypted part files. The downloader does the actual
+fetching, and the api-server does the actual serving.
 """
 
 from __future__ import annotations
@@ -25,41 +26,42 @@ from dataclasses import dataclass
 from app.core.types import PartRecord
 from app.tg.parser import parse_caption
 
-# ENC1(4) + nonce(12) + GCM tag(16) — байты, которые шифрование добавляет к части
-# поверх её plaintext (см. app.core.utils.encrypt_bytes).
+# ENC1(4) + nonce(12) + GCM tag(16) — the bytes encryption adds to a part
+# on top of its plaintext (see app.core.utils.encrypt_bytes).
 GCM_OVERHEAD = 32
 
 
 class LayoutError(ValueError):
-    """Раскладку построить нельзя (части неполны/неизвестен размер/несовместимы).
+    """The layout can't be built (parts are incomplete/have unknown size/are incompatible).
 
-    Вызывающий ловит и откатывается на полную сборку файла (``_ensure_share_file``).
+    The caller catches this and falls back to assembling the full file
+    (``_ensure_share_file``).
     """
 
 
 @dataclass(frozen=True)
 class PartSlice:
-    """Одна часть с её положением в plaintext-файле."""
+    """A single part with its position within the plaintext file."""
 
     part_index: int
     msg_id: int
     chat_id: str
-    stored_size: int  # байт хранится в telegram (зашифровано, если enc)
+    stored_size: int  # bytes stored in telegram (encrypted, if enc)
     enc: bool
-    plain_size: int  # байт в отдаваемом (расшифрованном) файле
-    plain_start: int  # включительное смещение в plaintext-файле
-    plain_end: int  # исключающее смещение (start + plain_size)
+    plain_size: int  # bytes in the served (decrypted) file
+    plain_start: int  # inclusive offset within the plaintext file
+    plain_end: int  # exclusive offset (start + plain_size)
 
 
 @dataclass(frozen=True)
 class StreamLayout:
-    """Упорядоченные части + полный размер plaintext-файла."""
+    """Ordered parts plus the total size of the plaintext file."""
 
     parts: list[PartSlice]
     total_size: int
 
     def select_parts(self, start: int, end: int) -> list[PartSlice]:
-        """Части, чей plaintext-диапазон пересекает ``[start, end]`` (end включительно)."""
+        """Parts whose plaintext range overlaps ``[start, end]`` (end inclusive)."""
         if end < start:
             return []
         out: list[PartSlice] = []
@@ -81,9 +83,10 @@ def _part_is_encrypted(part: PartRecord, caption_prefix: str) -> bool:
 
 
 def build_layout(parts: list[PartRecord], *, caption_prefix: str) -> StreamLayout:
-    """Построить раскладку из частей объекта. Бросает :class:`LayoutError`, если
-    объект неполон/несвязен или у части неизвестен размер — тогда стрим невозможен
-    и вызывающий откатывается на полную сборку."""
+    """Build the layout from an object's parts. Raises :class:`LayoutError` if
+    the object is incomplete/inconsistent, or a part has an unknown size — in
+    which case streaming isn't possible and the caller falls back to a full
+    assembly."""
     if not parts:
         raise LayoutError("no parts for object")
     ordered = sorted(parts, key=lambda p: int(p.part_index))
@@ -132,9 +135,9 @@ def iter_range_bytes(
     *,
     buffer_size: int = 256 * 1024,
 ) -> Iterator[bytes]:
-    """Выдавать plaintext-байты ``[start, end]`` (включительно) из расшифрованных
-    part-файлов ``part_paths`` (part_index → путь). Бросает ``FileNotFoundError``,
-    если нужная часть не скачана."""
+    """Yield plaintext bytes ``[start, end]`` (inclusive) from the decrypted
+    part files in ``part_paths`` (part_index → path). Raises
+    ``FileNotFoundError`` if a needed part hasn't been downloaded."""
     if end < start:
         return
     for part in layout.select_parts(start, end):
@@ -142,7 +145,7 @@ def iter_range_bytes(
         if not path:
             raise FileNotFoundError(f"decrypted part {part.part_index} not available")
         local_lo = max(start, part.plain_start) - part.plain_start
-        local_hi = min(end, part.plain_end - 1) - part.plain_start  # включительно
+        local_hi = min(end, part.plain_end - 1) - part.plain_start  # inclusive
         remaining = local_hi - local_lo + 1
         if remaining <= 0:
             continue

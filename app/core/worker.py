@@ -31,7 +31,7 @@ class TelegramWorker(QThread):
     account_pool_status = Signal(
         object
     )  # dict: active/total endpoints + degraded accounts
-    # Превью картинок (инкремент 1b): (folder_path, file_key, temp_image_path)
+    # Image previews (increment 1b): (folder_path, file_key, temp_image_path)
     thumbnail_ready = Signal(str, str, str)
     thumbnail_failed = Signal(str, str)  # (folder_path, file_key)
 
@@ -157,7 +157,7 @@ class TelegramWorker(QThread):
             logger.warning("⚠️ No upload accounts configured — using main session only")
 
         # Surface upload-pool health to the UI: if some configured accounts can't
-        # see their channel, striping silently degrades (e.g. 1 поток вместо 3).
+        # see their channel, striping silently degrades (e.g. 1 stream instead of 3).
         try:
             connected = account_manager.get_connected()
             degraded = [
@@ -237,7 +237,7 @@ class TelegramWorker(QThread):
 
         try:
             logger.info("🚀 Запуск автоматической сверки базы данных с Telegram...")
-            # Передаем None, так как scanner ожидает CancelToken, а не asyncio.Event
+            # Pass None, since scanner expects a CancelToken, not an asyncio.Event
             stats = await scanner.reconcile(cancel_token=None)
             logger.info(
                 "✅ Сверка завершена: удалено записей: %d, проиндексировано: %d",
@@ -249,7 +249,7 @@ class TelegramWorker(QThread):
 
         # Initialize core components
 
-        # Upload через user accounts
+        # Upload via user accounts
         if upload_accounts:
             from app.tg.client import TgClientEndpoint
 
@@ -286,7 +286,7 @@ class TelegramWorker(QThread):
                 upload_endpoints=list(tg_session.upload_endpoints),
             )
 
-        # Download через user accounts или основной аккаунт
+        # Download via user accounts, or the primary account
         download_endpoints = {}
         if upload_accounts:
             from app.tg.client import TgClientEndpoint
@@ -318,14 +318,14 @@ class TelegramWorker(QThread):
             download_endpoints=download_endpoints,
         )
 
-        # Авто-эскалация прокси посреди сессии: если все ретраи передачи
-        # исчерпаны ошибкой соединения, клиент переводится на следующий уровень
-        # цепочки primary→backup→direct (см. app.tg.proxy_escalation).
+        # Auto-escalate the proxy mid-session: if all transfer retries are
+        # exhausted by a connection error, the client is switched to the next
+        # tier of the primary→backup→direct chain (see app.tg.proxy_escalation).
         if account_manager is not None:
             uploader.proxy_escalator = account_manager.escalate_proxy
             downloader.proxy_escalator = account_manager.escalate_proxy
 
-        # Delete/реконсиляция через user accounts или основной аккаунт
+        # Delete/reconciliation via user accounts, or the primary account
         if upload_accounts:
             from app.tg.client import TgClientEndpoint
 
@@ -371,14 +371,14 @@ class TelegramWorker(QThread):
             delete_endpoints=all_delete_endpoints,
         )
 
-        # Валидация: убедиться что хотя бы один валидный роут зарегистрирован
+        # Validation: make sure at least one valid route is registered
         if not deleter._routes_by_chat_id:
             raise RuntimeError(
                 "No valid delete routes configured. "
                 "Ensure all Telegram accounts have proper channel access and chat entities are resolved."
             )
 
-        # Логирование количества роутов для отладки
+        # Log the route count for debugging
         total_routes = sum(
             len(routes) for routes in deleter._routes_by_chat_id.values()
         )
@@ -438,7 +438,7 @@ class TelegramWorker(QThread):
             if jobs is not None:
                 await jobs.stop()
             await tg_manager.stop()
-            # Отключаем мультиаккаунты
+            # Disconnect multi-accounts
             if account_manager:
                 await account_manager.disconnect_all()
 
@@ -450,8 +450,8 @@ class TelegramWorker(QThread):
             progress = float(event.progress)
             prev_progress = self._running_log_progress.get(event.job_id, -1.0)
             prev_ts = self._running_log_ts.get(event.job_id, 0.0)
-            # Rate-limit: максимум 10 обновлений в секунду (интервал >= 100мс)
-            # ИЛИ изменение прогресса >= 1%
+            # Rate-limit: at most 10 updates per second (interval >= 100ms)
+            # OR a progress change >= 1%
             should_emit = (
                 prev_progress < 0.0
                 or abs(progress - prev_progress) >= 1.0
@@ -521,7 +521,7 @@ class TelegramWorker(QThread):
         prev_ts = self._job_persist_ts.get(event.job_id, 0.0)
         if prev_progress is None:
             return True
-        # Оптимизация: сохраняем каждые 25% вместо 10% для снижения нагрузки на SQLite
+        # Optimization: persist every 25% instead of 10% to reduce load on SQLite
         if abs(progress - prev_progress) >= 25.0:
             return True
         if now - prev_ts >= 3.0:
@@ -578,9 +578,10 @@ class TelegramWorker(QThread):
         *,
         timeout: float = 1800.0,
     ) -> str | None:
-        """Собрать файл из чанков на диск и вернуть путь (для шар-ссылок,
-        инкремент 8). БЛОКИРУЕТ вызывающий поток (HTTP-обработчик), пока сборка
-        идёт в loop воркера. None при ошибке/таймауте. Не джоба — без тостов."""
+        """Assemble the file from its chunks on disk and return the path (for
+        share links, increment 8). BLOCKS the calling thread (the HTTP handler)
+        while the assembly runs on the worker's loop. Returns None on
+        error/timeout. Not a job — no toast notifications."""
         with self._state_lock:
             loop = self._loop
             downloader = self._downloader
@@ -621,15 +622,16 @@ class TelegramWorker(QThread):
         timeout: float = 600.0,
         prefix_bytes: dict[int, int] | None = None,
     ) -> dict[int, str]:
-        """Скачать+расшифровать ТОЛЬКО указанные части в ``cache_dir`` и вернуть
-        ``{part_index: путь}`` (стрим без полного скачивания, инкремент 9/10).
-        БЛОКИРУЕТ вызывающий поток (HTTP-обработчик), пока скачивание идёт в loop
-        воркера. Пустой dict при ошибке/таймауте/неготовности — раздача тогда
-        откатится на полную сборку файла.
+        """Download+decrypt ONLY the given parts into ``cache_dir`` and return
+        ``{part_index: path}`` (streaming without a full download, increment
+        9/10). BLOCKS the calling thread (the HTTP handler) while the download
+        runs on the worker's loop. Returns an empty dict on
+        error/timeout/not-ready — the serving code then falls back to
+        assembling the full file.
 
-        ``prefix_bytes`` — см. ``TgDownloader.fetch_parts_decrypted``: для
-        незашифрованных объектов позволяет скачать только начало огромной части
-        вместо неё целиком, чтобы плеер стартовал быстрее."""
+        ``prefix_bytes`` — see ``TgDownloader.fetch_parts_decrypted``: for
+        unencrypted objects, this lets us download just the start of a huge
+        part instead of the whole thing, so the player starts faster."""
         with self._state_lock:
             loop = self._loop
             downloader = self._downloader
@@ -662,9 +664,10 @@ class TelegramWorker(QThread):
             return {}
 
     def fetch_thumbnail(self, folder_path: str, file_key: str, dest_dir: str) -> bool:
-        """Лёгкая фоновая дозагрузка картинки во временную папку ради превью
-        (инкремент 1b). Не джоба — без тостов/прогресса. По готовности эмитит
-        thumbnail_ready(folder, key, temp_path), иначе thumbnail_failed."""
+        """A lightweight background download of an image into a temp folder for
+        preview purposes (increment 1b). Not a job — no toasts/progress. Emits
+        thumbnail_ready(folder, key, temp_path) once ready, otherwise
+        thumbnail_failed."""
         with self._state_lock:
             loop = self._loop
             downloader = self._downloader
@@ -709,10 +712,10 @@ class TelegramWorker(QThread):
     def build_video_poster(
         self, folder_path: str, file_key: str, src_path: str, dest_dir: str
     ) -> bool:
-        """Построить кадр-постер для уже СКАЧАННОГО видео через ffmpeg (инкремент 4).
-        Не джоба, без сети — только локальный файл. По готовности эмитит
-        thumbnail_ready(folder, key, png_path) (тот же путь, что и у картинок),
-        иначе thumbnail_failed."""
+        """Build a poster frame for an already-DOWNLOADED video via ffmpeg
+        (increment 4). Not a job, no network — a local file only. Emits
+        thumbnail_ready(folder, key, png_path) once ready (the same path field
+        as for images), otherwise thumbnail_failed."""
         with self._state_lock:
             loop = self._loop
             accepting = self._accepting_jobs
@@ -759,10 +762,11 @@ class TelegramWorker(QThread):
     def fetch_video_poster_remote(
         self, folder_path: str, file_key: str, dest_dir: str
     ) -> bool:
-        """Превью-постер для НЕскачанного видео: тянем только ПЕРВУЮ часть
-        (префикс файла) через стрим-инфраструктуру и снимаем кадр ffmpeg.
-        Не джоба, без тостов. По готовности эмитит thumbnail_ready(folder, key,
-        png_path) (тот же путь, что и у картинок), иначе thumbnail_failed."""
+        """Poster preview for a NOT-yet-downloaded video: fetch only the FIRST
+        part (the file's prefix) via the streaming infrastructure and grab a
+        frame with ffmpeg. Not a job, no toasts. Emits thumbnail_ready(folder,
+        key, png_path) once ready (the same path field as for images),
+        otherwise thumbnail_failed."""
         with self._state_lock:
             loop = self._loop
             downloader = self._downloader
@@ -933,7 +937,7 @@ class TelegramWorker(QThread):
                     progress_cb=progress,
                 )
 
-                # Логирование результата download
+                # Log the download result
                 analytics = result.get("analytics", {})
                 speed = analytics.get("speed_mbps", {})
                 transfer_mbps = speed.get("transfer_output", 0)
@@ -1018,7 +1022,7 @@ class TelegramWorker(QThread):
                         progress_cb=progress,
                     )
 
-                # Логирование результата upload
+                # Log the upload result
                 analytics = result.get("analytics", {})
                 speed = analytics.get("speed_mbps", {})
                 transfer_mbps = speed.get("transfer_payload", 0)

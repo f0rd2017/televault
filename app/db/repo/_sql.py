@@ -1,4 +1,4 @@
-"""SQL-константы DbRepo (вынесены из repo.py при дроблении god-модуля)."""
+"""DbRepo SQL constants (split out of repo.py when breaking up the god module)."""
 
 _UPSERT_MSG_PART_SQL = """
 INSERT INTO msg_index(

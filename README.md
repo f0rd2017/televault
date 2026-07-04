@@ -8,6 +8,7 @@
 ![Qt](https://img.shields.io/badge/UI-PySide6-41cd52)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
 ![Tests](https://img.shields.io/badge/tests-474%20passed-brightgreen)
+![Languages](https://img.shields.io/badge/UI-EN%20%7C%20RU%20%7C%20UA-informational)
 
 ---
 
@@ -32,6 +33,7 @@
 - 🎬 Стриминг видео из облака без полного скачивания, на лету перекодируется в fMP4
 - 📝 Встроенный текстовый редактор с подсветкой синтаксиса
 - 🔗 Шеринг файлов по ссылке, локальный REST API ([docs/REST_API.md](docs/REST_API.md))
+- 🌍 Интерфейс на английском (по умолчанию), русском и украинском — переключение одной кнопкой в верхней панели, без перезапуска
 
 ## Скриншоты
 
@@ -80,6 +82,8 @@ python scripts/manage_accounts.py
 ./scripts/build.sh      # Linux
 scripts\build.bat       # Windows
 ```
+
+Готовые сборки для Linux и Windows также публикуются автоматически в разделе **Releases** при пуше тега `vX.Y.Z` (`.github/workflows/release.yml`).
 
 ## Архитектура
 

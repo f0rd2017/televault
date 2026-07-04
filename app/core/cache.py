@@ -98,9 +98,9 @@ class CacheManager:
             return {"deleted_files": deleted_files, "freed_bytes": freed_bytes}
 
         # 2. Collect all regular files with their access times and sizes.
-        # relatime (типичный маунт) не обновляет atime на повторных чтениях,
-        # поэтому берём max(atime, mtime) — файл, который сейчас дописывается
-        # (растущий префикс стрима), не выглядит «самым старым».
+        # relatime (a typical mount option) doesn't update atime on repeated
+        # reads, so we take max(atime, mtime) — a file that's currently being
+        # written to (a growing stream prefix) won't look like the oldest one.
         file_entries: list[tuple[float, int, Path]] = []
         for f in root.rglob("*"):
             if f.is_file():

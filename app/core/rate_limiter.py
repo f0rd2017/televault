@@ -7,22 +7,24 @@ _BYTES_PER_MB = 1024 * 1024
 
 
 class BandwidthLimiter:
-    """Async byte token-bucket — ограничивает полосу (МБ/с) загрузки/скачивания.
+    """Async byte token-bucket — caps upload/download bandwidth (MB/s).
 
-    В отличие от :class:`AdaptiveRateLimiter` (1 токен = 1 запрос), здесь
-    1 токен = 1 байт. ``acquire(n)`` блокирует, пока не «накапает» n байт по
-    заданной скорости. ``mbps <= 0`` → лимит выключен (acquire — no-op), это
-    значение по умолчанию, поведение без троттлинга не меняется.
+    Unlike :class:`AdaptiveRateLimiter` (1 token = 1 request), here
+    1 token = 1 byte. ``acquire(n)`` blocks until n bytes have "trickled in"
+    at the configured rate. ``mbps <= 0`` → the limit is disabled
+    (acquire is a no-op); this is the default, so behavior without
+    throttling is unchanged.
 
-    Лимитер общий на инстанс загрузчика/скачивателя, поэтому параллельные части
-    делят единый бюджет — суммарная полоса не превышает заданную.
+    The limiter is shared across the uploader/downloader instance, so
+    parallel parts share a single budget — the combined bandwidth never
+    exceeds the configured rate.
     """
 
     def __init__(self, mbps: float, *, burst_sec: float = 1.0) -> None:
-        self._rate = max(0.0, float(mbps)) * _BYTES_PER_MB  # байт/с (0 = без лимита)
+        self._rate = max(0.0, float(mbps)) * _BYTES_PER_MB  # bytes/sec (0 = unlimited)
         self._burst_sec = max(0.1, float(burst_sec))
-        # Ёмкость бакета: запас на короткие всплески (но не меньше 1 МБ, чтобы
-        # одиночный крупный блок не упирался в нулевую ёмкость).
+        # Bucket capacity: headroom for short bursts (but at least 1 MB, so a
+        # single large chunk doesn't run into zero capacity).
         self._capacity = (
             max(self._rate * self._burst_sec, float(_BYTES_PER_MB))
             if self._rate > 0
@@ -50,9 +52,10 @@ class BandwidthLimiter:
                 elapsed = max(0.0, now - self._last)
                 self._last = now
                 self._tokens = min(self._capacity, self._tokens + elapsed * self._rate)
-                # Разрешаем, если хватает токенов ИЛИ бакет уже полон (запрос
-                # больше ёмкости — пропускаем, уведя токены в минус, чтобы
-                # следующие acquire ждали пропорционально; иначе — дедлок).
+                # Allow through if there are enough tokens OR the bucket is
+                # already full (the request is bigger than capacity — let it
+                # through and drive tokens negative, so subsequent acquires
+                # wait proportionally; otherwise this would deadlock).
                 if self._tokens >= need or self._tokens >= self._capacity:
                     self._tokens -= need
                     return

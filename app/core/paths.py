@@ -1,10 +1,10 @@
-"""Базовая директория приложения — единая точка отсчёта для config.json, .env
-и var/ (данные, кэш, логи).
+"""The app's base directory — the single reference point for config.json, .env
+and var/ (data, cache, logs).
 
-НЕ cwd: собранное PyInstaller-приложение запускают двойным кликом из
-произвольной рабочей директории (а на Windows cwd может быть вообще
-недоступен на запись). Portable-стиль: всё лежит рядом с исполняемым файлом;
-при запуске из исходников — в корне проекта, как раньше.
+NOT cwd: a bundled PyInstaller app is launched by double-clicking from an
+arbitrary working directory (and on Windows cwd may not even be writable).
+Portable style: everything lives next to the executable; when running from
+source, it's the project root, as before.
 """
 
 from __future__ import annotations
@@ -14,16 +14,16 @@ import sys
 
 
 def app_base_dir() -> Path:
-    """Папка приложения: рядом с exe (PyInstaller, ``sys.frozen``) или корень
-    проекта (родитель пакета ``app``) при запуске из исходников."""
+    """The app's folder: next to the exe (PyInstaller, ``sys.frozen``), or the
+    project root (the parent of the ``app`` package) when running from source."""
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parents[2]
 
 
 def resolve_app_path(value: str | Path) -> Path:
-    """Абсолютный путь: относительные значения конфига (``./var/cache``)
-    отсчитываются от :func:`app_base_dir`, а не от cwd."""
+    """Return an absolute path: relative config values (``./var/cache``) are
+    resolved against :func:`app_base_dir`, not against cwd."""
     path = Path(value).expanduser()
     if path.is_absolute():
         return path

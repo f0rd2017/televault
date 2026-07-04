@@ -13,22 +13,22 @@ class RetryConfig:
 
 @dataclass(frozen=True, slots=True)
 class TelegramAccount:
-    """Telegram user аккаунт для upload."""
+    """A Telegram user account used for uploads."""
 
-    id: int  # Уникальный ID в системе (не Telegram ID)
-    label: str  # Отображаемое имя, например "Аккаунт 1"
-    session_path: str  # Путь к .session файлу
-    tg_api_id: int  # API ID для этого аккаунта
+    id: int  # Unique ID in our system (not the Telegram ID)
+    label: str  # Display name, e.g. "Account 1"
+    session_path: str  # Path to the .session file
+    tg_api_id: int  # API ID for this account
     tg_api_hash: str  # API Hash
-    chat_target: str  # Ссылка/username канала куда писать
-    is_active: bool = True  # Включён ли аккаунт
-    is_primary: bool = False  # Основной аккаунт (без прокси)
-    proxy: str = ""  # SOCKS5 прокси для этого аккаунта (пусто = без прокси)
-    proxy_backup: str = ""  # Резервный прокси (fallback, если основной недоступен)
-    phone_masked: str = ""  # Маскированный номер для отображения
-    user_id: int = 0  # Telegram user ID (заполняется после авторизации)
+    chat_target: str  # Link/username of the channel to write to
+    is_active: bool = True  # Whether the account is enabled
+    is_primary: bool = False  # The primary account (no proxy)
+    proxy: str = ""  # SOCKS5 proxy for this account (empty = no proxy)
+    proxy_backup: str = ""  # Backup proxy (fallback if the primary is unreachable)
+    phone_masked: str = ""  # Masked phone number for display
+    user_id: int = 0  # Telegram user ID (filled in after authorization)
     username: str = ""  # Telegram username
-    is_premium: bool = False  # Premium статус
+    is_premium: bool = False  # Premium status
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,11 +39,11 @@ class CryptoConfig:
 
 @dataclass(frozen=True, slots=True)
 class ApiConfig:
-    """Локальный REST API поверх ядра (инкремент 5). Выключен по умолчанию.
+    """A local REST API on top of the core (increment 5). Disabled by default.
 
-    token пустой → авторизация отключена (полагаемся на привязку к 127.0.0.1).
-    Непустой token → требуется заголовок ``Authorization: Bearer <token>``
-    (или ``?token=``)."""
+    An empty token → authorization is disabled (we rely on binding to
+    127.0.0.1). A non-empty token → requires the
+    ``Authorization: Bearer <token>`` header (or ``?token=``)."""
 
     enabled: bool = False
     host: str = "127.0.0.1"
@@ -57,11 +57,11 @@ class AppConfig:
     tg_api_hash: str
     tg_session_path: str
     cache_dir: str
-    # Куда сохранять скачанные файлы. Пусто → используется cache_dir (поведение
-    # по умолчанию). Внутренний кэш (.batch_blob_cache и т.п.) всегда в cache_dir.
+    # Where to save downloaded files. Empty → cache_dir is used (the default
+    # behavior). The internal cache (.batch_blob_cache etc.) always lives in cache_dir.
     download_dir: str = ""
-    # Превью картинок в гриде: показывать миниатюры; и тянуть их фоном для ещё
-    # не скачанных картинок (использует трафик).
+    # Image previews in the grid: show thumbnails; and fetch them in the
+    # background for images not yet downloaded (uses bandwidth).
     show_thumbnails: bool = True
     fetch_thumbnails: bool = True
     ui_icon_size: int = 56
@@ -73,7 +73,7 @@ class AppConfig:
     scan_search: str = "FC1|"
     use_sha_as_key: bool = True
     cache_max_size_mb: int = 0
-    # Лимит кэша частей стриминга (.share_cache/.stream), МБ. 0 = без лимита.
+    # Cache limit for streaming parts (.share_cache/.stream), MB. 0 = unlimited.
     stream_cache_max_mb: int = 2048
     max_active_jobs: int = 8
     download_integrity_mode: str = "strict"
@@ -96,9 +96,9 @@ class AppConfig:
     small_batch_manifest_mode: str = "inline_local"
     send_media_rate_limit: float = 8.0
     get_file_rate_limit: float = 24.0
-    upload_throttle_mbps: float = 0.0  # лимит полосы загрузки, МБ/с (0 = без лимита)
+    upload_throttle_mbps: float = 0.0  # upload bandwidth limit, MB/s (0 = unlimited)
     download_throttle_mbps: float = (
-        0.0  # лимит полосы скачивания, МБ/с (0 = без лимита)
+        0.0  # download bandwidth limit, MB/s (0 = unlimited)
     )
     lane_upload_small_max: int = 4
     lane_upload_large_max: int = 4
@@ -110,7 +110,7 @@ class AppConfig:
     tg_proxy: str | None = None
     accounts: list[TelegramAccount] = field(
         default_factory=list
-    )  # Мультиаккаунты для upload
+    )  # Multiple accounts for uploading
 
     @property
     def chunk_size_bytes(self) -> int:
@@ -118,14 +118,15 @@ class AppConfig:
 
     @property
     def download_root(self) -> str:
-        """Корневая папка для скачанных файлов: явный download_dir или cache_dir."""
+        """The root folder for downloaded files: an explicit download_dir, or cache_dir."""
         explicit = str(self.download_dir or "").strip()
         return explicit or self.cache_dir
 
     def as_public_dict(self) -> dict[str, Any]:
         return {
-            # Локальный дамп для диалога настроек; без него сохранение настроек
-            # затирало бы креды в config.json (save_public_config не мержит).
+            # A local dump for the settings dialog; without this, saving
+            # settings would wipe out credentials in config.json
+            # (save_public_config doesn't merge).
             "tg_api_id": int(self.tg_api_id),
             "tg_api_hash": self.tg_api_hash,
             "tg_session_path": self.tg_session_path,
@@ -181,7 +182,7 @@ class AppConfig:
                 "port": self.api.port,
                 "token": self.api.token,
             },
-            "tg_proxy": "",  # Скрываем
+            "tg_proxy": "",  # Hidden
         }
 
 

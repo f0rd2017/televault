@@ -1,21 +1,23 @@
-"""Транскод/ремукс не-нативных форматов при стриминге (последний пункт roadmap).
+"""Transcode/remux non-native formats during streaming (last roadmap item).
 
-Не-нативный контейнер/кодек (AVI/XviD, WMV, FLV, MPEG-PS…) браузер получателя
-шар-ссылки не играет вовсе, а QMediaPlayer — не на всех бэкендах. Вместо
-скачивания целиком: ffmpeg на лету пересобирает поток в **fragmented MP4**
-(играется и браузером, и QMediaPlayer), читая исходник по HTTP с нашего же
-стрим-сервера (Range уже работает — ffmpeg сам сикает по индексу контейнера).
+A non-native container/codec (AVI/XviD, WMV, FLV, MPEG-PS…) won't play at all
+in the share-link recipient's browser, and not on every QMediaPlayer backend
+either. Instead of downloading the whole file: ffmpeg repacks the stream on
+the fly into **fragmented MP4** (playable by both the browser and
+QMediaPlayer), reading the source over HTTP from our own stream server
+(Range already works — ffmpeg seeks on its own using the container's index).
 
-Стратегию решает ffprobe по фактическим кодекам, а не по расширению:
-- h264/hevc/av1 видео и aac/mp3 аудио → ``-c copy`` (дешёвый ремукс, без CPU);
-- всё остальное → libx264 (veryfast) / aac.
+The strategy is decided by ffprobe based on the actual codecs, not the file
+extension:
+- h264/hevc/av1 video and aac/mp3 audio → ``-c copy`` (a cheap remux, no CPU cost);
+- everything else → libx264 (veryfast) / aac.
 
-v1 сознательно без перемотки: выход — chunked-поток неизвестной длины
-(``Connection: close``), Range не поддерживается. Для «посмотреть AVI по
-ссылке» этого достаточно; перемотка — через нативный путь.
+v1 deliberately has no seeking: the output is a chunked stream of unknown
+length (``Connection: close``), Range isn't supported. That's enough for
+"watch this AVI via the link"; seeking goes through the native path.
 
-Чистое планирование (``plan_from_probe``/``build_ffmpeg_args``) отделено от
-subprocess-обвязки (``probe_media``) — тестируется без ffmpeg.
+Pure planning (``plan_from_probe``/``build_ffmpeg_args``) is kept separate
+from the subprocess plumbing (``probe_media``) — so it can be tested without ffmpeg.
 """
 
 from __future__ import annotations
@@ -28,7 +30,7 @@ import subprocess
 
 logger = logging.getLogger(__name__)
 
-# Кодеки, которые валидны в MP4 и играются браузерами — их не перекодируем.
+# Codecs that are valid inside MP4 and play in browsers — we don't re-encode these.
 MP4_COPY_VIDEO_CODECS = {"h264", "hevc", "av1"}
 MP4_COPY_AUDIO_CODECS = {"aac", "mp3"}
 
@@ -37,31 +39,31 @@ _PROBE_TIMEOUT_SEC = 25.0
 
 @dataclass(frozen=True)
 class TranscodePlan:
-    """Что делать с потоками исходника при упаковке в fragmented MP4."""
+    """What to do with the source streams when packaging into fragmented MP4."""
 
-    video_codec: str | None  # None — видеопотока нет
-    audio_codec: str | None  # None — аудиопотока нет
+    video_codec: str | None  # None — there's no video stream
+    audio_codec: str | None  # None — there's no audio stream
     copy_video: bool
     copy_audio: bool
 
     @property
     def is_remux_only(self) -> bool:
-        """Только пересборка контейнера, без перекодирования (нет нагрузки CPU)."""
+        """Just repackaging the container, with no re-encoding (no CPU load)."""
         return (self.video_codec is None or self.copy_video) and (
             self.audio_codec is None or self.copy_audio
         )
 
 
 def transcode_available() -> bool:
-    """Есть ли ffmpeg+ffprobe в PATH (оба нужны конвейеру)."""
+    """Whether ffmpeg+ffprobe are both on PATH (the pipeline needs both)."""
     return shutil.which("ffmpeg") is not None and shutil.which("ffprobe") is not None
 
 
 def plan_from_probe(probe: dict) -> TranscodePlan:
-    """Построить план по JSON-выводу ffprobe (``-show_streams``).
+    """Build a plan from ffprobe's JSON output (``-show_streams``).
 
-    Берём первый видео- и первый аудиопоток (типичный кейс медиафайла);
-    неизвестный кодек = перекодировать (безопасный дефолт).
+    We take the first video stream and the first audio stream (the typical
+    media file case); an unrecognized codec means re-encode (the safe default).
     """
     streams = probe.get("streams") or []
     video = next((s for s in streams if str(s.get("codec_type")) == "video"), None)
@@ -77,11 +79,11 @@ def plan_from_probe(probe: dict) -> TranscodePlan:
 
 
 def build_ffmpeg_args(input_url: str, plan: TranscodePlan) -> list[str]:
-    """Аргументы ffmpeg: вход по URL, выход — fragmented MP4 в stdout.
+    """Build the ffmpeg args: input over a URL, output — fragmented MP4 to stdout.
 
-    ``frag_keyframe+empty_moov`` — moov сразу, дальше фрагменты: поток можно
-    играть с первого байта, не дожидаясь конца (обычный MP4 пишет moov в конце
-    и для пайпа непригоден).
+    ``frag_keyframe+empty_moov`` — writes moov right away, then fragments: the
+    stream can be played from the first byte without waiting for the end (a
+    regular MP4 writes moov at the end and doesn't work for piping).
     """
     args = [
         "ffmpeg",
@@ -112,15 +114,15 @@ def build_ffmpeg_args(input_url: str, plan: TranscodePlan) -> list[str]:
 
 
 def probe_media(input_url: str) -> dict | None:
-    """ffprobe по URL → распарсенный JSON или None (файл не читается/нет ffprobe).
+    """Run ffprobe on a URL → parsed JSON, or None (file unreadable/no ffprobe).
 
-    Блокирует вызывающий поток (HTTP-обработчик) — это осознанно, модель
-    сервера потоковая (ThreadingHTTPServer)."""
+    This blocks the calling thread (the HTTP handler) — that's intentional,
+    since the server model is threaded (ThreadingHTTPServer)."""
     ffprobe = shutil.which("ffprobe")
     if ffprobe is None:
         return None
     try:
-        completed = subprocess.run(  # noqa: S603 — фиксированный бинарь, наш URL
+        completed = subprocess.run(  # noqa: S603 — fixed binary, our own URL
             [
                 ffprobe,
                 "-v",

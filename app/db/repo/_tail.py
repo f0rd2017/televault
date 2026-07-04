@@ -1,4 +1,4 @@
-"""DbRepo: переименование/удаление объектов и аккаунты (вынесено из repo.py)."""
+"""DbRepo: renaming/deleting objects, and accounts (split out of repo.py)."""
 
 from __future__ import annotations
 

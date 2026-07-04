@@ -1,4 +1,4 @@
-"""DbRepo: объекты и их агрегаты (вынесено из repo.py)."""
+"""DbRepo: objects and their aggregates (split out of repo.py)."""
 
 from __future__ import annotations
 
@@ -14,9 +14,9 @@ from app.db.repo._sql import _REBUILD_ALL_OBJECTS_SQL, _REBUILD_SINGLE_OBJECT_SQ
 
 class _ObjectsMixin:
     def rebuild_objects_aggregates(self) -> None:
-        """Перестроить все агрегаты объектов из таблицы msg_index.
+        """Rebuild all object aggregates from the msg_index table.
 
-        Удаляет и пересоздаёт все записи в objects. Используется после сканирования.
+        Deletes and recreates all rows in objects. Used after a scan.
         """
         with self.conn:
             self.conn.execute("DELETE FROM objects")
@@ -243,9 +243,9 @@ class _ObjectsMixin:
         ]
 
     def get_part_chat_ids_by_folder(self, folder_path: str) -> dict[str, set[str]]:
-        """file_key -> множество chat_id его (не удалённых) частей, по папке.
+        """file_key -> the set of chat_ids of its (non-deleted) parts, per folder.
 
-        Дешёвый агрегат для вычисления offline/damaged в сетке без N запросов.
+        A cheap aggregate for computing offline/damaged in the grid without N queries.
         """
         normalized = normalize_folder_path(folder_path)
         rows = self.conn.execute(
@@ -259,7 +259,7 @@ class _ObjectsMixin:
         return result
 
     def get_lost_file_keys_by_folder(self, folder_path: str) -> set[str]:
-        """Множество file_key с хотя бы одной потерянной (lost_ts) частью, по папке."""
+        """The set of file_keys with at least one lost (lost_ts) part, per folder."""
         normalized = normalize_folder_path(folder_path)
         rows = self.conn.execute(
             "SELECT DISTINCT file_key FROM msg_index "

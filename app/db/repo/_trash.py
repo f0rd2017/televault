@@ -1,4 +1,4 @@
-"""DbRepo: корзина, шеринг, синхронизация папок, ссылки и батч-блоб-ключи (вынесено из repo.py)."""
+"""DbRepo: trash, sharing, folder sync, links, and batch blob keys (split out of repo.py)."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from app.core.utils import now_ts, normalize_folder_path
 
 
 class _TrashShareSyncMixin:
-    # === Корзина (soft-delete) ===
+    # === Trash (soft-delete) ===
 
     def move_to_trash(
         self,
@@ -42,8 +42,8 @@ class _TrashShareSyncMixin:
             )
 
     def list_trash(self) -> list[ObjectEntry]:
-        """Содержимое корзины как ObjectEntry (для переиспользования грид-модели).
-        last_seen_ts = момент помещения в корзину (для сортировки новые сверху)."""
+        """Trash contents as ObjectEntry (so the grid model can be reused).
+        last_seen_ts = the moment the item was moved to trash (for sorting newest-first)."""
         rows = self.conn.execute(
             "SELECT folder_path, file_key, orig_name, storage_kind, total_size, "
             "       trashed_ts FROM trash ORDER BY trashed_ts DESC"
@@ -81,7 +81,7 @@ class _TrashShareSyncMixin:
         row = self.conn.execute("SELECT COUNT(*) AS c FROM trash").fetchone()
         return int(row["c"]) if row is not None else 0
 
-    # ── Шар-ссылки ───────────────────────────────────────────────────────────
+    # ── Share links ───────────────────────────────────────────────────────────
     @staticmethod
     def _share_row_to_dict(row) -> dict[str, Any]:
         return {

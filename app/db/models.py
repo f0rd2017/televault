@@ -154,25 +154,25 @@ CREATE INDEX IF NOT EXISTS idx_batch_blobs_folder_deleted
 ON batch_blobs(folder_path, is_deleted);
 """
 
-# Оптимизация: индекс для быстрого поиска объектов по file_key (UI lookup)
+# Optimization: index for fast object lookups by file_key (UI lookup)
 CREATE_INDEX_OBJ_FILEKEY = """
 CREATE INDEX IF NOT EXISTS idx_obj_filekey
 ON objects(file_key);
 """
 
-# Оптимизация: индекс для фильтрации job по статусу (очередь, история)
+# Optimization: index for filtering jobs by status (queue, history)
 CREATE_INDEX_JOBS_STATUS = """
 CREATE INDEX IF NOT EXISTS idx_jobs_status
 ON jobs(status, created_ts DESC);
 """
 
-# Оптимизация: покрывающий индекс для поиска объектов без JOIN
+# Optimization: a covering index for looking up objects without a JOIN
 CREATE_INDEX_OBJ_FOLDER_KEY_STATUS = """
 CREATE INDEX IF NOT EXISTS idx_obj_folder_key_status
 ON objects(folder_path, file_key, status, last_seen_ts DESC);
 """
 
-# Таблица мультиаккаунтов для upload
+# Table of multiple accounts used for uploading
 CREATE_ACCOUNTS_TABLE = """
 CREATE TABLE IF NOT EXISTS accounts (
     id INTEGER PRIMARY KEY,
@@ -217,10 +217,10 @@ CREATE TABLE IF NOT EXISTS folder_sync (
 );
 """
 
-# Корзина (soft-delete): объект скрыт из обычных списков, но НЕ удалён из канала.
-# Независима от reconcile (та не трогает эту таблицу) — поэтому корзина переживает
-# сверку. Восстановление = удалить строку; «удалить навсегда» = реальный
-# remote-delete + удалить строку.
+# Trash (soft-delete): the object is hidden from normal listings but NOT
+# deleted from the channel. Independent of reconcile (which never touches
+# this table) — so trash survives a reconciliation pass. Restoring = delete
+# the row; "delete forever" = an actual remote delete + deleting the row.
 CREATE_TRASH_TABLE = """
 CREATE TABLE IF NOT EXISTS trash (
     folder_path TEXT NOT NULL,
@@ -233,9 +233,10 @@ CREATE TABLE IF NOT EXISTS trash (
 );
 """
 
-# Шар-ссылки: публичная ссылка на файл (по токену) с опциональным паролем и
-# сроком. Независима от reconcile. Раздаётся локальным HTTP-сервером (REST API):
-# GET /share/<token> собирает файл из чанков и отдаёт с поддержкой Range.
+# Share links: a public link to a file (by token) with an optional password
+# and expiry. Independent of reconcile. Served by the local HTTP server (REST
+# API): GET /share/<token> assembles the file from its chunks and serves it
+# with Range support.
 CREATE_SHARES_TABLE = """
 CREATE TABLE IF NOT EXISTS shares (
     token TEXT PRIMARY KEY,

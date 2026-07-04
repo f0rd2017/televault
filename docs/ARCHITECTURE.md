@@ -35,7 +35,8 @@ app/
 │   ├── rate_limiter.py      AdaptiveRateLimiter — адаптивный лимит запросов к Telegram
 │   ├── types.py             Датаклассы: AppConfig, TelegramAccount, PartRecord, JobEvent, …
 │   ├── utils.py             Хелперы: sha256, AES-GCM шифрование, пути, имена файлов
-│   └── logging.py           Настройка логирования
+│   ├── logging.py           Настройка логирования
+│   └── i18n.py              Реестр языков (en/ru/uk), QSettings-персистентность, install_language()
 │
 ├── db/                      Локальный SQLite-индекс
 │   ├── database.py          Подключение/инициализация БД
