@@ -1,0 +1,99 @@
+========================================================================
+ TG Cloud Cache Manager — установка и запуск из исходников (run.py)
+========================================================================
+
+Требуется: Python >= 3.11 (проверено на 3.11–3.14).
+Проверить версию:
+
+    python --version
+
+Если команды python нет — пробуй python3 (Linux/macOS) или py (Windows).
+
+
+------------------------------------------------------------------------
+ 1. LINUX / macOS  (оболочка fish)
+------------------------------------------------------------------------
+
+# перейти в папку проекта
+cd /путь/к/tg-cloud-cache-manager
+
+# создать виртуальное окружение
+python -m venv .venv
+
+# активировать (fish)
+source .venv/bin/activate.fish
+#   bash/zsh:  source .venv/bin/activate
+
+# обновить pip и поставить зависимости
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+
+# запустить
+python run.py
+
+
+------------------------------------------------------------------------
+ 2. WINDOWS  (PowerShell)
+------------------------------------------------------------------------
+
+cd C:\путь\к\TG_bd
+
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+#   cmd.exe:  .venv\Scripts\activate.bat
+
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+
+python run.py
+
+
+------------------------------------------------------------------------
+ 3. TELEGRAM API-КРЕДЫ (api_id / api_hash)
+------------------------------------------------------------------------
+
+Получить на https://my.telegram.org -> API development tools.
+Задать можно ДВУМЯ способами (любой на выбор):
+
+  а) Через GUI: запустить программу и вписать api_id / api_hash
+     в окне настроек (раздел TELEGRAM). Сохраняются в config.json.
+
+  б) Через файл .env рядом с run.py (приоритетнее GUI):
+     скопировать .env.example -> .env и заполнить:
+
+        TG_API_ID=123456
+        TG_API_HASH=ваш_api_hash
+
+     fish:        cp .env.example .env
+     PowerShell:  Copy-Item .env.example .env
+
+
+------------------------------------------------------------------------
+ 4. FFMPEG (опционально, но желательно)
+------------------------------------------------------------------------
+
+Нужен для транскода не-нативных видео (AVI и т.п.) и превью видео.
+Программа запустится и без него — просто эти функции будут недоступны.
+
+  Arch/CachyOS:  sudo pacman -S ffmpeg
+  Debian/Ubuntu: sudo apt install ffmpeg
+  macOS (brew):  brew install ffmpeg
+  Windows:       winget install Gyan.FFmpeg   (или скачать с ffmpeg.org
+                 и добавить папку bin в PATH)
+
+Проверить:  ffmpeg -version
+
+
+------------------------------------------------------------------------
+ 5. ПОСЛЕДУЮЩИЕ ЗАПУСКИ
+------------------------------------------------------------------------
+
+Окружение уже создано — достаточно активировать и запустить:
+
+  fish:        cd /путь/к/tg-cloud-cache-manager; source .venv/bin/activate.fish; python run.py
+  PowerShell:  cd C:\путь\к\TG_bd; .venv\Scripts\Activate.ps1; python run.py
+
+run.py можно запускать из любой рабочей папки — пути к config/var/logs
+привязаны к папке проекта, а не к текущему каталогу.
+
+========================================================================
