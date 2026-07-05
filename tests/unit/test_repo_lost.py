@@ -77,10 +77,10 @@ def test_object_notes_roundtrip(tmp_path):
     _part(repo, 0)
     assert repo.get_object_note("F", "k") == ""
 
-    repo.set_object_note("F", "k", "важный файл")
-    assert repo.get_object_note("F", "k") == "важный файл"
-    assert repo.get_object_notes_by_folder("F") == {"k": "важный файл"}
+    repo.set_object_note("F", "k", "important file")
+    assert repo.get_object_note("F", "k") == "important file"
+    assert repo.get_object_notes_by_folder("F") == {"k": "important file"}
 
     # Update overwrites.
-    repo.set_object_note("F", "k", "обновлено")
-    assert repo.get_object_note("F", "k") == "обновлено"
+    repo.set_object_note("F", "k", "updated")
+    assert repo.get_object_note("F", "k") == "updated"

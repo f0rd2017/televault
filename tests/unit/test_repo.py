@@ -323,8 +323,8 @@ def test_batch_overlay_unified_list_and_tombstone(tmp_path) -> None:
 
 
 def test_trash_hides_restores_and_lists(tmp_path) -> None:
-    """Корзина: move_to_trash скрывает из списков, list_trash показывает,
-    restore возвращает, delete_trash_entry убирает запись."""
+    """Trash: move_to_trash hides from listings, list_trash shows,
+    restore brings back, delete_trash_entry removes the record."""
     db = connect_db(tmp_path / "index.sqlite3")
     repo = DbRepo(db)
     repo.upsert_folder("Docs")
@@ -350,12 +350,12 @@ def test_trash_hides_restores_and_lists(tmp_path) -> None:
     ]
 
     repo.move_to_trash("Docs", "k1", "f1.txt", "regular", 10)
-    # Скрыт из обычного списка, виден в корзине.
+    # Hidden from the normal listing, visible in trash.
     assert [o.file_key for o in repo.list_objects_by_folder("Docs")] == ["k2"]
     assert [o.file_key for o in repo.list_trash()] == ["k1"]
     assert repo.count_trash() == 1
 
-    # Восстановление возвращает в список.
+    # Restore brings it back to the listing.
     assert repo.restore_from_trash("Docs", "k1") == 1
     assert sorted(o.file_key for o in repo.list_objects_by_folder("Docs")) == [
         "k1",
@@ -363,19 +363,19 @@ def test_trash_hides_restores_and_lists(tmp_path) -> None:
     ]
     assert repo.count_trash() == 0
 
-    # Корзина переживает reconcile-перестройку агрегатов.
+    # Trash survives the reconcile rebuild of aggregates.
     repo.move_to_trash("Docs", "k2", "f2.txt")
     repo.rebuild_objects_aggregates()
     assert [o.file_key for o in repo.list_objects_by_folder("Docs")] == ["k1"]
     assert [o.file_key for o in repo.list_trash()] == ["k2"]
-    # Удаление записи корзины (после remote-delete) — окончательно.
+    # Deleting the trash record (after remote-delete) is final.
     assert repo.delete_trash_entry("Docs", "k2") == 1
     assert repo.count_trash() == 0
 
 
 def test_supersede_batch_members_by_name(tmp_path) -> None:
-    """Обновлённый мелкий файл (та же папка+имя, новый ключ) вытесняет старую
-    версию: старый член помечается удалённым и исчезает из списка."""
+    """An updated small file (same folder+name, new key) evicts the old
+    version: the old member is marked deleted and disappears from the listing."""
     db = connect_db(tmp_path / "index.sqlite3")
     repo = DbRepo(db)
 
@@ -391,7 +391,7 @@ def test_supersede_batch_members_by_name(tmp_path) -> None:
             blob_sha256=None,
             manifest_json='{"members":[]}',
         )
-    # Старая и новая версии одного файла a.txt — разные ключи (разный sha).
+    # Old and new versions of the same file a.txt — different keys (different sha).
     repo.upsert_batch_members_bulk(
         [
             {
@@ -423,15 +423,15 @@ def test_supersede_batch_members_by_name(tmp_path) -> None:
             },
         ]
     )
-    # До вытеснения a.txt дублируется (a_old + a_new).
+    # Before eviction, a.txt is duplicated (a_old + a_new).
     before = sorted(o.file_key for o in repo.list_objects_by_folder("Docs"))
     assert before == ["a_new", "a_old", "keepb"]
 
-    # Вытесняем старые версии a.txt, оставляя a_new.
+    # Evict old versions of a.txt, keeping a_new.
     superseded = repo.supersede_batch_members_by_name("Docs", "a.txt", "a_new")
     assert superseded == 1
 
     after = sorted(o.file_key for o in repo.list_objects_by_folder("Docs"))
-    assert after == ["a_new", "keepb"]  # a_old исчез, b.txt не тронут
-    # Повторный вызов идемпотентен (старое уже удалено).
+    assert after == ["a_new", "keepb"]  # a_old is gone, b.txt untouched
+    # A repeat call is idempotent (the old one is already deleted).
     assert repo.supersede_batch_members_by_name("Docs", "a.txt", "a_new") == 0

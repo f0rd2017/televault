@@ -71,9 +71,9 @@ def test_properties_dialog_exposes_note():
         parts=[_part(0, chat_id="-100a")],
         connected_labels={"-100a": "Acc1"},
         expected_sha256=None,
-        note="моя заметка",
+        note="my note",
     )
-    assert dlg.note_value == "моя заметка"
+    assert dlg.note_value == "my note"
 
 
 def test_folder_properties_dialog_builds():
@@ -97,7 +97,7 @@ def test_folder_properties_dialog_handles_empty_folder():
     from app.ui.dialogs._properties import FolderPropertiesDialog
 
     QApplication.instance() or QApplication([])
-    # Пустая папка без файлов и подпапок не должна падать.
+    # An empty folder with no files or subfolders must not crash.
     dlg = FolderPropertiesDialog(
         folder_path="Empty",
         name="Empty",

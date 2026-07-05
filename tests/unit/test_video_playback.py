@@ -128,7 +128,7 @@ def test_video_player_scrub_previews_without_seeking_until_release(tmp_path):
         seek_calls: list[int] = []
         win._player.setPosition = lambda pos: seek_calls.append(int(pos))
 
-        # Клип двухсекундный (см. _write_test_video), диапазон слайдера ~0..2000мс.
+        # The clip is two seconds (see _write_test_video), slider range ~0..2000 ms.
         win._on_slider_pressed()
         for value in (300, 900, 1800):
             win._position.sliderMoved.emit(value)

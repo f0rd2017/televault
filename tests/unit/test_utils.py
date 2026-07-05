@@ -70,7 +70,7 @@ def test_build_telethon_proxy_and_endpoint() -> None:
     parsed = build_telethon_proxy("10.0.0.2:1234:user:pass")
     assert parsed == ("socks5", "10.0.0.2", 1234, True, "user", "pass")
     assert proxy_endpoint("10.0.0.2:1234:user:pass") == "socks5://10.0.0.2:1234"
-    # HTTP proxy теперь поддерживается (Telethon 1.36+ через python_socks)
+    # HTTP proxy is now supported (Telethon 1.36+ via python_socks)
     parsed_http = build_telethon_proxy("http://proxy.example:8080")
     assert parsed_http == ("http", "proxy.example", 8080, False)
     parsed_http_auth = build_telethon_proxy("http://u:p@proxy.example:8080")
@@ -92,7 +92,7 @@ def test_resolve_working_proxy_falls_back_to_direct_when_unreachable(
 
 
 def test_resolve_working_proxy_auto_detects_http_when_socks_dead(monkeypatch) -> None:
-    # SOCKS5 не отвечает, HTTP отвечает — должен выбраться HTTP.
+    # SOCKS5 does not respond, HTTP does — HTTP should be selected.
     def fake_probe(host, port, proxy_type, *a, **k):
         return proxy_type == "http"
 
@@ -114,11 +114,11 @@ def test_resolve_working_proxy_explicit_scheme_only_probes_that_type(
     monkeypatch.setattr(proxy_mod, "probe_proxy", fake_probe)
     proxy, label = resolve_working_proxy("socks5://u:p@proxy.example:9050")
     assert proxy == ("socks5", "proxy.example", 9050, False, "u", "p")
-    assert probed_types == ["socks5"]  # http не пробуется при явной схеме
+    assert probed_types == ["socks5"]  # http is not probed when the scheme is explicit
 
 
 def test_parse_socks5_proxy_rejects_invalid() -> None:
-    # http:// теперь поддерживается — НЕ должен вызывать ошибку
+    # http:// is now supported — should NOT raise an error
     with pytest.raises(ValueError):
         parse_socks5_proxy("ftp://127.0.0.1:8080")
     with pytest.raises(ValueError):

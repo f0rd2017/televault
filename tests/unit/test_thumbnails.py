@@ -24,7 +24,7 @@ from PySide6.QtCore import Qt
 
 
 def _write_test_video(path, *, duration: int = 2, size: str = "160x120") -> str:
-    """Сгенерировать короткое тестовое видео через ffmpeg (lavfi testsrc)."""
+    """Generate a short test video via ffmpeg (lavfi testsrc)."""
     subprocess.run(  # noqa: S603
         [
             "ffmpeg",
@@ -83,7 +83,7 @@ def test_make_thumbnail_icon(tmp_path):
     icon = make_thumbnail_icon(png, size=58)
     assert isinstance(icon, QIcon)
     assert not icon.isNull()
-    # Битый/несуществующий путь → None.
+    # A broken/nonexistent path → None.
     assert make_thumbnail_icon(str(tmp_path / "nope.png")) is None
     bad = tmp_path / "bad.png"
     bad.write_bytes(b"not an image")
@@ -99,13 +99,13 @@ def test_refresh_thumbnails_step_builds_and_caches(tmp_path):
     model.set_items([item])
 
     assert model.refresh_thumbnails_step(max_items=8) is True
-    # Миниатюра проставлена и отдаётся в DecorationRole.
+    # The thumbnail is set and returned in DecorationRole.
     idx = model.index(0, 0)
     deco = model.data(idx, Qt.ItemDataRole.DecorationRole)
     assert isinstance(deco, QIcon) and not deco.isNull()
     refreshed = model.item_for_index(idx)
     assert refreshed.thumbnail is not None
-    # Дисковый кэш записан → переживёт рестарт.
+    # The disk cache is written → survives a restart.
     assert any(cache.glob("*.png"))
 
 
@@ -118,7 +118,7 @@ def test_non_image_gets_no_thumbnail(tmp_path):
         entry=_entry("note.txt", key="k2"), local_path=str(txt), local_exists=True
     )
     model.set_items([item])
-    # Не-картинка → шаг ничего не строит.
+    # Not an image → the step builds nothing.
     assert model.refresh_thumbnails_step(max_items=8) is False
     assert model.item_for_index(model.index(0, 0)).thumbnail is None
 
@@ -127,7 +127,7 @@ def test_set_thumbnail_from_path(tmp_path):
     _app()
     png = _write_png(tmp_path / "remote.png")
     model = ExplorerGridModel(thumb_cache_dir=str(tmp_path / ".thumb_cache"))
-    # Нескачанная картинка (local_exists=False) — миниатюру ставим из временного файла.
+    # A not-downloaded image (local_exists=False) — set the thumbnail from a temp file.
     item = ExplorerFileItem(
         entry=_entry("remote.png", key="k3"), local_path=None, local_exists=False
     )
@@ -137,9 +137,9 @@ def test_set_thumbnail_from_path(tmp_path):
 
 
 def test_set_items_preserves_thumbnail_across_reload(tmp_path):
-    # Регрессия: скачивание файла триггерит reload, который раньше пересобирал
-    # элементы с thumbnail=None → уже показанное превью пропадало. set_items
-    # должен переносить готовую миниатюру на новый элемент того же объекта.
+    # Regression: downloading a file triggers a reload, which used to rebuild
+    # items with thumbnail=None → an already-shown preview disappeared. set_items
+    # must carry the ready thumbnail over to the new item of the same object.
     _app()
     png = _write_png(tmp_path / "remote.png")
     model = ExplorerGridModel(thumb_cache_dir=str(tmp_path / ".thumb_cache"))
@@ -149,8 +149,8 @@ def test_set_items_preserves_thumbnail_across_reload(tmp_path):
     assert model.set_thumbnail_from_path("Photos", "k9", png) is True
     assert model.item_for_index(model.index(0, 0)).thumbnail is not None
 
-    # Имитируем reload после скачивания: свежий элемент (thumbnail=None) того же
-    # объекта, теперь локальный. Превью должно сохраниться, а не пропасть.
+    # Simulate a reload after download: a fresh item (thumbnail=None) of the same
+    # object, now local. The preview must persist, not vanish.
     fresh = ExplorerFileItem(
         entry=_entry("remote.png", key="k9"),
         local_path=str(tmp_path / "dl" / "remote.png"),
@@ -165,8 +165,8 @@ def test_set_items_preserves_thumbnail_across_reload(tmp_path):
 
 
 def test_folder_download_mark_and_carry_over(tmp_path):
-    # Скачанная папка (все файлы внутри локально) помечается тем же значком
-    # "загружено", что и файлы; метка переживает reload и идемпотентна.
+    # A downloaded folder (all files inside are local) is marked with the same
+    # "downloaded" badge as files; the mark survives reload and is idempotent.
     _app()
     from app.ui.models_qt import ExplorerFolderItem
 
@@ -180,21 +180,21 @@ def test_folder_download_mark_and_carry_over(tmp_path):
     assert model.set_folder_downloaded("Photos/Sub", True) is True
     assert model.item_for_index(idx).downloaded is True
     assert "downloaded" in model.data(idx, Qt.ItemDataRole.ToolTipRole)
-    # Идемпотентно — повторная установка того же значения ничего не меняет.
+    # Idempotent — setting the same value again changes nothing.
     assert model.set_folder_downloaded("Photos/Sub", True) is False
 
-    # Метка переживает reload (как и превью файлов).
+    # The mark survives a reload (like file previews).
     model.set_items([ExplorerFolderItem(name="Sub", path="Photos/Sub")])
     assert model.item_for_index(model.index(0, 0)).downloaded is True
 
-    # Снятие метки работает.
+    # Clearing the mark works.
     assert model.set_folder_downloaded("Photos/Sub", False) is True
     assert model.item_for_index(model.index(0, 0)).downloaded is False
 
 
 def test_set_icon_size_drops_stale_size_thumbnail(tmp_path):
-    # После смены размера иконок старые (другого размера) миниатюры не должны
-    # переноситься carry-over'ом — иначе они заблокируют пересборку под новый размер.
+    # After an icon-size change, old (different-size) thumbnails must not
+    # be carried over — otherwise they'd block the rebuild for the new size.
     _app()
     png = _write_png(tmp_path / "pic.png")
     model = ExplorerGridModel(thumb_cache_dir=str(tmp_path / ".thumb_cache"))
@@ -204,11 +204,11 @@ def test_set_icon_size_drops_stale_size_thumbnail(tmp_path):
     assert model.refresh_thumbnails_step(max_items=8) is True
     assert model.item_for_index(model.index(0, 0)).thumbnail is not None
 
-    model.set_icon_size(128)  # смена размера очищает миниатюры с элементов
+    model.set_icon_size(128)  # resizing clears thumbnails off the items
     model.set_items(
         [ExplorerFileItem(entry=_entry(key="ksz"), local_path=png, local_exists=True)]
     )
-    # Ничего не перенеслось — миниатюра пересоберётся под новый размер отдельным шагом.
+    # Nothing carried over — the thumbnail is rebuilt for the new size in a separate step.
     assert model.item_for_index(model.index(0, 0)).thumbnail is None
 
 
@@ -221,7 +221,7 @@ def test_clear_dir_files(tmp_path):
     (d / "b.bin").write_bytes(b"y")
     assert clear_dir_files(d) == 2
     assert list(d.iterdir()) == []
-    # Несуществующая папка — 0, без ошибки.
+    # A nonexistent folder — 0, no error.
     assert clear_dir_files(tmp_path / "nope") == 0
 
 
@@ -236,13 +236,13 @@ def test_evict_dir_to_limit(tmp_path):
     for i in range(5):
         f = d / f"{i}.png"
         f.write_bytes(b"x")
-        # Разводим mtime, чтобы порядок был детерминирован (старые — меньший i).
+        # Spread out mtime so ordering is deterministic (older = smaller i).
         os.utime(f, (time.time() + i, time.time() + i))
-    # Оставляем 2 новейших → удаляем 3 старейших.
+    # Keep the 2 newest → delete the 3 oldest.
     assert evict_dir_to_limit(d, max_files=2) == 3
     remaining = sorted(p.name for p in d.iterdir())
     assert remaining == ["3.png", "4.png"]
-    # Под лимитом — ничего не трогаем.
+    # Under the limit — nothing is touched.
     assert evict_dir_to_limit(d, max_files=10) == 0
 
 
@@ -261,11 +261,11 @@ def test_image_rows_needing_fetch(tmp_path):
     model.set_items([img_item, have_item, txt_item])
     need = model.image_rows_needing_fetch(max_items=8)
     keys = [it.entry.file_key for it in need]
-    # Только нескачанная картинка без кэша.
+    # Only a not-downloaded image with no cache.
     assert keys == ["ka"]
 
 
-# ── Видео-постеры (инкремент 4) ──────────────────────────────────────────────
+# ── Video posters (increment 4) ──────────────────────────────────────────────
 
 
 def test_is_video_name():
@@ -290,15 +290,15 @@ def test_is_video_name():
 def test_video_rows_needing_poster(tmp_path):
     _app()
     model = ExplorerGridModel(thumb_cache_dir=str(tmp_path / ".thumb_cache"))
-    # Скачанное видео без постера → кандидат.
+    # A downloaded video with no poster → a candidate.
     local_vid = ExplorerFileItem(
         entry=_entry("v.mp4", key="kv"), local_path="x", local_exists=True
     )
-    # Нескачанное видео → НЕ кандидат (тянуть ради кадра дорого).
+    # A not-downloaded video → NOT a candidate (pulling it just for a frame is expensive).
     remote_vid = ExplorerFileItem(
         entry=_entry("r.mp4", key="kr"), local_path=None, local_exists=False
     )
-    # Скачанная картинка → НЕ видео-кандидат.
+    # A downloaded image → NOT a video candidate.
     img = ExplorerFileItem(
         entry=_entry("p.png", key="kp"), local_path="y", local_exists=True
     )
@@ -313,7 +313,7 @@ def test_extract_video_poster_png(tmp_path):
     out = tmp_path / "poster.png"
     assert extract_video_poster_png(vid, out, box=128) is True
     assert out.is_file() and out.stat().st_size > 0
-    # Построенный постер — валидная картинка → из него строится миниатюра.
+    # The built poster is a valid image → a thumbnail is built from it.
     icon = make_thumbnail_icon(str(out), size=58)
     assert isinstance(icon, QIcon) and not icon.isNull()
 
@@ -539,7 +539,7 @@ def test_remote_poster_skips_black_intro_frame(tmp_path):
 
 @pytest.mark.skipif(not ffmpeg_available(), reason="ffmpeg not installed")
 def test_extract_video_poster_seek_past_end_falls_back(tmp_path):
-    # Видео короче seek_sec → фолбэк на первый кадр, всё равно успех.
+    # The video is shorter than seek_sec → fall back to the first frame, still a success.
     vid = _write_test_video(tmp_path / "short.mp4", duration=1)
     out = tmp_path / "p.png"
     assert extract_video_poster_png(vid, out, box=96, seek_sec=10.0) is True
@@ -547,7 +547,7 @@ def test_extract_video_poster_seek_past_end_falls_back(tmp_path):
 
 
 def test_extract_video_poster_bad_input(tmp_path):
-    # Не-видео / отсутствующий файл → False, без исключений.
+    # Non-video / missing file → False, no exceptions.
     assert extract_video_poster_png(tmp_path / "nope.mp4", tmp_path / "o.png") is False
     bad = tmp_path / "bad.mp4"
     bad.write_bytes(b"not a video")
@@ -561,10 +561,10 @@ def test_video_poster_loads_from_disk_cache(tmp_path):
     entry = _entry("v.mp4", key="kvd")
     item = ExplorerFileItem(entry=entry, local_path="x", local_exists=True)
     model.set_items([item])
-    # Постер ещё не построен → шаг ничего не строит синхронно (ffmpeg в фоне).
+    # The poster isn't built yet → the step builds nothing synchronously (ffmpeg in the background).
     assert model.refresh_thumbnails_step(max_items=8) is False
     assert model.item_for_index(model.index(0, 0)).thumbnail is None
-    # Имитируем готовый постер из фона: set_thumbnail_from_path кладёт в кэш.
+    # Simulate a ready poster from the background: set_thumbnail_from_path puts it in the cache.
     png = _write_png(tmp_path / "frame.png")
     assert model.set_thumbnail_from_path("Photos", "kvd", png) is True
     assert any(cache.glob("*.png"))

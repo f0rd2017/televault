@@ -1,8 +1,8 @@
-"""Транскод/ремукс не-нативных форматов при стриминге.
+"""Transcode/remux of non-native formats during streaming.
 
-Чистое планирование (ffprobe JSON → план → аргументы ffmpeg) — без ffmpeg;
-сквозной тест (AVI → fragmented MP4 через реальный сокет) — со skip'ом,
-если ffmpeg/ffprobe недоступны.
+Pure planning (ffprobe JSON → plan → ffmpeg args) — no ffmpeg;
+an end-to-end test (AVI → fragmented MP4 via a real socket) — skipped
+if ffmpeg/ffprobe are unavailable.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ from app.db.database import connect_db
 from app.db.repo import DbRepo
 from app.tg.parser import build_caption
 
-# ── Планирование (чистое) ────────────────────────────────────────────────────
+# ── Planning (pure) ──────────────────────────────────────────────────────────
 
 
 def _probe(video: str | None, audio: str | None) -> dict:
@@ -85,7 +85,7 @@ def test_build_args_copy_vs_transcode() -> None:
     assert "-c:v" not in audio_only
 
 
-# ── Маршрутизация (dispatch, без сокетов) ────────────────────────────────────
+# ── Routing (dispatch, no sockets) ───────────────────────────────────────────
 
 
 def _caption(folder: str, key: str, idx: int, total: int, name: str) -> str:
@@ -140,7 +140,7 @@ def test_share_transcode_param_returns_transcode_response(tmp_path) -> None:
     result = dispatch(ctx, "GET", "/share/vid", {"transcode": ["1"]}, {}, b"")
     assert isinstance(result, TranscodeResponse)
     assert result.input_path == "/share/vid"
-    assert result.input_query == {}  # без пароля query пустой
+    assert result.input_query == {}  # without a password the query is empty
     assert result.filename == "movie.avi"
 
 
@@ -165,12 +165,12 @@ def test_media_transcode_param_carries_token(tmp_path) -> None:
     assert result.input_query["folder"] == "Vids"
 
 
-# ── Сквозной: AVI → fMP4 через реальный сокет ────────────────────────────────
+# ── End-to-end: AVI → fMP4 via a real socket ─────────────────────────────────
 
 
 class _SliceWorker:
-    """Отдаёт запрошенные части, нарезая готовый байтовый контент (как в
-    test_stream.FakeStreamWorker, но без учёта статистики)."""
+    """Serves the requested parts, slicing prepared byte content (like in
+    test_stream.FakeStreamWorker, but without tracking stats)."""
 
     def __init__(self, content: bytes, part_size: int) -> None:
         self.content = content
@@ -233,13 +233,13 @@ def test_real_http_transcode_avi_to_fmp4(tmp_path) -> None:
     try:
         host, port = server.address
 
-        # Нативная раздача остаётся как была: AVI-байты по Range.
+        # Native serving stays as before: AVI bytes over Range.
         with urllib.request.urlopen(
             f"http://{host}:{port}/share/vid", timeout=15
         ) as resp:
             assert resp.read() == avi
 
-        # Транскод: на выходе fragmented MP4 (ftyp в начале), не AVI.
+        # Transcode: the output is fragmented MP4 (ftyp at the start), not AVI.
         with urllib.request.urlopen(
             f"http://{host}:{port}/share/vid?transcode=1", timeout=60
         ) as resp:
@@ -247,7 +247,7 @@ def test_real_http_transcode_avi_to_fmp4(tmp_path) -> None:
             assert resp.headers["Content-Type"] == "video/mp4"
             body = resp.read()
         assert body[4:8] == b"ftyp"
-        assert b"moof" in body  # fragmented: есть фрагменты, играется с пайпа
+        assert b"moof" in body  # fragmented: has fragments, plays from a pipe
         assert not body.startswith(b"RIFF")
     finally:
         server.stop()

@@ -1,8 +1,8 @@
-"""Регрессия на сопоставление клиента по chat_id в TgScanner.
+"""Regression for matching a client by chat_id in TgScanner.
 
-Раньше использовался lstrip("100"), который жадно убирает любые ведущие
-символы '1'/'0', а не префикс "-100" супергрупп Telegram, из-за чего мог
-выбираться неправильный клиент/аккаунт.
+It used to use lstrip("100"), which greedily strips any leading
+'1'/'0' characters rather than the "-100" prefix of Telegram supergroups, so it could
+pick the wrong client/account.
 """
 
 from __future__ import annotations
@@ -24,13 +24,13 @@ def _make_config() -> AppConfig:
 
 def test_normalize_chat_id_strips_only_real_prefix() -> None:
     norm = TgScanner._normalize_chat_id_for_match
-    # Полный peer-формат супергруппы.
+    # Full supergroup peer format.
     assert norm("-1001234567890") == "1234567890"
-    # Обычный отрицательный id.
+    # A regular negative id.
     assert norm("-987654") == "987654"
-    # Голый id не калечится (lstrip съел бы ведущую '1').
+    # A bare id is not mangled (lstrip would eat the leading '1').
     assert norm("1234567890") == "1234567890"
-    # id, который начинается с '1'/'0' но без префикса, остаётся как есть.
+    # An id that starts with '1'/'0' but has no prefix stays as-is.
     assert norm("1023456") == "1023456"
 
 
@@ -39,14 +39,14 @@ def test_get_client_matches_peer_form_to_bare_id() -> None:
     bare_client = object()
     scanner = TgScanner(
         config,
-        repo=None,  # не используется при выборе клиента
+        repo=None,  # unused when selecting a client
         chats=[object()],
         chat_ids=["1234567890"],
         client_by_chat_id={"1234567890": bare_client},
     )
-    # Запрос в peer-форме должен найти клиента, зарегистрированного по голому id.
+    # A peer-form query must find the client registered by the bare id.
     assert scanner._get_client_for_chat("-1001234567890") is bare_client
-    # И точное совпадение по-прежнему работает.
+    # And the exact match still works.
     assert scanner._get_client_for_chat("1234567890") is bare_client
 
 
@@ -60,13 +60,13 @@ def test_get_client_falls_back_to_only_mapped_client() -> None:
         chat_ids=["111"],
         client_by_chat_id={"111": only},
     )
-    # Незнакомый chat_id без main-клиента отдаёт единственного в маппинге.
+    # An unknown chat_id with no main client returns the only one in the mapping.
     assert scanner._get_client_for_chat("999") is only
 
 
 def test_get_client_raises_without_any_client() -> None:
     config = _make_config()
-    # Мульти-канальный режим без клиентов: маппинг пуст, main-клиента нет.
+    # Multi-channel mode with no clients: the mapping is empty, no main client.
     scanner = TgScanner(
         config,
         repo=None,

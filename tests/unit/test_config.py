@@ -76,7 +76,7 @@ def test_load_app_config_valid(monkeypatch, tmp_path) -> None:
     assert cfg.lane_download_max == 2
     assert cfg.perf_telemetry_window_sec == 1.0
     assert cfg.tg_proxy is None
-    # download_dir не задан → download_root падает обратно на cache_dir.
+    # download_dir unset → download_root falls back to cache_dir.
     assert cfg.download_dir == ""
     assert cfg.download_root == cfg.cache_dir
 
@@ -98,7 +98,7 @@ def test_invalid_mtproxy_tg_proxy_rejected(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("TG_API_HASH", "a" * 32)
 
     payload = _base_public_config()
-    payload["tg_proxy"] = "mtproto://1.2.3.4:443"  # нет секрета
+    payload["tg_proxy"] = "mtproto://1.2.3.4:443"  # no secret
     path = _write_config(tmp_path, payload)
     with pytest.raises(ConfigError, match="tg_proxy"):
         load_app_config(config_path=path, dotenv_path=tmp_path / "missing.env")
@@ -116,14 +116,14 @@ def test_throttle_mbps_loaded_and_validated(monkeypatch, tmp_path) -> None:
     assert cfg.upload_throttle_mbps == 5.0
     assert cfg.download_throttle_mbps == 12.5
 
-    payload["download_throttle_mbps"] = -1.0  # вне диапазона
+    payload["download_throttle_mbps"] = -1.0  # out of range
     path = _write_config(tmp_path, payload)
     with pytest.raises(ConfigError, match="download_throttle_mbps"):
         load_app_config(config_path=path, dotenv_path=tmp_path / "missing.env")
 
 
 def test_api_creds_fallback_from_config(monkeypatch, tmp_path) -> None:
-    # env пуст → креды берутся из config.json (заполняются в GUI на новом ПК).
+    # env empty → credentials come from config.json (filled in the GUI on a new PC).
     monkeypatch.delenv("TG_API_ID", raising=False)
     monkeypatch.delenv("TG_API_HASH", raising=False)
 
@@ -135,14 +135,14 @@ def test_api_creds_fallback_from_config(monkeypatch, tmp_path) -> None:
     assert cfg.tg_api_id == 54321
     assert cfg.tg_api_hash == "b" * 32
 
-    # env задан → приоритет у env, config-значения игнорируются.
+    # env set → env wins, config values are ignored.
     monkeypatch.setenv("TG_API_ID", "12345")
     monkeypatch.setenv("TG_API_HASH", "a" * 32)
     cfg = load_app_config(config_path=path, dotenv_path=tmp_path / "missing.env")
     assert cfg.tg_api_id == 12345
     assert cfg.tg_api_hash == "a" * 32
 
-    # Нет ни env, ни config → ConfigError.
+    # Neither env nor config → ConfigError.
     monkeypatch.delenv("TG_API_ID")
     monkeypatch.delenv("TG_API_HASH")
     payload["tg_api_id"] = 0
@@ -156,7 +156,7 @@ def test_stream_cache_max_mb_loaded_and_validated(monkeypatch, tmp_path) -> None
     monkeypatch.setenv("TG_API_ID", "12345")
     monkeypatch.setenv("TG_API_HASH", "a" * 32)
 
-    # Не задан → дефолт 2048 МБ.
+    # Unset → default 2048 MB.
     payload = _base_public_config()
     path = _write_config(tmp_path, payload)
     cfg = load_app_config(config_path=path, dotenv_path=tmp_path / "missing.env")
@@ -167,7 +167,7 @@ def test_stream_cache_max_mb_loaded_and_validated(monkeypatch, tmp_path) -> None
     cfg = load_app_config(config_path=path, dotenv_path=tmp_path / "missing.env")
     assert cfg.stream_cache_max_mb == 512
 
-    payload["stream_cache_max_mb"] = -1  # вне диапазона
+    payload["stream_cache_max_mb"] = -1  # out of range
     path = _write_config(tmp_path, payload)
     with pytest.raises(ConfigError, match="stream_cache_max_mb"):
         load_app_config(config_path=path, dotenv_path=tmp_path / "missing.env")
@@ -202,11 +202,11 @@ def test_blank_download_dir_falls_back_to_cache(monkeypatch, tmp_path) -> None:
 
     payload = _base_public_config()
     payload["cache_dir"] = "./mycache"
-    payload["download_dir"] = "   "  # только пробелы → считаем пустым
+    payload["download_dir"] = "   "  # whitespace only → treated as empty
     path = _write_config(tmp_path, payload)
     cfg = load_app_config(config_path=path, dotenv_path=tmp_path / "missing.env")
-    # Относительные пути конфига резолвятся от app_base_dir (переносимость
-    # frozen-сборки), поэтому сравниваем резолвленные значения.
+    # Relative config paths resolve against app_base_dir (portability of
+    # frozen builds), so we compare the resolved values.
     from app.core.paths import resolve_app_path
 
     assert cfg.download_root == cfg.cache_dir

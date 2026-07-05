@@ -22,15 +22,15 @@ def _overlay() -> StartupLoadingOverlay:
 
 def test_loading_hides_action_buttons():
     ov = _overlay()
-    ov.show_loading("Подключение…")
-    assert ov._status.text() == "Подключение…"
+    ov.show_loading("Connecting…")
+    assert ov._status.text() == "Connecting…"
     assert ov._buttons.isHidden()
 
 
 def test_error_state_shows_buttons_and_message():
     ov = _overlay()
-    ov.show_error("нет аккаунтов")
-    assert "нет аккаунтов" in ov._status.text()
+    ov.show_error("no accounts")
+    assert "no accounts" in ov._status.text()
     assert not ov._buttons.isHidden()
 
 

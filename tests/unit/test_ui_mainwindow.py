@@ -361,10 +361,10 @@ def _parse_mbps(status: str) -> float | None:
 
 
 def test_eta_speed_is_stable_under_bursty_events(tmp_path, monkeypatch) -> None:
-    """Скорость скачивания приходит рваными кусками (часть «падает» целиком за
-    один опрос, между кусками тики без прогресса). Оконный оценщик должен
-    держать показанную скорость у истинной, а не проваливаться к 0 между
-    кусками и не взлетать на их приходе."""
+    """Download speed arrives in ragged bursts (a part "lands" whole in
+    one poll, with no-progress ticks between bursts). The windowed estimator must
+    keep the displayed speed near the true one, not drop to 0 between
+    bursts, and not spike when they arrive."""
     window = _build_window(tmp_path, monkeypatch)
     try:
         clock = {"t": 1000.0}
@@ -374,9 +374,9 @@ def test_eta_speed_is_stable_under_bursty_events(tmp_path, monkeypatch) -> None:
 
         mb = 1024 * 1024
         total = 200.0 * mb
-        rate = 5.0 * mb  # истинная скорость 5 MB/s
+        rate = 5.0 * mb  # true rate 5 MB/s
         state = {"done": 0.0}
-        # Притворяемся, что идёт активная download-джоба (для метки активности).
+        # Pretend an active download job is running (for the activity mark).
         window._active_jobs = {601}
         window._job_type_by_id = {601: "download"}
         monkeypatch.setattr(
@@ -385,8 +385,8 @@ def test_eta_speed_is_stable_under_bursty_events(tmp_path, monkeypatch) -> None:
             lambda: (state["done"], total),
         )
 
-        # Неравномерные интервалы между событиями; прогресс «выдаётся» только на
-        # части тиков (куски), иначе done не меняется.
+        # Uneven intervals between events; progress is "emitted" only on
+        # some of the ticks (bursts), otherwise done doesn't change.
         gaps = [0.05, 0.05, 0.7, 0.05, 0.9, 0.1, 0.05, 1.1, 0.3, 0.05, 0.8, 0.05]
         deliver = [1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0]
         gaps = gaps * 4
@@ -397,20 +397,20 @@ def test_eta_speed_is_stable_under_bursty_events(tmp_path, monkeypatch) -> None:
         for gap, give in zip(gaps, deliver):
             clock["t"] += gap
             if give:
-                # done выходит на истинную линию rate*elapsed (кусок целиком).
+                # done reaches the true rate*elapsed line (a whole burst).
                 state["done"] = min(total, rate * (clock["t"] - t_start))
             status = window._build_global_progress_status()
             elapsed = clock["t"] - t_start
             mbps = _parse_mbps(status or "")
-            # Собираем только после прогрева окна (>= _ETA_WINDOW_SEC).
+            # Collect only after the window warms up (>= _ETA_WINDOW_SEC).
             if elapsed >= window._ETA_WINDOW_SEC and mbps is not None:
                 speeds.append(mbps)
 
         assert len(speeds) >= 5
-        # Все цифры в разумном коридоре вокруг истинных 5 MB/s (старый per-call
-        # EMA проваливался к ~0 на тиках без прогресса).
+        # All numbers in a reasonable band around the true 5 MB/s (the old per-call
+        # EMA dropped to ~0 on no-progress ticks).
         assert all(3.0 <= s <= 7.0 for s in speeds), speeds
-        # Соседние показания не скачут резко.
+        # Adjacent readings don't jump sharply.
         max_jump = max(abs(b - a) for a, b in zip(speeds, speeds[1:]))
         assert max_jump < 1.5, (max_jump, speeds)
     finally:
@@ -418,15 +418,15 @@ def test_eta_speed_is_stable_under_bursty_events(tmp_path, monkeypatch) -> None:
 
 
 def test_startup_overlay_waits_for_initial_load(tmp_path, monkeypatch) -> None:
-    """Стартовый экран загрузки должен прятаться не сразу при подключении к
-    Telegram, а после завершения первичной сверки (джобы с _ui_initial_load)."""
+    """The startup loading screen must not hide immediately on connecting to
+    Telegram, but after the initial reconcile finishes (jobs with _ui_initial_load)."""
     window = _build_window(tmp_path, monkeypatch)
     try:
-        # Подключились к Telegram — оверлей НЕ должен прятаться немедленно.
+        # Connected to Telegram — the overlay must NOT hide immediately.
         window._on_worker_ready()
         assert window._startup_overlay_done is False
 
-        # Не-стартовая джоба завершилась — оверлей всё ещё держится.
+        # A non-startup job finished — the overlay is still held.
         window._on_job_event(
             JobEvent(
                 job_id=10,
@@ -438,7 +438,7 @@ def test_startup_overlay_waits_for_initial_load(tmp_path, monkeypatch) -> None:
         )
         assert window._startup_overlay_done is False
 
-        # Первичная сверка завершилась — теперь экран загрузки прячется.
+        # The initial reconcile finished — now the loading screen hides.
         window._on_job_event(
             JobEvent(
                 job_id=11,
@@ -454,12 +454,12 @@ def test_startup_overlay_waits_for_initial_load(tmp_path, monkeypatch) -> None:
 
 
 def test_startup_overlay_finishes_on_initial_load_error(tmp_path, monkeypatch) -> None:
-    """Даже если первичная сверка упала с ошибкой — экран загрузки прячется
-    (подключение есть, не оставляем пользователя на сплэше)."""
+    """Even if the initial reconcile failed with an error — the loading screen hides
+    (there is a connection, we don't leave the user on the splash)."""
     window = _build_window(tmp_path, monkeypatch)
     try:
-        # Гасим модальный диалог ошибки: иначе его QTimer выстрелит позже и
-        # заблокирует event loop полного прогона на QMessageBox.critical.
+        # Suppress the modal error dialog: otherwise its QTimer fires later and
+        # blocks the full-run event loop on QMessageBox.critical.
         monkeypatch.setattr(window, "_queue_error_dialog", lambda *a, **k: None)
         window._on_worker_ready()
         assert window._startup_overlay_done is False
@@ -492,8 +492,8 @@ def _img_object_entry(name="pic.png", key="imgk"):
 
 
 def test_thumbnail_fetch_enqueue_and_ready(tmp_path, monkeypatch) -> None:
-    """Нескачанная картинка ставится в фоновую дозагрузку; по готовности
-    миниатюра проставляется, временный файл удаляется, inflight очищается."""
+    """A not-downloaded image is queued for a background fetch; when ready
+    the thumbnail is set, the temp file is removed, inflight is cleared."""
     from PySide6.QtGui import QColor, QImage
 
     window = _build_window(tmp_path, monkeypatch)
@@ -503,21 +503,21 @@ def test_thumbnail_fetch_enqueue_and_ready(tmp_path, monkeypatch) -> None:
         )
         window.explorer_model.set_items([item])
 
-        # Очередь дозагрузки: воркер получил запрос на нашу картинку.
+        # Fetch queue: the worker received a request for our image.
         window._enqueue_thumbnail_fetches()
         assert window.worker.thumbnail_fetches == [
             ("Photos", "imgk", window._thumb_fetch_dir)
         ]
         assert ("Photos", "imgk") in window._thumb_fetch_inflight
 
-        # Готовим «скачанный» временный файл и эмитим готовность.
+        # Prepare a "downloaded" temp file and emit readiness.
         temp = tmp_path / "tmp_pic.png"
         img = QImage(40, 30, QImage.Format.Format_RGB32)
         img.fill(QColor("#22aa55"))
         img.save(str(temp), "PNG")
         window.worker.thumbnail_ready.emit("Photos", "imgk", str(temp))
 
-        # Миниатюра проставлена, временный файл удалён, inflight пуст.
+        # The thumbnail is set, the temp file is removed, inflight is empty.
         applied = window.explorer_model.item_for_index(
             window.explorer_model.index(0, 0)
         )
@@ -541,7 +541,7 @@ def test_thumbnail_fetch_failed_not_retried(tmp_path, monkeypatch) -> None:
         window.worker.thumbnail_failed.emit("Photos", "bad")
         assert ("Photos", "bad") in window._thumb_fetch_failed
 
-        # Повторная попытка не дёргает воркер снова.
+        # A retry doesn't poke the worker again.
         window._enqueue_thumbnail_fetches()
         assert len(window.worker.thumbnail_fetches) == 1
     finally:
@@ -549,9 +549,9 @@ def test_thumbnail_fetch_failed_not_retried(tmp_path, monkeypatch) -> None:
 
 
 def test_video_poster_enqueue_and_ready(tmp_path, monkeypatch) -> None:
-    """Скачанное видео ставится в фоновое построение постера через ffmpeg;
-    по готовности постер проставляется как миниатюра, inflight очищается.
-    Нескачанное видео в очередь НЕ попадает."""
+    """A downloaded video is queued for background poster building via ffmpeg;
+    when ready the poster is set as the thumbnail, inflight is cleared.
+    A not-downloaded video does NOT enter the queue."""
     from PySide6.QtGui import QColor, QImage
 
     window = _build_window(tmp_path, monkeypatch)
@@ -571,13 +571,13 @@ def test_video_poster_enqueue_and_ready(tmp_path, monkeypatch) -> None:
         window.explorer_model.set_items([local, remote])
 
         window._enqueue_video_posters()
-        # Только скачанное видео ушло в построение.
+        # Only the downloaded video went to building.
         assert window.worker.video_poster_builds == [
             ("Photos", "vidk", str(vid), window._thumb_fetch_dir)
         ]
         assert ("Photos", "vidk") in window._thumb_fetch_inflight
 
-        # Имитируем готовый кадр-постер из фона.
+        # Simulate a ready poster frame from the background.
         poster = tmp_path / "vp_vidk.png"
         img = QImage(48, 36, QImage.Format.Format_RGB32)
         img.fill(QColor("#aa3322"))
@@ -595,8 +595,8 @@ def test_video_poster_enqueue_and_ready(tmp_path, monkeypatch) -> None:
 
 
 def test_trash_move_view_and_restore(tmp_path, monkeypatch) -> None:
-    """В корзину → файл скрывается из папки и виден в режиме корзины →
-    восстановление возвращает его в папку."""
+    """To trash → the file is hidden from the folder and visible in trash mode →
+    restore returns it to the folder."""
     window = _build_window(tmp_path, monkeypatch)
     try:
         repo = window.repo
@@ -633,24 +633,24 @@ def test_trash_move_view_and_restore(tmp_path, monkeypatch) -> None:
 
         assert _file_keys() == {"k1"}
 
-        # Выделяем и кладём в корзину.
+        # Select and move to trash.
         window.explorer_view.setCurrentIndex(window.explorer_model.index(0, 0))
         window._on_move_to_trash()
-        assert _file_keys() == set()  # исчез из папки
+        assert _file_keys() == set()  # gone from the folder
         assert repo.count_trash() == 1
 
-        # Включаем режим корзины — файл там.
+        # Enable trash mode — the file is there.
         window.trash_btn.setChecked(True)
         assert window._trash_view is True
         assert _file_keys() == {"k1"}
 
-        # Восстанавливаем из корзины.
+        # Restore from trash.
         window.explorer_view.setCurrentIndex(window.explorer_model.index(0, 0))
         window._on_restore_from_trash()
         assert repo.count_trash() == 0
-        assert _file_keys() == set()  # корзина теперь пуста
+        assert _file_keys() == set()  # trash is now empty
 
-        # Возврат в обычный режим — файл снова в папке.
+        # Back to normal mode — the file is in the folder again.
         window.trash_btn.setChecked(False)
         assert window._trash_view is False
         assert _file_keys() == {"k1"}
@@ -659,8 +659,8 @@ def test_trash_move_view_and_restore(tmp_path, monkeypatch) -> None:
 
 
 def test_recursive_search_toggle(tmp_path, monkeypatch) -> None:
-    """«Везде» + запрос → поиск по всему поддереву (файлы из вложенных папок);
-    выключено → только текущая папка."""
+    """'Everywhere' + a query → search the whole subtree (files from nested folders);
+    off → only the current folder."""
     window = _build_window(tmp_path, monkeypatch)
     try:
         repo = window.repo
@@ -686,7 +686,7 @@ def test_recursive_search_toggle(tmp_path, monkeypatch) -> None:
         window.current_folder = "A"
         window.search_edit.setText("report")
 
-        # «Везде» выключено → только файл из текущей папки A.
+        # 'Everywhere' off → only the file from the current folder A.
         window.search_everywhere_btn.setChecked(False)
         window.reload_items()
         keys_local = {
@@ -701,7 +701,7 @@ def test_recursive_search_toggle(tmp_path, monkeypatch) -> None:
         }
         assert keys_local == {"ka"}
 
-        # «Везде» включено → файлы из A и A/B.
+        # 'Everywhere' on → files from A and A/B.
         window.search_everywhere_btn.setChecked(True)
         window.reload_items()
         keys_rec = {
@@ -1446,8 +1446,8 @@ def test_folder_download_groups_batch_members_by_blob(tmp_path, monkeypatch) -> 
 
 
 def test_mass_download_asks_confirmation(tmp_path, monkeypatch) -> None:
-    """Тысячи джоб (папка из тысяч обычных файлов) — спрашиваем подтверждение;
-    отказ не ставит ни одной джобы. Тихий автосинк не спрашивает."""
+    """Thousands of jobs (a folder of thousands of regular files) — we ask for confirmation;
+    declining enqueues no jobs. A silent auto-sync does not ask."""
     QApplication.instance() or QApplication([])
     window = _build_window(tmp_path, monkeypatch)
     try:
@@ -1484,7 +1484,7 @@ def test_mass_download_asks_confirmation(tmp_path, monkeypatch) -> None:
             transfer_ops_mod.QMessageBox, "question", staticmethod(_fake_question)
         )
 
-        # Отказ → 0 джоб.
+        # Decline → 0 jobs.
         job_count = window._enqueue_download_group(
             many, fast=False, allow_incomplete=False
         )
@@ -1492,15 +1492,15 @@ def test_mass_download_asks_confirmation(tmp_path, monkeypatch) -> None:
         assert captured == []
         assert len(questions) == 1
 
-        # confirm=False (тихий автосинк) → без вопроса, всё в очереди.
+        # confirm=False (silent auto-sync) → no prompt, everything queued.
         job_count = window._enqueue_download_group(
             many, fast=False, allow_incomplete=False, confirm=False
         )
         assert job_count == len(many)
         assert len(captured) == len(many)
-        assert len(questions) == 1  # вопрос не задавался повторно
+        assert len(questions) == 1  # the question wasn't asked again
 
-        # Согласие → джобы ставятся.
+        # Consent → jobs are enqueued.
         captured.clear()
         monkeypatch.setattr(
             transfer_ops_mod.QMessageBox,

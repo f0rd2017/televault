@@ -81,7 +81,7 @@ def _call(ctx, method, path, *, query=None, headers=None, body=None):
     return dispatch(ctx, method, path, q, headers or {}, raw)
 
 
-# ── Авторизация ──────────────────────────────────────────────────────────────
+# ── Authorization ────────────────────────────────────────────────────────────
 
 
 def test_health_is_public():
@@ -126,7 +126,7 @@ def test_no_token_disables_auth():
     assert status == 200
 
 
-# ── Чтение ───────────────────────────────────────────────────────────────────
+# ── Read ─────────────────────────────────────────────────────────────────────
 
 
 def test_folders():
@@ -169,7 +169,7 @@ def test_unknown_endpoint_and_method():
     assert _call(ctx, "PUT", "/api/folders")[0] == 405
 
 
-# ── Запись ───────────────────────────────────────────────────────────────────
+# ── Write ────────────────────────────────────────────────────────────────────
 
 
 def test_upload_validates_and_submits(tmp_path):
@@ -177,9 +177,9 @@ def test_upload_validates_and_submits(tmp_path):
     f.write_text("x", encoding="utf-8")
     ctx, _, worker = _ctx()
 
-    # Пустой список → 400.
+    # Empty list → 400.
     assert _call(ctx, "POST", "/api/upload", body={"paths": []})[0] == 400
-    # Несуществующий файл → 400.
+    # Nonexistent file → 400.
     assert _call(ctx, "POST", "/api/upload", body={"paths": ["/no/such"]})[0] == 400
 
     status, payload = _call(
@@ -228,7 +228,7 @@ def test_bad_json_body_returns_400():
     assert status == 400
 
 
-# ── Сквозной HTTP (реальный сокет) ───────────────────────────────────────────
+# ── End-to-end HTTP (real socket) ────────────────────────────────────────────
 
 
 def test_real_http_roundtrip():
@@ -243,17 +243,17 @@ def test_real_http_roundtrip():
         host, port = server.address
         base = f"http://{host}:{port}"
 
-        # health без токена
+        # health without a token
         with urllib.request.urlopen(f"{base}/api/health", timeout=5) as resp:
             assert resp.status == 200
             assert json.loads(resp.read())["status"] == "ok"
 
-        # без токена на защищённый эндпоинт → 401
+        # no token on a protected endpoint → 401
         with pytest.raises(urllib.error.HTTPError) as exc:
             urllib.request.urlopen(f"{base}/api/folders", timeout=5)
         assert exc.value.code == 401
 
-        # с токеном → 200 + данные
+        # with a token → 200 + data
         req = urllib.request.Request(
             f"{base}/api/folders", headers={"Authorization": "Bearer tok"}
         )

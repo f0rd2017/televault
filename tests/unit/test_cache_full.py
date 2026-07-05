@@ -96,16 +96,16 @@ def test_cache_lru_eviction(tmp_path: Path) -> None:
 
 
 def test_cache_lru_keeps_recently_written_file(tmp_path: Path) -> None:
-    # На relatime atime не обновляется при повторных чтениях — файл, который
-    # прямо сейчас дописывается (свежий mtime при старом atime, растущий префикс
-    # стрима), не должен вытесняться раньше действительно старого.
+    # On relatime, atime is not updated on repeated reads — a file that
+    # is being appended right now (fresh mtime with an old atime, a growing prefix
+    # stream), it must not be evicted before something genuinely older.
     now = time.time()
     growing = tmp_path / "growing.bin"
     growing.write_bytes(b"y" * 500)
-    os.utime(growing, (now - 1000, now))  # atime старый, mtime свежий
+    os.utime(growing, (now - 1000, now))  # old atime, fresh mtime
     stale = tmp_path / "stale.bin"
     stale.write_bytes(b"y" * 500)
-    os.utime(stale, (now - 500, now - 500))  # atime новее, но всё старое
+    os.utime(stale, (now - 500, now - 500))  # newer atime, but all old
     r = CacheManager().cleanup(tmp_path, 600)
     assert r["deleted_files"] == 1
     assert growing.exists()

@@ -23,7 +23,7 @@ from app.db.repo import DbRepo
 CONTENT = b"hello-share-content-0123456789-abcdefghij"
 
 
-# ── Хелперы шеринга (чистые) ─────────────────────────────────────────────────
+# ── Sharing helpers (pure) ───────────────────────────────────────────────────
 
 
 def test_token_is_random_and_urlsafe():
@@ -71,7 +71,7 @@ def test_repo_share_crud(tmp_path):
     assert repo.get_share("tok1") is None
 
 
-# ── Worker-заглушка + контекст ───────────────────────────────────────────────
+# ── Worker stub + context ────────────────────────────────────────────────────
 
 
 class FakeWorker:
@@ -95,7 +95,7 @@ def _ctx(tmp_path, *, token: str = "", worker: FakeWorker | None = None):
     worker = worker or FakeWorker()
     config = SimpleNamespace(
         cache_dir=str(tmp_path / "cache"),
-        download_root=str(tmp_path / "dl"),  # пусто → форсирует сборку через worker
+        download_root=str(tmp_path / "dl"),  # empty → forces assembly via the worker
         api=ApiConfig(enabled=True, host="127.0.0.1", port=20451, token=token),
     )
     ctx = ApiContext(
@@ -114,7 +114,7 @@ def _call(ctx, method, path, *, query=None, headers=None, body=None):
     return dispatch(ctx, method, path, q, headers or {}, raw)
 
 
-# ── Управление шарами через dispatch ────────────────────────────────────────
+# ── Share management via dispatch ────────────────────────────────────────────
 
 
 def test_create_list_revoke_delete_share(tmp_path):
@@ -131,7 +131,7 @@ def test_create_list_revoke_delete_share(tmp_path):
 
     status, payload = _call(ctx, "GET", "/api/shares")
     assert status == 200 and len(payload["shares"]) == 1
-    assert "password_hash" not in payload["shares"][0]  # секрет не утекает
+    assert "password_hash" not in payload["shares"][0]  # the secret does not leak
 
     status, _ = _call(ctx, "POST", f"/api/shares/{token}/revoke")
     assert status == 200 and repo.get_share(token)["revoked"] is True
@@ -147,7 +147,7 @@ def test_create_share_requires_fields(tmp_path):
     assert _call(ctx, "POST", "/api/shares", body={"folder": "Docs"})[0] == 400
 
 
-# ── Раздача: проверки токена/срока/пароля ───────────────────────────────────
+# ── Serving: token/expiry/password checks ────────────────────────────────────
 
 
 def test_serve_unknown_revoked_expired(tmp_path):
@@ -167,11 +167,11 @@ def test_serve_password_protected(tmp_path):
     repo.create_share(
         "pw", "Docs", "k1", "a.bin", password_hash=hash_share_password("open")
     )
-    # без пароля → 401
+    # without a password → 401
     assert _call(ctx, "GET", "/share/pw")[0] == 401
-    # неверный → 401
+    # wrong → 401
     assert _call(ctx, "GET", "/share/pw", query={"pw": "bad"})[0] == 401
-    # верный → FileResponse
+    # correct → FileResponse
     result = _call(ctx, "GET", "/share/pw", query={"pw": "open"})
     assert isinstance(result, FileResponse)
     assert Path(result.path).read_bytes() == CONTENT
@@ -183,13 +183,13 @@ def test_serve_assembles_and_counts(tmp_path):
     result = _call(ctx, "GET", "/share/ok")
     assert isinstance(result, FileResponse)
     assert result.content_type == "video/mp4"
-    assert worker.calls  # сборка была вызвана (локально файла нет)
+    assert worker.calls  # assembly was invoked (no local file)
     assert repo.get_share("ok")["download_count"] == 1
 
 
 def test_serve_prefers_local_file(tmp_path):
     ctx, repo, worker = _ctx(tmp_path)
-    # Кладём «уже скачанный» файл в download_root → worker не должен вызываться.
+    # Put an 'already downloaded' file in download_root → the worker must not be called.
     local = Path(ctx.config.download_root) / "Docs" / "doc.bin"
     local.parent.mkdir(parents=True, exist_ok=True)
     local.write_bytes(b"local-bytes")
@@ -197,10 +197,10 @@ def test_serve_prefers_local_file(tmp_path):
     result = _call(ctx, "GET", "/share/loc")
     assert isinstance(result, FileResponse)
     assert Path(result.path) == local
-    assert worker.calls == []  # локальный файл — без пересборки
+    assert worker.calls == []  # local file — no reassembly
 
 
-# ── Сквозной HTTP с Range (реальный сокет) ──────────────────────────────────
+# ── End-to-end HTTP with Range (real socket) ─────────────────────────────────
 
 
 def test_real_http_share_download_and_range(tmp_path):
@@ -218,13 +218,13 @@ def test_real_http_share_download_and_range(tmp_path):
         base = f"http://{host}:{port}"
         repo.create_share("pub", "Docs", "k1", "data.bin")
 
-        # Публичная раздача без API-токена.
+        # Public serving without an API token.
         with urllib.request.urlopen(f"{base}/share/pub", timeout=5) as resp:
             assert resp.status == 200
             assert resp.read() == CONTENT
             assert resp.headers.get("Accept-Ranges") == "bytes"
 
-        # Range-запрос → 206 + срез.
+        # Range request → 206 + slice.
         req = urllib.request.Request(
             f"{base}/share/pub", headers={"Range": "bytes=0-4"}
         )
@@ -233,13 +233,13 @@ def test_real_http_share_download_and_range(tmp_path):
             assert resp.read() == CONTENT[:5]
             assert resp.headers.get("Content-Range") == f"bytes 0-4/{len(CONTENT)}"
 
-        # download_count увеличился (2 успешные раздачи).
+        # download_count increased (2 successful serves).
         assert repo.get_share("pub")["download_count"] == 2
     finally:
         server.stop()
 
 
-# ── UI-диалог ────────────────────────────────────────────────────────────────
+# ── UI dialog ────────────────────────────────────────────────────────────────
 
 
 def test_share_link_dialog_creates_share(tmp_path):
@@ -265,7 +265,7 @@ def test_share_link_dialog_creates_share(tmp_path):
     )
     dlg = ShareLinkDialog(entry=entry, repo=repo, config=config)
     dlg._password_edit.setText("pw")
-    dlg._expiry_combo.setCurrentIndex(2)  # 1 день
+    dlg._expiry_combo.setCurrentIndex(2)  # 1 day
     dlg._on_create()
 
     url = dlg._url_edit.text()

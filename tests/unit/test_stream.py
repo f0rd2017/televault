@@ -1,8 +1,8 @@
-"""Тесты поблочного стрима без полного скачивания (инкремент 9/10).
+"""Tests for block-wise streaming without a full download (increment 9/10).
 
-Чистая логика раскладки/нарезки (без сети) + сквозной HTTP-стрим через реальный
-сокет с фейковым воркером, который «скачивает» расшифрованные части на диск —
-проверяем, что по Range качаются ТОЛЬКО нужные части.
+Pure layout/slicing logic (no network) + an end-to-end HTTP stream over a real
+socket with a fake worker that "downloads" decrypted parts to disk —
+we check that a Range request fetches ONLY the needed parts.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from app.db.repo import DbRepo
 from app.tg.parser import build_caption
 
 
-# ── Хелперы построения частей ────────────────────────────────────────────────
+# ── Part-building helpers ────────────────────────────────────────────────────
 
 
 def _caption(
@@ -72,7 +72,7 @@ def _part(
     )
 
 
-# ── Раскладка (чистая) ───────────────────────────────────────────────────────
+# ── Layout (pure) ────────────────────────────────────────────────────────────
 
 
 def test_layout_plaintext_offsets_unencrypted():
@@ -92,7 +92,7 @@ def test_layout_plaintext_offsets_unencrypted():
 
 
 def test_layout_encrypted_subtracts_gcm_overhead():
-    # Зашифрованные части хранят на GCM_OVERHEAD байт больше plaintext.
+    # Encrypted parts store GCM_OVERHEAD bytes more than the plaintext.
     parts = [
         _part("F", "k", 0, 2, "a.bin", 100 + GCM_OVERHEAD, enc=True),
         _part("F", "k", 1, 2, "a.bin", 40 + GCM_OVERHEAD, enc=True),
@@ -112,7 +112,7 @@ def test_layout_rejects_incomplete():
 
 def test_layout_rejects_non_contiguous():
     parts = [_part("F", "k", 0, 2, "a.bin", 10), _part("F", "k", 2, 2, "a.bin", 10)]
-    # parts_total=2, two parts, но индексы 0 и 2 — несвязно.
+    # parts_total=2, two parts, but indices 0 and 2 — non-contiguous.
     parts[1] = _part("F", "k", 2, 3, "a.bin", 10)
     with pytest.raises(LayoutError):
         build_layout(parts, caption_prefix="FC1|")
@@ -148,11 +148,11 @@ def test_select_parts_by_range():
     assert [p.part_index for p in layout.select_parts(150, 150)] == [1]
     assert [p.part_index for p in layout.select_parts(99, 100)] == [0, 1]
     assert [p.part_index for p in layout.select_parts(250, 299)] == [2]
-    # точная граница: байт 100 принадлежит части 1, не 0
+    # exact boundary: byte 100 belongs to part 1, not 0
     assert [p.part_index for p in layout.select_parts(100, 199)] == [1]
 
 
-# ── Нарезка байтов из расшифрованных part-файлов ─────────────────────────────
+# ── Slicing bytes out of decrypted part files ────────────────────────────────
 
 
 def _write_parts(tmp_path: Path, blobs: list[bytes]) -> dict[int, str]:
@@ -165,7 +165,7 @@ def _write_parts(tmp_path: Path, blobs: list[bytes]) -> dict[int, str]:
 
 
 def test_iter_range_bytes_full_and_subrange(tmp_path):
-    blobs = [b"AAAAA", b"BBBBB", b"CCCCC"]  # 15 байт всего
+    blobs = [b"AAAAA", b"BBBBB", b"CCCCC"]  # 15 bytes total
     parts = [_part("F", "k", i, 3, "a.bin", 5) for i in range(3)]
     layout = build_layout(parts, caption_prefix="FC1|")
     paths = _write_parts(tmp_path, blobs)
@@ -173,11 +173,11 @@ def test_iter_range_bytes_full_and_subrange(tmp_path):
     full = b"".join(iter_range_bytes(layout, paths, 0, 14))
     assert full == b"AAAAABBBBBCCCCC"
 
-    # подрэндж, пересекающий 3 части: байты 3..11 → "AABBBBBCC"
+    # a subrange spanning 3 parts: bytes 3..11 → "AABBBBBCC"
     mid = b"".join(iter_range_bytes(layout, paths, 3, 11))
     assert mid == b"AABBBBBCC"
 
-    # внутри одной части
+    # within a single part
     one = b"".join(iter_range_bytes(layout, paths, 6, 8))
     assert one == b"BBB"
 
@@ -185,22 +185,22 @@ def test_iter_range_bytes_full_and_subrange(tmp_path):
 def test_iter_range_bytes_missing_part_raises(tmp_path):
     parts = [_part("F", "k", i, 2, "a.bin", 5) for i in range(2)]
     layout = build_layout(parts, caption_prefix="FC1|")
-    paths = {0: str(_write_parts(tmp_path, [b"AAAAA"])[0])}  # части 1 нет
+    paths = {0: str(_write_parts(tmp_path, [b"AAAAA"])[0])}  # part 1 missing
     with pytest.raises(FileNotFoundError):
         list(iter_range_bytes(layout, paths, 0, 9))
 
 
-# ── Сквозной HTTP-стрим (реальный сокет, фейковый воркер) ────────────────────
+# ── End-to-end HTTP stream (real socket, fake worker) ────────────────────────
 
 
-CONTENT = b"".join(bytes([65 + i]) * 64 for i in range(6))  # 6 частей по 64 байта
+CONTENT = b"".join(bytes([65 + i]) * 64 for i in range(6))  # 6 parts of 64 bytes each
 
 
 class FakeStreamWorker:
-    """«Скачивает» только запрошенные части, кладёт их plaintext на диск.
+    """'Downloads' only the requested parts, writes their plaintext to disk.
 
-    Считает, сколько РАЗ каждую часть скачали с нуля — проверяем, что по узкому
-    Range качаются не все части."""
+    Counts how many TIMES each part was downloaded from scratch — we check that a narrow
+    Range does not fetch all parts."""
 
     def __init__(self, content: bytes, part_size: int) -> None:
         self.content = content
@@ -225,7 +225,7 @@ class FakeStreamWorker:
         out: dict[int, str] = {}
         for idx in part_indices:
             p = cache / f"part_{int(idx):08d}.bin"
-            if not p.exists():  # переиспользуем кэш между запросами
+            if not p.exists():  # reuse the cache between requests
                 lo = int(idx) * self.part_size
                 p.write_bytes(self.content[lo : lo + self.part_size])
             out[int(idx)] = str(p)
@@ -278,33 +278,33 @@ def test_real_http_stream_range_fetches_only_needed_parts(tmp_path):
         api=ApiConfig(enabled=True, host="127.0.0.1", port=0, token=""),
     )
     server = ApiServer(config=config, repo=repo, worker=worker)
-    # Подменяем контекст на наш (со stream-полями).
+    # Swap in our context (with stream fields).
     server._ctx = ctx  # noqa: SLF001
     assert server.start()
     try:
         host, port = server.address
         base = f"http://{host}:{port}/share/vid"
 
-        # Узкий Range внутри части 2 (байты 130..140) → качается ТОЛЬКО часть 2.
+        # A narrow Range inside part 2 (bytes 130..140) → ONLY part 2 is fetched.
         req = urllib.request.Request(base, headers={"Range": "bytes=130-140"})
         with urllib.request.urlopen(req, timeout=10) as resp:
             assert resp.status == 206
             assert resp.headers["Content-Range"] == f"bytes 130-140/{len(CONTENT)}"
             body = resp.read()
         assert body == CONTENT[130:141]
-        # Для отдачи Range синхронно качается ТОЛЬКО часть 2.
+        # To serve the Range, ONLY part 2 is fetched synchronously.
         assert worker.fetch_log[0] == [2]
-        # prefix_bytes просит у части 2 только байты до конца запрошенного Range
-        # (130..140 → внутри части 2 это 2..12 → нужно 13 байт от начала части),
-        # а не всю часть целиком — так плеер не ждёт скачивания огромной части.
+        # prefix_bytes asks part 2 for only the bytes up to the end of the requested Range
+        # (130..140 → inside part 2 that is 2..12 → 13 bytes from the part start are needed),
+        # not the whole part — so the player doesn't wait for a huge part to download.
         assert worker.prefix_log[0] == {2: 13}
-        # Упреждающая подкачка в фоне греет следующую часть (3) к приходу плеера.
+        # Background prefetch warms the next part (3) for when the player arrives.
         deadline = time.monotonic() + 5.0
         while [3] not in worker.fetch_log and time.monotonic() < deadline:
             time.sleep(0.02)
         assert [3] in worker.fetch_log
 
-        # Полный запрос → все части, корректная склейка.
+        # A full request → all parts, correct assembly.
         with urllib.request.urlopen(base, timeout=10) as resp:
             assert resp.status == 200
             assert resp.read() == CONTENT
@@ -314,7 +314,7 @@ def test_real_http_stream_range_fetches_only_needed_parts(tmp_path):
 
 
 def test_stream_falls_back_to_full_when_no_parts(tmp_path):
-    # Объект без частей в БД → build_layout падает → отдаём через полную сборку.
+    # An object with no parts in the DB → build_layout fails → serve via full assembly.
     repo = DbRepo(connect_db(tmp_path / "idx.sqlite3"))
     repo.create_share("np", "Docs", "nokey", "x.bin", total_size=5)
 

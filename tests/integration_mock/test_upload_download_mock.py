@@ -237,11 +237,11 @@ async def test_upload_then_download(tmp_path) -> None:
 
 @pytest.mark.asyncio
 async def test_fetch_parts_decrypted_downloads_parts_concurrently(tmp_path) -> None:
-    """Стрим-плеер ждёт, пока все части окна не окажутся на диске — если бы
-    fetch_parts_decrypted качало части одну за другой, это напрямую било бы по
-    задержке первого кадра. Проверяем, что несколько частей реально качаются
-    ОДНОВРЕМЕННО (а не последовательно), результат корректен, а повторный запрос
-    переиспользует уже скачанные части."""
+    """The stream player waits until all window parts are on disk — if
+    fetch_parts_decrypted fetched parts one by one, that would directly hurt
+    the time to first frame. We check that several parts are actually fetched
+    CONCURRENTLY (not sequentially), the result is correct, and a repeat request
+    reuses the already-downloaded parts."""
 
     class ConcurrencyTrackingClient(FakeClient):
         def __init__(self, *args, delay: float = 0.03, **kwargs):
@@ -296,9 +296,9 @@ async def test_fetch_parts_decrypted_downloads_parts_concurrently(tmp_path) -> N
     repo = DbRepo(db)
     client = ConcurrencyTrackingClient(delay=0.03)
 
-    # Каждая часть — отдельное "отправленное" сообщение (как реальные чанки в
-    # Telegram); chunked_upload тут не годится — с одним аккаунтом в пуле он не
-    # делит маленький файл на несколько частей (см. base_logical_parts).
+    # Each part is a separate "sent" message (like real chunks in
+    # Telegram); chunked_upload doesn't fit here — with one account in the pool it doesn't
+    # split a small file into several parts (see base_logical_parts).
     folder, file_key = "Anime/Cache", "testkey"
     part_records = []
     for idx, blob in enumerate(payloads):
@@ -339,7 +339,7 @@ async def test_fetch_parts_decrypted_downloads_parts_concurrently(tmp_path) -> N
     assert assembled == payload
     assert client.max_active >= 2, "parts should download concurrently, not one-by-one"
 
-    # Повторный запрос переиспользует уже скачанные части — без новых сетевых вызовов.
+    # A repeat request reuses the already-downloaded parts — no new network calls.
     calls_before = len(client.iter_download_calls)
     parts_again = await downloader.fetch_parts_decrypted(
         folder, file_key, [0, 1, 2], str(stream_cache)
@@ -352,10 +352,10 @@ async def test_fetch_parts_decrypted_downloads_parts_concurrently(tmp_path) -> N
 async def test_fetch_parts_decrypted_prefix_grows_without_full_redownload(
     tmp_path,
 ) -> None:
-    """Части могут весить сотни МБ — плеер не должен ждать скачивания ВСЕЙ
-    части, если сейчас нужен лишь небольшой отрезок в начале. prefix_bytes
-    должен качать только префикс и ДОРАЩИВАТЬ его при росте окна, не перекачивая
-    уже полученные байты заново."""
+    """Parts can weigh hundreds of MB — the player must not wait for the WHOLE
+    part to download if only a small slice at the start is needed now. prefix_bytes
+    must fetch only the prefix and GROW it as the window expands, not re-fetching
+    already-received bytes again."""
     from app.core.types import PartMeta
     from app.tg.parser import build_caption
 
@@ -370,7 +370,7 @@ async def test_fetch_parts_decrypted_prefix_grows_without_full_redownload(
         crypto=CryptoConfig(enabled=False, key_env="TG_CRYPTO_KEY_B64"),
     )
 
-    payload = bytes(range(256)) * 20_000  # 5,120,000 байт, детерминированный контент
+    payload = bytes(range(256)) * 20_000  # 5,120,000 bytes, deterministic content
     db = connect_db(tmp_path / "index.sqlite3")
     repo = DbRepo(db)
     client = FakeClient()
@@ -403,18 +403,18 @@ async def test_fetch_parts_decrypted_prefix_grows_without_full_redownload(
     downloader = TgDownloader(config, repo, client, chat=object(), chat_id="1")
     stream_cache = tmp_path / "stream_cache"
 
-    # Первому запросу нужно только 700 000 байт из 5 120 000.
+    # The first request needs only 700,000 bytes out of 5,120,000.
     parts = await downloader.fetch_parts_decrypted(
         folder, file_key, [0], str(stream_cache), prefix_bytes={0: 700_000}
     )
     cached_path = Path(parts[0])
     first_size = cached_path.stat().st_size
-    assert 700_000 <= first_size < len(payload), "должен кэшировать только префикс"
+    assert 700_000 <= first_size < len(payload), "should cache only the prefix"
     assert cached_path.read_bytes() == payload[:first_size]
     calls_after_first = len(client.iter_download_calls)
 
-    # Второй запрос — окно продвинулось, нужно уже 2 000 000 байт: должен
-    # ДОРАСТИ существующий префикс, а не перекачать всё с нуля.
+    # Second request — the window advanced, now 2,000,000 bytes are needed: it must
+    # GROW the existing prefix, not re-download everything from scratch.
     parts2 = await downloader.fetch_parts_decrypted(
         folder, file_key, [0], str(stream_cache), prefix_bytes={0: 2_000_000}
     )
@@ -423,9 +423,9 @@ async def test_fetch_parts_decrypted_prefix_grows_without_full_redownload(
     assert Path(parts2[0]).read_bytes() == payload[:second_size]
 
     new_calls = client.iter_download_calls[calls_after_first:]
-    assert new_calls, "должны были уйти новые запросы, чтобы дорастить префикс"
+    assert new_calls, "new requests should have gone out to grow the prefix"
     assert all(call["offset"] >= first_size for call in new_calls), (
-        "не должен перекачивать уже полученные байты префикса заново"
+        "must not re-download already-received prefix bytes"
     )
 
 
@@ -433,10 +433,10 @@ async def test_fetch_parts_decrypted_prefix_grows_without_full_redownload(
 async def test_fetch_parts_decrypted_prefix_downloads_striped_in_parallel(
     tmp_path,
 ) -> None:
-    """Окно стрима (≈12 МБ) раньше качалось ОДНИМ последовательным потоком —
-    это и был главный вклад в задержку до первого кадра. Теперь многочанковый
-    префикс раскладывается на несколько параллельных stride-потоков, а собранные
-    байты должны в точности совпадать с началом файла (без дыр/перехлёста)."""
+    """The stream window (≈12 MB) used to download as ONE sequential stream —
+    that was the main contributor to the time-to-first-frame. Now the multi-chunk
+    prefix is spread across several parallel stride streams, and the assembled
+    bytes must exactly match the start of the file (no gaps/overlap)."""
     from app.core.types import PartMeta
     from app.tg.parser import build_caption
 
@@ -451,9 +451,9 @@ async def test_fetch_parts_decrypted_prefix_downloads_striped_in_parallel(
         crypto=CryptoConfig(enabled=False, key_env="TG_CRYPTO_KEY_B64"),
     )
 
-    # Детерминированный контент, заметно больше префикса, чтобы последний чанк
-    # был полным (никаких коротких хвостов у границы файла).
-    payload = bytes(range(256)) * 24_000  # 6,144,000 байт
+    # Deterministic content, noticeably bigger than the prefix, so the last chunk
+    # is full (no short tails at the file boundary).
+    payload = bytes(range(256)) * 24_000  # 6,144,000 bytes
     db = connect_db(tmp_path / "index.sqlite3")
     repo = DbRepo(db)
     client = FakeClient()
@@ -486,20 +486,20 @@ async def test_fetch_parts_decrypted_prefix_downloads_striped_in_parallel(
     downloader = TgDownloader(config, repo, client, chat=object(), chat_id="1")
     stream_cache = tmp_path / "stream_cache"
 
-    # Нужен префикс в несколько request-size чанков (524288 Б каждый).
+    # We need a prefix spanning several request-size chunks (524288 B each).
     parts = await downloader.fetch_parts_decrypted(
         folder, file_key, [0], str(stream_cache), prefix_bytes={0: 3_000_000}
     )
     cached = Path(parts[0])
     size = cached.stat().st_size
     assert 3_000_000 <= size < len(payload)
-    # Байты собраны верно — потоки уложили чанки без дыр и перехлёста.
+    # Bytes assembled correctly — the streams laid down chunks with no gaps or overlap.
     assert cached.read_bytes() == payload[:size]
 
-    # Скачивание шло параллельными stride-потоками, а не одним последовательным.
+    # The download used parallel stride streams, not a single sequential one.
     striped = [c for c in client.iter_download_calls if c["stride"] is not None]
     assert len(striped) >= 2, (
-        f"ожидались параллельные stride-потоки, а вызовы были: "
+        f"expected parallel stride streams, but the calls were: "
         f"{client.iter_download_calls}"
     )
     request_size = 524288
@@ -507,7 +507,7 @@ async def test_fetch_parts_decrypted_prefix_downloads_striped_in_parallel(
     offsets = sorted(c["offset"] for c in striped)
     assert offsets == [i * request_size for i in range(len(striped))]
 
-    # Третий запрос требует часть целиком — должен докачать хвост.
+    # The third request needs the whole part — it must fetch the tail.
     parts3 = await downloader.fetch_parts_decrypted(
         folder, file_key, [0], str(stream_cache), prefix_bytes={0: len(payload)}
     )
@@ -518,10 +518,10 @@ async def test_fetch_parts_decrypted_prefix_downloads_striped_in_parallel(
 async def test_fetch_parts_decrypted_ignores_prefix_hint_when_encrypted(
     tmp_path,
 ) -> None:
-    """При включённом шифровании частичный отрезок части бесполезен без
-    расшифровки целиком (AES-GCM тег проверяется только по всему шифротексту) —
-    prefix_bytes должен игнорироваться, часть качается и расшифровывается
-    полностью, как раньше."""
+    """With encryption enabled, a partial slice of a part is useless without
+    decrypting it whole (the AES-GCM tag is verified over the entire ciphertext) —
+    prefix_bytes must be ignored, the part is fetched and decrypted
+    in full, as before."""
     from app.core.types import CryptoConfig as _CryptoConfig
     from app.core.types import PartMeta
     from app.core.utils import encrypt_bytes
@@ -541,7 +541,7 @@ async def test_fetch_parts_decrypted_ignores_prefix_hint_when_encrypted(
             crypto=_CryptoConfig(enabled=True, key_env="TG_CRYPTO_KEY_B64_TEST_PREFIX"),
         )
 
-        payload = bytes(range(256)) * 5_000  # 1,280,000 байт plaintext
+        payload = bytes(range(256)) * 5_000  # 1,280,000 bytes plaintext
         key = base64.urlsafe_b64decode(monkeypatch_key + "==")
         encrypted = encrypt_bytes(payload, key)
 
@@ -577,8 +577,8 @@ async def test_fetch_parts_decrypted_ignores_prefix_hint_when_encrypted(
         downloader = TgDownloader(config, repo, client, chat=object(), chat_id="1")
         stream_cache = tmp_path / "stream_cache"
 
-        # Просим маленький "префикс" — при шифровании это должно быть
-        # проигнорировано, часть скачается и расшифруется целиком.
+        # Ask for a small "prefix" — with encryption this must be
+        # ignored, the part is downloaded and decrypted in full.
         parts = await downloader.fetch_parts_decrypted(
             folder, file_key, [0], str(stream_cache), prefix_bytes={0: 1024}
         )

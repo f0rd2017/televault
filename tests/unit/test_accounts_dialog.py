@@ -1,7 +1,7 @@
-"""Smoke-тесты диалога аккаунтов: таблица + фоновая проверка живости.
+"""Smoke tests for the accounts dialog: the table + background liveness probe.
 
-Сетевые проверки (_probe_proxy / _probe_account) замоканы, чтобы не ждать
-реальных коннектов к Telegram.
+Network checks (_probe_proxy / _probe_account) are mocked to avoid waiting on
+real connections to Telegram.
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ def _make_repo(tmp_path) -> DbRepo:
 
 
 def test_dialog_builds_status_columns(tmp_path, monkeypatch) -> None:
-    # Не стартуем фоновый поток в этом тесте — проверяем только структуру.
+    # Don't start the background thread in this test — we only check the structure.
     monkeypatch.setattr(AccountsDialog, "_start_probe", lambda self: None)
     _ = QApplication.instance() or QApplication([])
     repo = _make_repo(tmp_path)
@@ -59,25 +59,25 @@ def test_dialog_builds_status_columns(tmp_path, monkeypatch) -> None:
         assert dlg.table.horizontalHeaderItem(8).text() == "Proxy status"
         assert dlg.table.horizontalHeaderItem(9).text() == "Account status"
         assert dlg.table.rowCount() == 2
-        # Колонки статуса инициализированы плейсхолдером.
+        # Status columns are initialized with a placeholder.
         assert dlg.table.item(0, AccountsDialog.COL_ACC_STATUS).text() == "—"
-        # Канал — это кнопка-виджет, а не текстовая ячейка.
+        # The channel is a button widget, not a text cell.
         from PySide6.QtWidgets import QPushButton
 
         ch_widget = dlg.table.cellWidget(1, AccountsDialog.COL_CHANNEL)
         assert isinstance(ch_widget, QPushButton)
-        # Прокси показывается коротко (только host:port, без логина/пароля).
+        # The proxy is shown briefly (host:port only, no login/password).
         assert dlg.table.item(1, AccountsDialog.COL_PROXY).text() == "1.2.3.4:1080"
     finally:
         dlg.deleteLater()
 
 
 def test_short_proxy_and_proxy_guard() -> None:
-    # Короткий прокси скрывает креды.
+    # A short proxy hides the credentials.
     assert AccountsDialog._short_proxy("1.2.3.4:1080:u:p") == "1.2.3.4:1080"
     assert AccountsDialog._short_proxy("") == "No proxy"
     assert AccountsDialog._short_proxy("socks5://h:9050") == "h:9050"
-    # Защита канала от прокси: канал НЕ прокси, прокси — прокси.
+    # Guard the channel against the proxy: the channel is NOT a proxy, the proxy is.
     assert AccountsDialog._looks_like_proxy("https://t.me/+AbCdEfGh12345678") is False
     assert AccountsDialog._looks_like_proxy("@example_channel") is False
     assert AccountsDialog._looks_like_proxy("203.0.113.10:1080:u:p") is True
@@ -86,35 +86,35 @@ def test_short_proxy_and_proxy_guard() -> None:
 def test_probe_fills_status_cells(tmp_path, monkeypatch) -> None:
     app = QApplication.instance() or QApplication([])
 
-    # Мокаем сетевые проверки на мгновенные детерминированные ответы.
+    # Mock the network checks to instant deterministic responses.
     monkeypatch.setattr(
         _StatusProbe,
         "_probe_proxy",
         staticmethod(
             lambda acc: (
-                ("— прямое", None)
+                ("— direct", None)
                 if acc.is_primary
-                else ("✅ работает", ("socks5", "1.2.3.4", 1080, True, "u", "p"))
+                else ("✅ works", ("socks5", "1.2.3.4", 1080, True, "u", "p"))
             )
         ),
     )
 
     async def fake_probe_account(cls, acc, proxy_tuple):
-        return "✅ онлайн @user" if acc.is_primary else "❌ недоступен"
+        return "✅ online @user" if acc.is_primary else "❌ unavailable"
 
     monkeypatch.setattr(_StatusProbe, "_probe_account", classmethod(fake_probe_account))
 
     repo = _make_repo(tmp_path)
-    dlg = AccountsDialog(repo)  # _start_probe запускается автоматически
+    dlg = AccountsDialog(repo)  # _start_probe starts automatically
 
-    # Прокачиваем event loop, пока поток не завершится (с таймаутом).
+    # Pump the event loop until the thread finishes (with a timeout).
     import time
 
     deadline = time.monotonic() + 10.0
     while time.monotonic() < deadline:
         app.processEvents()
         if dlg._probe is None or not dlg._probe.isRunning():
-            # дать сигналам row_status доставиться
+            # let the row_status signals be delivered
             app.processEvents()
             break
         time.sleep(0.02)
@@ -127,30 +127,30 @@ def test_probe_fills_status_cells(tmp_path, monkeypatch) -> None:
         proxy_secondary = dlg.table.item(1, AccountsDialog.COL_PROXY_STATUS).text()
         acc_secondary = dlg.table.item(1, AccountsDialog.COL_ACC_STATUS).text()
 
-        assert proxy_primary == "— прямое"
-        assert acc_primary.startswith("✅ онлайн")
-        assert proxy_secondary == "✅ работает"
-        assert acc_secondary == "❌ недоступен"
-        # Кнопка снова активна после завершения.
+        assert proxy_primary == "— direct"
+        assert acc_primary.startswith("✅ online")
+        assert proxy_secondary == "✅ works"
+        assert acc_secondary == "❌ unavailable"
+        # The button is active again after completion.
         assert dlg.check_btn.isEnabled()
-        # После завершения ссылка на поток сброшена в None.
+        # After completion, the thread reference is reset to None.
         assert dlg._probe is None
     finally:
         dlg.deleteLater()
 
 
 def test_close_after_probe_finishes_does_not_crash(tmp_path, monkeypatch) -> None:
-    """Регрессия: RuntimeError 'C++ object _StatusProbe already deleted' в done()."""
+    """Regression: RuntimeError 'C++ object _StatusProbe already deleted' in done()."""
     app = QApplication.instance() or QApplication([])
 
     monkeypatch.setattr(
         _StatusProbe,
         "_probe_proxy",
-        staticmethod(lambda acc: ("— прямое", None)),
+        staticmethod(lambda acc: ("— direct", None)),
     )
 
     async def fake_probe_account(cls, acc, proxy_tuple):
-        return "✅ онлайн"
+        return "✅ online"
 
     monkeypatch.setattr(_StatusProbe, "_probe_account", classmethod(fake_probe_account))
 
@@ -166,33 +166,33 @@ def test_close_after_probe_finishes_does_not_crash(tmp_path, monkeypatch) -> Non
             break
         time.sleep(0.02)
 
-    # Дать deleteLater реально уничтожить C++-объект потока.
+    # Let deleteLater actually destroy the thread's C++ object.
     app.processEvents()
-    app.sendPostedEvents(None, 0)  # тип 0 включает DeferredDelete
+    app.sendPostedEvents(None, 0)  # type 0 includes DeferredDelete
     app.processEvents()
 
-    # Закрытие после завершения проверки не должно падать.
+    # Closing after the probe finishes must not crash.
     dlg.done(0)
     assert dlg._probe is None
 
 
 def test_status_maps_by_account_id_not_row(tmp_path, monkeypatch) -> None:
-    """Результат проверки ложится на строку нужного аккаунта по ID, а не индексу."""
+    """The probe result lands on the row of the right account by id, not by index."""
     monkeypatch.setattr(AccountsDialog, "_start_probe", lambda self: None)
     _ = QApplication.instance() or QApplication([])
     repo = _make_repo(tmp_path)
     dlg = AccountsDialog(repo)
     try:
-        # ID второй строки.
+        # The id of the second row.
         target_id = int(dlg.table.item(1, AccountsDialog.COL_ID).text())
         other_id = int(dlg.table.item(0, AccountsDialog.COL_ID).text())
 
-        dlg._on_row_status(target_id, "✅ работает", "✅ онлайн")
-        assert dlg.table.item(1, AccountsDialog.COL_ACC_STATUS).text() == "✅ онлайн"
-        # Чужая строка не тронута.
+        dlg._on_row_status(target_id, "✅ works", "✅ online")
+        assert dlg.table.item(1, AccountsDialog.COL_ACC_STATUS).text() == "✅ online"
+        # A different row is untouched.
         assert dlg.table.item(0, AccountsDialog.COL_ACC_STATUS).text() == "—"
 
-        # Несуществующий ID — без падений и без эффекта.
+        # A nonexistent id — no crash and no effect.
         dlg._on_row_status(999999, "x", "y")
         assert dlg.table.item(0, AccountsDialog.COL_ACC_STATUS).text() == "—"
         assert other_id != target_id
@@ -203,11 +203,11 @@ def test_status_maps_by_account_id_not_row(tmp_path, monkeypatch) -> None:
 def test_session_disk_path_and_missing_session() -> None:
     import asyncio
 
-    # Расширение .session добавляется, если его нет.
+    # The .session extension is added if it's missing.
     assert _StatusProbe._session_disk_path("/x/a") == "/x/a.session"
     assert _StatusProbe._session_disk_path("/x/a.session") == "/x/a.session"
 
-    # Реальная проверка на несуществующей сессии — без сети, копировать нечего.
+    # A real check on a nonexistent session — no network, nothing to copy.
     acc = TelegramAccount(
         id=1,
         label="ghost",

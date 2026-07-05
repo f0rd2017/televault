@@ -1,4 +1,4 @@
-"""Авто-эскалация прокси при устойчивых сбоях соединения посреди сессии."""
+"""Auto-escalation of the proxy on persistent connection failures mid-session."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from app.tg.proxy_escalation import ProxyEscalationMixin
 
 
 class _Guard(ProxyEscalationMixin):
-    """Голый носитель mixin'а: фиксирует вызовы эскалатора."""
+    """A bare carrier of the mixin: records escalator calls."""
 
     def __init__(self) -> None:
         self.calls: list[object] = []
@@ -40,7 +40,7 @@ async def test_timeout_error_triggers_escalation() -> None:
 async def test_non_connection_errors_do_not_escalate() -> None:
     guard = _Guard()
     client = object()
-    # RPCError: сервер ответил — прокси жив. OSError: может быть диск (ENOSPC).
+    # RPCError: the server replied — the proxy is alive. OSError: could be disk (ENOSPC).
     await guard._on_persistent_connection_failure(client, RPCError(None, "err"))
     await guard._on_persistent_connection_failure(client, OSError(28, "ENOSPC"))
     await guard._on_persistent_connection_failure(client, RuntimeError("misc"))
@@ -55,13 +55,13 @@ async def test_cooldown_limits_escalation_rate(monkeypatch) -> None:
 
     await guard._on_persistent_connection_failure(client, ConnectionError("x"))
     await guard._on_persistent_connection_failure(client, ConnectionError("x"))
-    assert len(guard.calls) == 1  # вторая — внутри cooldown
+    assert len(guard.calls) == 1  # the second is within the cooldown
 
     fake_now[0] += guard._PROXY_ESCALATION_COOLDOWN_SEC + 1
     await guard._on_persistent_connection_failure(client, ConnectionError("x"))
-    assert len(guard.calls) == 2  # после cooldown — снова можно
+    assert len(guard.calls) == 2  # after the cooldown, allowed again
 
-    # Cooldown ПО-КЛИЕНТСКИ: другой клиент эскалируется независимо.
+    # Cooldown is PER-CLIENT: another client escalates independently.
     other = object()
     await guard._on_persistent_connection_failure(other, ConnectionError("x"))
     assert guard.calls[-1] is other
@@ -81,13 +81,13 @@ async def test_escalator_exception_is_swallowed() -> None:
         raise RuntimeError("escalation infra broke")
 
     guard.proxy_escalator = _boom
-    # Не должно бросить: исходная ошибка передачи важнее проблем эскалации.
+    # Must not raise: the original transfer error matters more than escalation issues.
     await guard._on_persistent_connection_failure(object(), ConnectionError("x"))
 
 
 async def test_send_with_retry_escalates_on_exhausted_connection_errors() -> None:
-    """Интеграционно: воронка _send_with_retry после исчерпания ретраев
-    ошибкой соединения зовёт эскалатор и пробрасывает исходную ошибку."""
+    """Integration: the _send_with_retry funnel, after retries are exhausted
+    on a connection error, calls the escalator and re-raises the original error."""
     from app.core.types import AppConfig, RetryConfig
     from app.tg.upload.uploader import TgUploader
 
@@ -119,7 +119,7 @@ async def test_send_with_retry_escalates_on_exhausted_connection_errors() -> Non
 
     uploader.proxy_escalator = _escalate
 
-    # Быстрые ретраи: без реальных пауз tenacity/лимитеров.
+    # Fast retries: no real pauses from tenacity/limiters.
     async def _noop_acquire(*a, **k) -> None:
         return None
 

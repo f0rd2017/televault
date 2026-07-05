@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QApplication
 
 from app.ui.media_viewer import PdfViewerWindow
 
-# Держим окна живыми до конца теста — иначе shiboken соберёт их до проверок.
+# Keep the windows alive until the end of the test — otherwise shiboken collects them before the assertions.
 _KEEP_ALIVE: list[PdfViewerWindow] = []
 
 
@@ -40,8 +40,8 @@ def test_pdf_viewer_loads_valid_pdf(tmp_path) -> None:
     _KEEP_ALIVE.append(window)
     window.show()
     _wait_events()
-    # Регрессия: QBuffer поверх ВРЕМЕННОГО QByteArray терял данные (PySide не
-    # держит ссылку) — документ молча грузился в Status.Error, окно было пустым.
+    # Regression: QBuffer over a TEMPORARY QByteArray lost data (PySide did not
+    # keep a reference) — the document silently loaded into Status.Error, the window was empty.
     assert window._doc.status() == QPdfDocument.Status.Ready
     assert window._doc.pageCount() == 1
     assert window._status.isHidden()
@@ -56,6 +56,6 @@ def test_pdf_viewer_shows_error_for_corrupt_file(tmp_path) -> None:
     window.show()
     _wait_events()
     assert window._doc.status() != QPdfDocument.Status.Ready
-    # Пользователь должен видеть сообщение, а не пустое окно.
+    # The user must see a message, not an empty window.
     assert not window._status.isHidden()
     assert "PDF" in window._status.text()

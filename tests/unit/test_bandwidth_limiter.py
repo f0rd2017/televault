@@ -15,7 +15,7 @@ def test_unlimited_is_noop_and_disabled():
 
     async def go() -> float:
         start = time.monotonic()
-        # Даже гигантский запрос при выключенном лимите проходит мгновенно.
+        # Even a huge request passes instantly when the limit is off.
         await lim.acquire(500 * _MB)
         await lim.acquire(0)
         await lim.acquire(-5)
@@ -27,7 +27,7 @@ def test_unlimited_is_noop_and_disabled():
 def test_negative_mbps_treated_as_unlimited():
     lim = BandwidthLimiter(-10.0)
     assert lim.enabled is False
-    asyncio.run(lim.acquire(10 * _MB))  # не виснет
+    asyncio.run(lim.acquire(10 * _MB))  # does not hang
 
 
 def test_mbps_property():
@@ -36,14 +36,14 @@ def test_mbps_property():
 
 
 def test_throttle_delays_when_over_capacity():
-    # rate=100 МБ/с, ёмкость=100 МБ. Осушаем бакет, затем берём ещё 40 МБ →
-    # ждём ~40/100 = 0.4 с.
+    # rate=100 MB/s, capacity=100 MB. Drain the bucket, then take another 40 MB →
+    # wait ~40/100 = 0.4 s.
     lim = BandwidthLimiter(100.0)
 
     async def go() -> float:
-        await lim.acquire(100 * _MB)  # осушает полный бакет (мгновенно)
+        await lim.acquire(100 * _MB)  # drains the full bucket (instant)
         start = time.monotonic()
-        await lim.acquire(40 * _MB)  # дефицит → ждёт ~0.4 с
+        await lim.acquire(40 * _MB)  # deficit → waits ~0.4 s
         return time.monotonic() - start
 
     elapsed = asyncio.run(go())
@@ -51,25 +51,25 @@ def test_throttle_delays_when_over_capacity():
 
 
 def test_huge_single_acquire_does_not_deadlock():
-    # Запрос больше ёмкости бакета должен пройти (уведя токены в минус), а не виснуть.
+    # A request bigger than the bucket capacity must pass (driving tokens negative), not hang.
     lim = BandwidthLimiter(50.0)
 
     async def go() -> float:
         start = time.monotonic()
-        await lim.acquire(500 * _MB)  # >> ёмкости — но бакет полон, пропускаем
+        await lim.acquire(500 * _MB)  # >> capacity — but the bucket is full, pass
         return time.monotonic() - start
 
     assert asyncio.run(go()) < 0.2
 
 
 def test_average_rate_is_capped():
-    # Берём суммарно много байт мелкими порциями — суммарное время не меньше
-    # того, что диктует скорость (грубая проверка, что троттл реально тормозит).
-    lim = BandwidthLimiter(50.0)  # 50 МБ/с
+    # Take many bytes in small chunks — the total time is at least
+    # what the rate dictates (a rough check that throttling actually slows things down).
+    lim = BandwidthLimiter(50.0)  # 50 MB/s
 
     async def go() -> float:
         start = time.monotonic()
-        # 100 МБ при 50 МБ/с и стартовом бакете 50 МБ → ~1 с на «лишние» 50 МБ.
+        # 100 MB at 50 MB/s with a starting bucket of 50 MB → ~1 s for the 'extra' 50 MB.
         for _ in range(100):
             await lim.acquire(1 * _MB)
         return time.monotonic() - start

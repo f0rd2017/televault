@@ -132,8 +132,8 @@ def _prepared_tab(editor_window, text: str, name: str = "f.txt"):
 
 
 def test_replace_all_does_not_loop_when_replacement_contains_needle(editor_window):
-    """Регрессия: «a» → «aa» зацикливалось навсегда (поиск wrap'ался на начало
-    и находил только что вставленное)."""
+    """Regression: «a» → «aa» looped forever (search wrapped to the start
+    and found what was just inserted)."""
     tab = _prepared_tab(editor_window, "a b a")
     editor_window._find_edit.setText("a")
     editor_window._replace_edit.setText("aa")
@@ -154,15 +154,15 @@ def test_replace_all_regex_groups(editor_window):
 def test_replace_all_empty_regex_match_does_not_hang(editor_window):
     tab = _prepared_tab(editor_window, "abc")
     editor_window._regex_chk.setChecked(True)
-    editor_window._find_edit.setText("x*")  # может совпадать с пустотой
+    editor_window._find_edit.setText("x*")  # may match emptiness
     editor_window._replace_edit.setText("y")
-    editor_window._replace_all()  # главное — завершилась, не зависла
+    editor_window._replace_all()  # the point is it finished, did not hang
     editor_window._regex_chk.setChecked(False)
     assert "abc" in tab.editor.toPlainText().replace("y", "")
 
 
 def test_move_last_line_up_keeps_line_count(app):
-    """Регрессия: перемещение последней строки вверх добавляло пустую строку."""
+    """Regression: moving the last line up added an empty line."""
     editor = CodeEditor()
     editor.setPlainText("a\nb")
     cursor = editor.textCursor()
@@ -170,7 +170,7 @@ def test_move_last_line_up_keeps_line_count(app):
     editor.setTextCursor(cursor)
     editor.move_line(up=True)
     assert editor.toPlainText() == "b\na"
-    editor.move_line(up=False)  # обратно вниз
+    editor.move_line(up=False)  # back down
     assert editor.toPlainText() == "a\nb"
 
 
@@ -209,4 +209,4 @@ def test_expand_regex_groups_helper():
     assert _expand_regex_groups(r"$2..$1", match) == "20..10"
     assert _expand_regex_groups(r"\1+\2", match) == "10+20"
     assert _expand_regex_groups("$0", match) == "10-20"
-    assert _expand_regex_groups("$9 нет", match) == "$9 нет"  # несуществующая группа
+    assert _expand_regex_groups("$9 none", match) == "$9 none"  # nonexistent group

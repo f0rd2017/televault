@@ -22,14 +22,14 @@ def test_set_folders_skips_reset_when_unchanged() -> None:
 
     folders = ["A", "A/B", "C"]
     model.set_folders(folders)
-    assert resets == [1]  # первый раз — полный reset
+    assert resets == [1]  # first time — full reset
 
-    # Тот же набор (другой порядок / дубликаты) — reset НЕ должен повторяться,
-    # иначе дерево слева мигает при каждом релоаде во время скачивания.
+    # The same set (different order / duplicates) — reset must NOT repeat,
+    # otherwise the tree on the left flickers on every reload during a download.
     model.set_folders(["C", "A/B", "A", "A"])
     assert resets == [1]
 
-    # Изменился набор → reset снова.
+    # The set changed → reset again.
     model.set_folders(["A", "A/B", "C", "D"])
     assert resets == [1, 1]
 
@@ -39,9 +39,9 @@ def test_set_folders_builds_tree() -> None:
     model = FolderTreeModel()
     model.set_folders(["Anime", "Anime/Movies", "Docs"])
 
-    # Два корневых узла: Anime и Docs.
+    # Two root nodes: Anime and Docs.
     assert model.rowCount() == 2
     anime_index = model.find_index_by_path("Anime")
     assert anime_index.isValid()
-    # У Anime один дочерний — Movies.
+    # Anime has one child — Movies.
     assert model.rowCount(anime_index) == 1

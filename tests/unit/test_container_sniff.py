@@ -37,7 +37,7 @@ def test_head_without_mdat_is_streamable():
 
 
 class _PartZeroWorker:
-    """Отдаёт заданные байты как содержимое part 0 (для сниффа контейнера)."""
+    """Returns the given bytes as the content of part 0 (for container sniffing)."""
 
     def __init__(self, head: bytes) -> None:
         self.head = head
@@ -55,8 +55,8 @@ class _PartZeroWorker:
 
 
 def test_avi_signature_is_non_streamable(tmp_path):
-    # RIFF....AVI  — сигнатура AVI (индекс idx1 в хвосте файла, см. модульный
-    # докстринг): такие контейнеры НЕ должны стримиться частями по Range.
+    # RIFF....AVI — the AVI signature (idx1 index at the file tail, see the module
+    # docstring): such containers must NOT be streamed part-by-part via Range.
     worker = _PartZeroWorker(b"RIFF\x00\x00\x00\x00AVI LIST" + b"\x00" * 64)
     ctx = SimpleNamespace(worker=worker, share_dir=str(tmp_path))
     assert (

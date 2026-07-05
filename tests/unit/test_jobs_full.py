@@ -116,7 +116,7 @@ async def test_parallel_jobs_error_one_doesnt_affect_other() -> None:
     await asyncio.sleep(0.2)
     await mgr.stop()
 
-    # Падение одной задачи не должно мешать другой завершиться успешно.
+    # One task failing must not stop another from finishing successfully.
     errors = statuses.count("error")
     dones = statuses.count("done")
     assert errors == 1

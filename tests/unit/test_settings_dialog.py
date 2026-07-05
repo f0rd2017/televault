@@ -56,7 +56,7 @@ def test_advanced_widgets_reflect_initial():
 def test_advanced_edits_flow_into_public_config():
     _app()
     dlg = SetupDialog(initial=_initial())
-    # Поменять значения на «Расширенных» и убедиться, что они попадают в конфиг.
+    # Change values on 'Advanced' and make sure they land in the config.
     dlg.integrity_combo.setCurrentIndex(dlg.integrity_combo.findData("strict"))
     dlg.compression_combo.setCurrentIndex(dlg.compression_combo.findData("off"))
     dlg.chunk_size_spin.setValue(256)
