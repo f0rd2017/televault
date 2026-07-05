@@ -112,10 +112,12 @@ uv run ruff check .    # линтер
 
 | Способ | Реквизиты |
 |---|---|
-| USDT (TRC-20) | `TODO_ВАШ_АДРЕС` |
-| TON | `TODO_ВАШ_АДРЕС` |
-| BTC | `TODO_ВАШ_АДРЕС` |
-| PayPal | `TODO_ссылка paypal.me` |
+| USDT (TRC-20) / Tron | `TLmkJf2x4bqqf6bGf35wXXB5S78AoeLvoF` |
+| BTC | `bc1q0w3qyfavnrc8mjj2cfhn3y0u5xth5gcv7dy2ha` |
+| EVM (ETH / USDT / USDC, ERC-20) | `0xd6a1B8ab387a3CC30d94f8D4836830ACc3F52Ecd` |
+| Solana | `9Snv19GoyoAu1dmkJ7GEER6MBjXtJGW3A63fXstsuHG4` |
+| TON | `UQCy7CyH3yUMw6APzVhO5PINjfVEYUTCpOyfG6kQ8oxHpQf7` |
+| PayPal / карта | через [Ko-fi](https://ko-fi.com/) |
 
 Также помогают ⭐ звезда на GitHub, багрепорты и pull request'ы.
 
