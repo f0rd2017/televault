@@ -108,3 +108,40 @@ def test_validation_detects_duplicate_phone(app):
     # A different number passes.
     dlg.phone_edit.setText("+380501112233")
     assert dlg._validated_form() is not None
+
+
+def test_saved_messages_checkbox_uses_me_as_channel(app):
+    dlg = AddAccountDialog(_FakeRepo())
+    dlg.label_edit.setText("Acc 2")
+    dlg.phone_edit.setText("+79991234567")
+    dlg.api_id_edit.setText("12345")
+    dlg.api_hash_edit.setText("hash")
+    dlg.saved_messages_check.setChecked(True)
+
+    assert not dlg.channel_edit.isEnabled()
+    form = dlg._validated_form()
+    assert form is not None
+    assert form["channel"] == "me"
+
+
+def test_saved_messages_checkbox_toggle_restores_channel_field(app):
+    dlg = AddAccountDialog(_FakeRepo())
+    assert dlg.channel_edit.isEnabled()
+    dlg.saved_messages_check.setChecked(True)
+    assert not dlg.channel_edit.isEnabled()
+    dlg.saved_messages_check.setChecked(False)
+    assert dlg.channel_edit.isEnabled()
+
+
+def test_set_form_enabled_keeps_channel_disabled_when_saved_messages_checked(app):
+    dlg = AddAccountDialog(_FakeRepo())
+    dlg.saved_messages_check.setChecked(True)
+    dlg._set_form_enabled(False)
+    assert not dlg.channel_edit.isEnabled()
+    assert not dlg.saved_messages_check.isEnabled()
+
+    dlg._set_form_enabled(True)
+    # Re-enabling the form must not re-enable the channel field, since
+    # Saved Messages is still checked.
+    assert not dlg.channel_edit.isEnabled()
+    assert dlg.saved_messages_check.isEnabled()

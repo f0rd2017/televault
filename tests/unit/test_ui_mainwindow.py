@@ -2185,7 +2185,12 @@ def test_watchdog_ignores_non_running_jobs(tmp_path, monkeypatch) -> None:
         window.close()
 
 
-def test_backspace_shortcut_deletes_when_file_selected(tmp_path, monkeypatch) -> None:
+def test_backspace_shortcut_moves_to_trash_when_file_selected(
+    tmp_path, monkeypatch
+) -> None:
+    """Delete/Backspace now moves files to trash (safe, reversible) instead of
+    deleting them permanently — matching the standard file-manager
+    convention. Permanent delete moved to Shift+Delete/Shift+Backspace."""
     app = QApplication.instance() or QApplication([])
     window = _build_window(tmp_path, monkeypatch)
     try:
@@ -2227,7 +2232,59 @@ def test_backspace_shortcut_deletes_when_file_selected(tmp_path, monkeypatch) ->
 
         window._on_delete_shortcut()
 
+        assert delete_calls["count"] == 0
+        assert window.repo.count_trash() == 1
+        assert window.current_folder == "A/B"
+    finally:
+        window.close()
+
+
+def test_shift_backspace_shortcut_deletes_permanently_when_file_selected(
+    tmp_path, monkeypatch
+) -> None:
+    app = QApplication.instance() or QApplication([])
+    window = _build_window(tmp_path, monkeypatch)
+    try:
+        window.repo.upsert_folder("A/B")
+        window.repo.upsert_msg_part(
+            PartRecord(
+                msg_id=302,
+                chat_id="1",
+                folder_path="A/B",
+                file_key="shift_backspace_del_01",
+                part_index=0,
+                parts_total=1,
+                orig_name="demo2.bin",
+                file_size=16,
+                caption_raw='FC1|{"folder_path":"A/B","file_key":"shift_backspace_del_01","part_index":0,"parts_total":1,"orig_name":"demo2.bin"}',
+                date_ts=602,
+            )
+        )
+        window.repo.rebuild_objects_aggregates()
+        window.reload_all()
+        window._set_current_folder("A/B", push_history=True, sync_tree=True)
+        app.processEvents()
+
+        idx = window.explorer_model.index(0, 0)
+        window.explorer_view.setCurrentIndex(idx)
+        window.explorer_view.selectionModel().select(
+            idx,
+            window.explorer_view.selectionModel().SelectionFlag.ClearAndSelect,
+        )
+        window.explorer_view.setFocus()
+        app.processEvents()
+
+        delete_calls = {"count": 0}
+        monkeypatch.setattr(
+            window,
+            "_on_delete_remote",
+            lambda: delete_calls.__setitem__("count", delete_calls["count"] + 1),
+        )
+
+        window._on_delete_forever_shortcut()
+
         assert delete_calls["count"] == 1
+        assert window.repo.count_trash() == 0
         assert window.current_folder == "A/B"
     finally:
         window.close()
@@ -2312,22 +2369,15 @@ def test_delete_shortcut_ignores_text_input_focus(tmp_path, monkeypatch) -> None
         )
         app.processEvents()
 
-        delete_calls = {"count": 0}
-        monkeypatch.setattr(
-            window,
-            "_on_delete_remote",
-            lambda: delete_calls.__setitem__("count", delete_calls["count"] + 1),
-        )
-
         window.search_edit.setFocus()
         app.processEvents()
         window._on_delete_shortcut()
-        assert delete_calls["count"] == 0
+        assert window.repo.count_trash() == 0
 
         window.explorer_view.setFocus()
         app.processEvents()
         window._on_delete_shortcut()
-        assert delete_calls["count"] == 1
+        assert window.repo.count_trash() == 1
     finally:
         window.close()
 
@@ -2366,17 +2416,10 @@ def test_delete_shortcut_not_blocked_by_readonly_pathbar_focus(
         )
         app.processEvents()
 
-        delete_calls = {"count": 0}
-        monkeypatch.setattr(
-            window,
-            "_on_delete_remote",
-            lambda: delete_calls.__setitem__("count", delete_calls["count"] + 1),
-        )
-
         window.path_bar.setFocus()
         app.processEvents()
         window._on_delete_shortcut()
-        assert delete_calls["count"] == 1
+        assert window.repo.count_trash() == 1
     finally:
         window.close()
 

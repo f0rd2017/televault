@@ -37,6 +37,18 @@ _MAX_FOLDER_PATH_LEN = 255
 _MAX_FOLDER_SEGMENT_LEN = 64
 
 
+def app_icon_path() -> Path:
+    """Resolve the path to the application icon (window/taskbar/tray)."""
+    candidates = [
+        Path(__file__).resolve().parent.parent / "assets" / "icon.png",
+        Path.cwd() / "icon.png",
+    ]
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_file():
+            return candidate
+    return candidates[0]
+
+
 def now_ts() -> int:
     return int(time.time())
 
@@ -268,6 +280,54 @@ def convert_image_to_png(
         return proc.returncode == 0 and out.is_file() and out.stat().st_size > 0
     except OSError:
         return False
+
+
+def write_sparse_head_tail(
+    out_path: str | Path,
+    head_path: str | Path,
+    tail_path: str | Path,
+    tail_offset: int,
+    total_size: int,
+) -> bool:
+    """Assemble a sparse file that holds only the file's HEAD and TAIL at their
+    real byte offsets, leaving the middle as a hole (zeros).
+
+    Used to build a video poster for a NOT-fully-downloaded file whose metadata
+    lives at the END (e.g. a non-faststart MP4 — often what a ".avi" really is —
+    keeps its ``moov`` atom at the tail). ffmpeg reads the tail (moov) to find
+    the first sample, then reads that sample from the head; the untouched middle
+    is never needed for a single frame, so it stays a hole and costs no disk.
+
+    Returns True on success. The gap between head and tail must be non-negative.
+    """
+    head = Path(head_path)
+    tail = Path(tail_path)
+    out = Path(out_path)
+    try:
+        head_data = head.read_bytes()
+        tail_data = tail.read_bytes()
+    except OSError:
+        return False
+    if tail_offset < len(head_data):
+        # Head and tail would overlap — the parts metadata is inconsistent with
+        # what we downloaded; refuse rather than corrupt the reconstruction.
+        return False
+    if tail_offset + len(tail_data) > total_size:
+        return False
+    try:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with out.open("wb") as handle:
+            handle.write(head_data)
+            # Seek past the hole to the tail's real offset; the OS leaves the
+            # gap sparse (unwritten), so a 50 GB video costs only head+tail bytes.
+            handle.seek(tail_offset)
+            handle.write(tail_data)
+            # Make the file report its true length so absolute offsets in the
+            # tail's index/moov resolve correctly.
+            handle.truncate(total_size)
+    except OSError:
+        return False
+    return True
 
 
 def iter_file_chunks(file_path: str | Path, chunk_size: int) -> Iterator[bytes]:

@@ -174,6 +174,47 @@ def test_video_player_shows_buffering_indicator_on_stall(tmp_path):
         httpd.shutdown()
 
 
+def test_video_single_click_toggles_double_click_fullscreens(tmp_path):
+    # Regression: the old timer-based click handling mistook a quick
+    # pause→resume double-tap for a double click and flipped fullscreen, so the
+    # window "jumped". Now a single click toggles instantly and only a real
+    # double click switches fullscreen.
+    _app()
+    from PySide6.QtCore import QEvent, QPointF, Qt
+    from PySide6.QtGui import QMouseEvent
+
+    win = VideoViewerWindow("http://127.0.0.1:1/none.mp4", "x")
+    try:
+        calls = {"toggle": 0, "fs": 0}
+        win._toggle = lambda: calls.__setitem__("toggle", calls["toggle"] + 1)
+        win._toggle_fullscreen = lambda: calls.__setitem__("fs", calls["fs"] + 1)
+
+        def ev(kind) -> QMouseEvent:
+            return QMouseEvent(
+                kind,
+                QPointF(5, 5),
+                QPointF(5, 5),
+                Qt.MouseButton.LeftButton,
+                Qt.MouseButton.LeftButton,
+                Qt.KeyboardModifier.NoModifier,
+            )
+
+        # A single click (release) toggles play/pause and consumes the event.
+        assert win.eventFilter(win._video, ev(QEvent.Type.MouseButtonRelease)) is True
+        assert calls == {"toggle": 1, "fs": 0}
+
+        # A double click switches fullscreen (no window jump from a stray click).
+        assert win.eventFilter(win._video, ev(QEvent.Type.MouseButtonDblClick)) is True
+        assert calls["fs"] == 1
+
+        # A press alone must NOT toggle (avoids double-firing with release).
+        before = dict(calls)
+        win.eventFilter(win._video, ev(QEvent.Type.MouseButtonPress))
+        assert calls == before
+    finally:
+        win.close()
+
+
 def test_video_player_invalid_source_shows_fallback(tmp_path):
     _app()
     (tmp_path / "broken.mp4").write_bytes(b"not a real video, no moov atom here")

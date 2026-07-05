@@ -69,8 +69,10 @@ class JobEventsMixin:
             f"{self._activity_for_job(job_type)} queued"
         )
         self._sync_busy_state(self._activity_for_job(job_type))
-        if self._local_presence_timer.isActive():
-            self._local_presence_timer.stop()
+        # NOTE: the local-presence timer intentionally keeps running while jobs
+        # are active — its incremental sweep (~120 stat() calls per 450 ms) is
+        # cheap, and stopping it left freshly downloaded files without their
+        # "downloaded" checkmark until the whole queue drained.
         submitted = bool(self.worker.submit_job(job_type, enriched_payload))
         if submitted:
             self._pending_enqueue_retries.pop(request_id, None)

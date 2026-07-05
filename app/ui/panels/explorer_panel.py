@@ -555,8 +555,68 @@ class ExplorerPanelMixin:
             if bool(getattr(self.config, "fetch_thumbnails", True)):
                 self._enqueue_thumbnail_fetches()
                 self._enqueue_remote_video_posters()
+        self._refresh_folder_download_marks()
         if changed:
             self._refresh_action_state()
+
+    # Beyond this many files, skip the "folder downloaded" scan — the recursive
+    # stat sweep isn't worth it for very large trees. Kept high enough that
+    # real folders (tens of thousands of small batched files) still get their
+    # badge; the per-path presence cache absorbs most of the stat cost.
+    _FOLDER_DOWNLOAD_SCAN_MAX_FILES = 25000
+    _FOLDER_DOWNLOAD_CACHE_TTL_SEC = 5.0
+
+    def _refresh_folder_download_marks(self) -> None:
+        """Mark child folders whose every file is present locally with the same
+        "downloaded" badge files get. Throttled per folder via a TTL cache so the
+        recursive scan doesn't run on every 450 ms presence tick."""
+        if self._trash_view:
+            return
+        paths = self.explorer_model.folder_paths()
+        if not paths:
+            return
+        import time
+
+        now = time.monotonic()
+        for path in paths:
+            cached = self._folder_download_cache.get(path)
+            if cached is not None and (now - cached[0]) <= (
+                self._FOLDER_DOWNLOAD_CACHE_TTL_SEC
+            ):
+                downloaded = cached[1]
+            else:
+                downloaded = self._compute_folder_downloaded(path)
+                self._folder_download_cache[path] = (now, downloaded)
+            self.explorer_model.set_folder_downloaded(path, downloaded)
+
+    def _compute_folder_downloaded(self, folder_path: str) -> bool:
+        """True iff the folder has at least one file and every file under it
+        (recursively) exists on disk at its expected download location."""
+        from app.core.utils import build_safe_output_path
+
+        try:
+            # COUNT first: for over-limit trees this avoids materializing tens
+            # of thousands of rows on the UI thread just to say "no".
+            total = self.repo.count_objects_recursive(folder_path)
+            if total == 0 or total > self._FOLDER_DOWNLOAD_SCAN_MAX_FILES:
+                return False
+            rows = self.repo.list_objects_unified(
+                folder_path=folder_path, recursive=True
+            )
+        except Exception:
+            return False
+        if not rows or len(rows) > self._FOLDER_DOWNLOAD_SCAN_MAX_FILES:
+            return False
+        for row in rows:
+            try:
+                local = build_safe_output_path(
+                    self.config.download_root, row.folder_path, row.orig_name
+                )
+            except Exception:
+                return False
+            if not self._check_local_exists_cached(local):
+                return False
+        return True
 
     def _enqueue_thumbnail_fetches(self) -> None:
         """Queue background fetches of not-yet-downloaded images for previews (1b).
@@ -814,6 +874,10 @@ class ExplorerPanelMixin:
         return bool(exists)
 
     def _invalidate_local_presence_cache(self, local_path: Path | None = None) -> None:
+        # A file's local presence just changed → the "downloaded" verdict of the
+        # folders above it may flip, so drop the folder-mark cache too (cheap, and
+        # it's recomputed lazily on the next presence tick).
+        self._folder_download_cache.clear()
         if local_path is None:
             self._local_presence_cache.clear()
             return

@@ -313,8 +313,15 @@ class AccountsDialog(QDialog):
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         # Account status stretches to fill the remaining width — it has the
-        # longest text.
+        # longest text. Left-align it (header + cells): centering short text
+        # in a wide stretched column leaves it stranded in empty space, far
+        # from the "Proxy status" column it reads alongside.
         header.setSectionResizeMode(self.COL_ACC_STATUS, QHeaderView.ResizeMode.Stretch)
+        acc_status_header = self.table.horizontalHeaderItem(self.COL_ACC_STATUS)
+        if acc_status_header is not None:
+            acc_status_header.setTextAlignment(
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+            )
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -322,41 +329,58 @@ class AccountsDialog(QDialog):
         self.table.verticalHeader().setVisible(False)
         layout.addWidget(self.table)
 
-        # Buttons
-        btn_layout = QHBoxLayout()
+        # Buttons — two rows so translated (longer) labels never get clipped
+        # by overflowing a single row's width (hit with ru/uk in practice).
+        btn_layout = QVBoxLayout()
         btn_layout.setSpacing(8)
+        btn_row1 = QHBoxLayout()
+        btn_row1.setSpacing(8)
+        btn_row2 = QHBoxLayout()
+        btn_row2.setSpacing(8)
 
-        self.add_btn = QPushButton(self.tr("➕ Add account"))
+        self.add_btn = QPushButton(self.tr("+ Add account"))
         self.add_btn.setObjectName("primaryBtn")
         self.add_btn.clicked.connect(self._on_add)
         self.add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_layout.addWidget(self.add_btn)
+        btn_row1.addWidget(self.add_btn)
 
         self.primary_btn = QPushButton(self.tr("Set as primary"))
         self.primary_btn.clicked.connect(self._on_set_primary)
         self.primary_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_layout.addWidget(self.primary_btn)
+        btn_row1.addWidget(self.primary_btn)
 
         self.toggle_btn = QPushButton(self.tr("On / Off"))
         self.toggle_btn.clicked.connect(self._on_toggle)
         self.toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_layout.addWidget(self.toggle_btn)
+        btn_row1.addWidget(self.toggle_btn)
 
         self.channel_btn = QPushButton(self.tr("Change channel"))
         self.channel_btn.clicked.connect(self._on_change_channel)
         self.channel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_layout.addWidget(self.channel_btn)
+        btn_row1.addWidget(self.channel_btn)
+
+        self.favorites_btn = QPushButton(self.tr("Use Saved Messages"))
+        self.favorites_btn.setToolTip(
+            self.tr(
+                "Switch this account to store new uploads in Saved Messages "
+                "(Favorites) instead of a channel"
+            )
+        )
+        self.favorites_btn.clicked.connect(self._on_use_saved_messages)
+        self.favorites_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_row1.addWidget(self.favorites_btn)
+        btn_row1.addStretch()
 
         self.proxy_btn = QPushButton(self.tr("Proxy"))
         self.proxy_btn.clicked.connect(self._on_change_proxy)
         self.proxy_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_layout.addWidget(self.proxy_btn)
+        btn_row2.addWidget(self.proxy_btn)
 
         self.remove_btn = QPushButton(self.tr("Remove"))
         self.remove_btn.setObjectName("removeBtn")
         self.remove_btn.clicked.connect(self._on_remove)
         self.remove_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_layout.addWidget(self.remove_btn)
+        btn_row2.addWidget(self.remove_btn)
 
         self.check_btn = QPushButton(self.tr("Check liveness"))
         self.check_btn.clicked.connect(self._start_probe)
@@ -367,15 +391,17 @@ class AccountsDialog(QDialog):
             )
         )
         self.check_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_layout.addWidget(self.check_btn)
+        btn_row2.addWidget(self.check_btn)
 
-        btn_layout.addStretch()
+        btn_row2.addStretch()
 
         self.close_btn = QPushButton(self.tr("Close"))
         self.close_btn.clicked.connect(self.accept)
         self.close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_layout.addWidget(self.close_btn)
+        btn_row2.addWidget(self.close_btn)
 
+        btn_layout.addLayout(btn_row1)
+        btn_layout.addLayout(btn_row2)
         layout.addLayout(btn_layout)
 
         self._load_accounts()
@@ -477,7 +503,12 @@ class AccountsDialog(QDialog):
         from PySide6.QtGui import QColor
 
         item = QTableWidgetItem(text)
-        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        if col == self.COL_ACC_STATUS:
+            item.setTextAlignment(
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+            )
+        else:
+            item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         if text.startswith("✅"):
             item.setForeground(QColor("#4ade80"))  # green — alive
         elif text.startswith(("❌", "⚠")):
@@ -522,10 +553,18 @@ class AccountsDialog(QDialog):
         except Exception:
             return raw
 
+    @staticmethod
+    def _is_saved_messages(chat_target: str) -> bool:
+        return str(chat_target or "").strip().lower() in ("me", "self")
+
     def _make_channel_button(self, chat_target: str) -> QPushButton:
-        btn = QPushButton(self.tr("📋 Link"))
+        if self._is_saved_messages(chat_target):
+            btn = QPushButton(self.tr("Saved Messages"))
+            btn.setToolTip(self.tr("Files are stored in Saved Messages (Favorites)"))
+        else:
+            btn = QPushButton(self.tr("Link"))
+            btn.setToolTip(chat_target or self.tr("Channel not set"))
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn.setToolTip(chat_target or self.tr("Channel not set"))
         btn.setEnabled(bool(chat_target))
         btn.clicked.connect(lambda _=False, t=chat_target: self._copy_channel(t))
         return btn
@@ -534,6 +573,16 @@ class AccountsDialog(QDialog):
         from PySide6.QtWidgets import QApplication
 
         if not chat_target:
+            return
+        if self._is_saved_messages(chat_target):
+            QMessageBox.information(
+                self,
+                self.tr("Saved Messages"),
+                self.tr(
+                    "This account stores files in Saved Messages (Favorites), "
+                    "not a separate channel."
+                ),
+            )
             return
         QApplication.clipboard().setText(chat_target)
         QMessageBox.information(
@@ -569,7 +618,7 @@ class AccountsDialog(QDialog):
         self.repo.update_account(acc_id, is_primary=1)
         self._load_accounts()
         QMessageBox.information(
-            self, self.tr("Done"), self.tr("The account is now primary! ✨")
+            self, self.tr("Done"), self.tr("The account is now primary.")
         )
 
     def _on_toggle(self):
@@ -625,6 +674,48 @@ class AccountsDialog(QDialog):
                 self.tr("Done"),
                 self.tr("Channel updated: {0}").format(new_channel),
             )
+
+    def _on_use_saved_messages(self):
+        acc_id = self._get_selected_id()
+        if acc_id is None:
+            return
+
+        acc = self.repo.get_account(acc_id)
+        if not acc:
+            return
+
+        if self._is_saved_messages(acc.chat_target):
+            QMessageBox.information(
+                self,
+                self.tr("Saved Messages"),
+                self.tr("This account already stores files in Saved Messages."),
+            )
+            return
+
+        from app.ui.dialogs import ConfirmDialog
+
+        dialog = ConfirmDialog(
+            title=self.tr("Switch to Saved Messages?"),
+            message=self.tr(
+                "Account '{0}' will now upload new files to Saved Messages "
+                "(Favorites) instead of channel '{1}'.\n\n"
+                "This only affects new uploads — existing files stay where "
+                "they are."
+            ).format(acc.label, acc.chat_target),
+            parent=self,
+        )
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        self.repo.update_account(acc_id, chat_target="me")
+        self._load_accounts()
+        QMessageBox.information(
+            self,
+            self.tr("Done"),
+            self.tr("Account '{0}' now stores files in Saved Messages.").format(
+                acc.label
+            ),
+        )
 
     @staticmethod
     def _looks_like_proxy(value: str) -> bool:

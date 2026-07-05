@@ -10,11 +10,12 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 
 from app.core.types import TelegramAccount
 from app.db.database import connect_db
 from app.db.repo import DbRepo
+from app.ui.dialogs import ConfirmDialog
 from app.ui.dialogs._accounts import AccountsDialog, _StatusProbe
 
 
@@ -217,3 +218,90 @@ def test_session_disk_path_and_missing_session() -> None:
     )
     result = asyncio.run(_StatusProbe._probe_account(acc, None))
     assert result == "⚠️ no session"
+
+
+def test_is_saved_messages_detection() -> None:
+    assert AccountsDialog._is_saved_messages("me") is True
+    assert AccountsDialog._is_saved_messages("Me") is True
+    assert AccountsDialog._is_saved_messages(" self ") is True
+    assert AccountsDialog._is_saved_messages("@channel") is False
+    assert AccountsDialog._is_saved_messages("") is False
+
+
+def test_channel_button_shows_saved_messages_label(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(AccountsDialog, "_start_probe", lambda self: None)
+    _ = QApplication.instance() or QApplication([])
+    repo = _make_repo(tmp_path)
+    acc_id = repo.list_accounts()[0].id
+    repo.update_account(acc_id, chat_target="me")
+    dlg = AccountsDialog(repo)
+    try:
+        widget = dlg.table.cellWidget(0, AccountsDialog.COL_CHANNEL)
+        assert widget.text() == "Saved Messages"
+        other_widget = dlg.table.cellWidget(1, AccountsDialog.COL_CHANNEL)
+        assert other_widget.text() == "Link"
+    finally:
+        dlg.deleteLater()
+
+
+def test_copy_channel_saved_messages_shows_info_not_clipboard(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr(AccountsDialog, "_start_probe", lambda self: None)
+    _ = QApplication.instance() or QApplication([])
+    info_calls = []
+    monkeypatch.setattr(
+        QMessageBox, "information", staticmethod(lambda *a, **k: info_calls.append(a))
+    )
+    repo = _make_repo(tmp_path)
+    dlg = AccountsDialog(repo)
+    try:
+        dlg._copy_channel("me")
+        assert len(info_calls) == 1
+    finally:
+        dlg.deleteLater()
+
+
+def test_use_saved_messages_switches_chat_target(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(AccountsDialog, "_start_probe", lambda self: None)
+    _ = QApplication.instance() or QApplication([])
+    monkeypatch.setattr(QMessageBox, "information", staticmethod(lambda *a, **k: None))
+    monkeypatch.setattr(
+        ConfirmDialog, "exec", lambda *_a, **_k: QDialog.DialogCode.Accepted
+    )
+    repo = _make_repo(tmp_path)
+    dlg = AccountsDialog(repo)
+    try:
+        acc_id = dlg._accounts[0].id
+        dlg.table.setCurrentCell(0, 0)
+        dlg._on_use_saved_messages()
+        updated = repo.get_account(acc_id)
+        assert updated.chat_target == "me"
+    finally:
+        dlg.deleteLater()
+
+
+def test_use_saved_messages_already_set_skips_confirm(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(AccountsDialog, "_start_probe", lambda self: None)
+    _ = QApplication.instance() or QApplication([])
+    info_calls = []
+    monkeypatch.setattr(
+        QMessageBox, "information", staticmethod(lambda *a, **k: info_calls.append(a))
+    )
+    confirm_calls = []
+    monkeypatch.setattr(
+        ConfirmDialog,
+        "exec",
+        lambda *_a, **_k: confirm_calls.append(1) or QDialog.DialogCode.Accepted,
+    )
+    repo = _make_repo(tmp_path)
+    acc_id = repo.list_accounts()[0].id
+    repo.update_account(acc_id, chat_target="me")
+    dlg = AccountsDialog(repo)
+    try:
+        dlg.table.setCurrentCell(0, 0)
+        dlg._on_use_saved_messages()
+        assert confirm_calls == []
+        assert len(info_calls) == 1
+    finally:
+        dlg.deleteLater()

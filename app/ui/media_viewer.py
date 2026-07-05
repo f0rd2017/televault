@@ -416,13 +416,6 @@ class VideoViewerWindow(QWidget):
 
         self._video.installEventFilter(self)
 
-        from PySide6.QtCore import QTimer
-
-        self._click_timer = QTimer(self)
-        self._click_timer.setSingleShot(True)
-        self._click_timer.setInterval(250)
-        self._click_timer.timeout.connect(self._toggle)
-
         self._play_btn.clicked.connect(self._toggle)
         # sliderMoved fires on EVERY mouse move while dragging — if we hooked
         # player.setPosition directly to it, scrubbing would turn into a flood
@@ -470,15 +463,21 @@ class VideoViewerWindow(QWidget):
     def eventFilter(self, obj, event) -> bool:
         from PySide6.QtCore import QEvent
 
+        # Single click toggles play/pause instantly; double click toggles
+        # fullscreen. We deliberately DON'T debounce the single click behind a
+        # timer: a double click then delivers two single toggles (pause then
+        # unpause — net no change) followed by the fullscreen switch, so
+        # playback state is preserved and there's no lag. The old timer-based
+        # approach mistook a quick pause→resume double-tap for a double click
+        # and flipped fullscreen, making the window "jump".
         if obj == self._video:
             if event.type() == QEvent.Type.MouseButtonDblClick:
-                self._click_timer.stop()
-                self._toggle_fullscreen()
-                return True
-            elif event.type() == QEvent.Type.MouseButtonPress:
                 if event.button() == Qt.MouseButton.LeftButton:
-                    if not self._click_timer.isActive():
-                        self._click_timer.start()
+                    self._toggle_fullscreen()
+                    return True
+            elif event.type() == QEvent.Type.MouseButtonRelease:
+                if event.button() == Qt.MouseButton.LeftButton:
+                    self._toggle()
                     return True
         return super().eventFilter(obj, event)
 

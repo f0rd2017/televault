@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 
 from app.core.types import JobType
 from app.core.utils import has_cryptg
-from app.ui.theme import _MAIN_WINDOW_STYLESHEET
+from app.ui.theme import main_window_stylesheet
 
 if TYPE_CHECKING:
     pass
@@ -312,27 +312,36 @@ class MiscMixin:
         )
 
     def _apply_dark_theme(self) -> None:
-        self.setStyleSheet(_MAIN_WINDOW_STYLESHEET)
+        self.setStyleSheet(main_window_stylesheet())
 
     def _configure_shortcuts(self) -> None:
         # Keep shortcuts explicit and local to this window for predictable behavior.
         self._shortcuts.clear()
 
-        self.action_refresh.setShortcut(QKeySequence("Ctrl+R"))
-        self.action_reindex.setShortcut(QKeySequence("F5"))
+        # F5 and Ctrl+R both trigger the everyday refresh — the browser/file
+        # manager convention, where F5 is the casual key and Ctrl+Shift+R is
+        # reserved for the heavier "full" refresh (here: full reindex).
+        self.action_refresh.setShortcuts([QKeySequence("Ctrl+R"), QKeySequence("F5")])
+        self.action_reindex.setShortcut(QKeySequence("Ctrl+Shift+R"))
         self.action_upload.setShortcut(QKeySequence("Ctrl+U"))
         self.action_download.setShortcut(QKeySequence("Ctrl+D"))
+        self.action_create_folder.setShortcut(QKeySequence("Ctrl+N"))
         for action in (
             self.action_refresh,
             self.action_reindex,
             self.action_upload,
             self.action_download,
+            self.action_create_folder,
         ):
             self.addAction(action)
 
         focus_search = QShortcut(QKeySequence("Ctrl+F"), self)
         focus_search.activated.connect(self._focus_search)
         self._shortcuts.append(focus_search)
+
+        select_all = QShortcut(QKeySequence("Ctrl+A"), self)
+        select_all.activated.connect(self._on_select_all_shortcut)
+        self._shortcuts.append(select_all)
 
         nav_back = QShortcut(QKeySequence("Alt+Left"), self)
         nav_back.activated.connect(self._on_nav_back)
@@ -346,13 +355,29 @@ class MiscMixin:
         nav_up.activated.connect(self._on_nav_up_shortcut)
         self._shortcuts.append(nav_up)
 
-        backspace_delete_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Backspace), self)
-        backspace_delete_shortcut.activated.connect(self._on_delete_shortcut)
-        self._shortcuts.append(backspace_delete_shortcut)
+        # Delete/Backspace: move to trash (safe, reversible) — the file manager
+        # standard. Shift+Delete/Shift+Backspace bypasses trash for good.
+        for seq in ("Delete", "Backspace"):
+            soft_delete_shortcut = QShortcut(QKeySequence(seq), self)
+            soft_delete_shortcut.activated.connect(self._on_delete_shortcut)
+            self._shortcuts.append(soft_delete_shortcut)
 
-        delete_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Delete), self)
-        delete_shortcut.activated.connect(self._on_delete_shortcut)
-        self._shortcuts.append(delete_shortcut)
+        for seq in ("Shift+Delete", "Shift+Backspace"):
+            hard_delete_shortcut = QShortcut(QKeySequence(seq), self)
+            hard_delete_shortcut.activated.connect(self._on_delete_forever_shortcut)
+            self._shortcuts.append(hard_delete_shortcut)
+
+        rename_shortcut = QShortcut(QKeySequence(Qt.Key.Key_F2), self)
+        rename_shortcut.activated.connect(self._on_rename_shortcut)
+        self._shortcuts.append(rename_shortcut)
+
+        hotkeys_shortcut = QShortcut(QKeySequence(Qt.Key.Key_F1), self)
+        hotkeys_shortcut.activated.connect(self._on_show_hotkeys)
+        self._shortcuts.append(hotkeys_shortcut)
+
+        quit_shortcut = QShortcut(QKeySequence("Ctrl+Q"), self)
+        quit_shortcut.activated.connect(self.close)
+        self._shortcuts.append(quit_shortcut)
 
         # Download selected file(s) with D — and Cyrillic в/В (same physical key).
         for seq in ("D", "в", "В"):
@@ -378,7 +403,30 @@ class MiscMixin:
         self._on_download()
 
     def _on_delete_shortcut(self) -> None:
+        """Delete/Backspace: move file(s) to trash (safe, reversible) — the
+        file-manager standard. Folders have no trash concept, so they're
+        still deleted permanently (with confirmation). In the Trash view
+        itself there's nowhere further to move things, so this deletes
+        forever."""
         if self._is_text_input_focused():
+            return
+        if self._trash_view:
+            self._on_delete_from_trash_forever()
+            return
+        file_entries, folder_paths = self._resolve_delete_shortcut_targets()
+        if not file_entries and not folder_paths:
+            return
+        if file_entries:
+            self._on_move_to_trash()
+        if folder_paths:
+            self._confirm_and_enqueue_delete_folders(folder_paths)
+
+    def _on_delete_forever_shortcut(self) -> None:
+        """Shift+Delete/Shift+Backspace: permanent delete, bypassing trash."""
+        if self._is_text_input_focused():
+            return
+        if self._trash_view:
+            self._on_delete_from_trash_forever()
             return
         file_entries, folder_paths = self._resolve_delete_shortcut_targets()
         if not file_entries and not folder_paths:
@@ -393,6 +441,58 @@ class MiscMixin:
             self._confirm_and_enqueue_delete_files(file_entries)
         if folder_paths:
             self._confirm_and_enqueue_delete_folders(folder_paths)
+
+    def _on_select_all_shortcut(self) -> None:
+        if self._is_text_input_focused():
+            return
+        self.explorer_view.selectAll()
+
+    def _on_rename_shortcut(self) -> None:
+        if self._is_text_input_focused():
+            return
+        entries = self._selected_objects()
+        if len(entries) != 1:
+            return
+        self._on_rename_file(entries[0])
+
+    def _on_show_hotkeys(self) -> None:
+        """Display list for the "Keyboard shortcuts" dialog. Kept in literal
+        self.tr(...) calls (not built from a data table) so pyside6-lupdate
+        can actually extract these strings for translation. The real key
+        bindings live in _configure_shortcuts — keep the two in sync by hand
+        when either changes."""
+        from app.ui.dialogs._hotkeys import HotkeysDialog
+
+        nav = self.tr("Navigation")
+        search_sel = self.tr("Search & selection")
+        files = self.tr("Files")
+        data = self.tr("Data")
+        window = self.tr("Window")
+
+        entries = [
+            (nav, ["Alt+Left"], self.tr("Back")),
+            (nav, ["Alt+Right"], self.tr("Forward")),
+            (nav, ["Alt+Up"], self.tr("Up one level")),
+            (search_sel, ["Ctrl+F"], self.tr("Focus search")),
+            (search_sel, ["Ctrl+A"], self.tr("Select all")),
+            (files, ["Ctrl+U"], self.tr("Upload")),
+            (files, ["Ctrl+D", "D"], self.tr("Download selected")),
+            (files, ["Ctrl+N"], self.tr("Create folder")),
+            (files, ["F2"], self.tr("Rename")),
+            (files, ["Delete", "Backspace"], self.tr("Move to trash")),
+            (
+                files,
+                ["Shift+Delete", "Shift+Backspace"],
+                self.tr("Delete permanently"),
+            ),
+            (data, ["Ctrl+R", "F5"], self.tr("Refresh")),
+            (data, ["Ctrl+Shift+R"], self.tr("Full reindex")),
+            (window, ["F1"], self.tr("Show keyboard shortcuts")),
+            (window, ["Ctrl+Q"], self.tr("Quit")),
+            (window, ["Esc"], self.tr("Close window / minimize to tray")),
+        ]
+        dialog = HotkeysDialog(entries, parent=self)
+        dialog.exec()
 
     def dragEnterEvent(self, event) -> None:  # noqa: N802
         if event.mimeData().hasUrls() and any(

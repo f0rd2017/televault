@@ -1,6 +1,31 @@
 from __future__ import annotations
 
-from PySide6.QtWidgets import QApplication
+from pathlib import Path
+
+from PySide6.QtWidgets import QApplication, QProxyStyle, QStyle
+
+TOOLTIP_WAKEUP_DELAY_MS = 2000
+
+_ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
+_CHEVRON_ICON_PATH = (_ASSETS_DIR / "chevron_down.png").as_posix()
+_CHEVRON_ICON_HOVER_PATH = (_ASSETS_DIR / "chevron_down_hover.png").as_posix()
+
+
+class _DelayedTooltipStyle(QProxyStyle):
+    """Makes tooltips wait for the cursor to actually stop moving.
+
+    Qt's default ~700ms wake-up delay also lets a "fall asleep" grace
+    period chain tooltips together when hopping between adjacent
+    widgets, which feels twitchy. We want every tooltip to wait the
+    same fixed delay, so the grace period is disabled (set to 0).
+    """
+
+    def styleHint(self, hint, option=None, widget=None, returnData=None):
+        if hint == QStyle.StyleHint.SH_ToolTip_WakeUpDelay:
+            return TOOLTIP_WAKEUP_DELAY_MS
+        if hint == QStyle.StyleHint.SH_ToolTip_FallAsleepDelay:
+            return 0
+        return super().styleHint(hint, option, widget, returnData)
 
 
 _MAIN_WINDOW_STYLESHEET = """
@@ -88,6 +113,30 @@ _MAIN_WINDOW_STYLESHEET = """
                 color: #ffffff;
                 border: 1px solid #3f3f46;
             }
+            QPushButton#topActionButton:checked {
+                background: #3b0764;
+                color: #ffffff;
+                border: 1px solid #6d28d9;
+            }
+            QPushButton#everywhereButton {
+                background: transparent;
+                color: #a1a1aa;
+                border: 1px solid transparent;
+                border-radius: 10px;
+                padding: 0 14px;
+                font-size: 13px;
+                font-weight: 600;
+            }
+            QPushButton#everywhereButton:hover {
+                background: #27272a;
+                color: #ffffff;
+                border: 1px solid #3f3f46;
+            }
+            QPushButton#everywhereButton:checked {
+                background: #3b0764;
+                color: #ffffff;
+                border: 1px solid #6d28d9;
+            }
             
             QPushButton#applyFilterButton {
                 background: qlineargradient(
@@ -151,11 +200,18 @@ _MAIN_WINDOW_STYLESHEET = """
                 subcontrol-origin: padding;
                 subcontrol-position: top right;
                 width: 26px;
+                background: transparent;
                 border: none;
                 border-left: 1px solid #27272a;
             }
             QComboBox::down-arrow {
-                image: none;
+                image: url("__CHEVRON_ICON__");
+                width: 10px;
+                height: 10px;
+                margin-right: 10px;
+            }
+            QComboBox:hover::down-arrow {
+                image: url("__CHEVRON_ICON_HOVER__");
             }
             
             /* Panels */
@@ -347,5 +403,19 @@ _MAIN_WINDOW_STYLESHEET = """
         """
 
 
+def main_window_stylesheet() -> str:
+    """The main window QSS with asset placeholders resolved to real paths.
+
+    Any code that applies ``_MAIN_WINDOW_STYLESHEET`` directly to a widget
+    (rather than through :func:`apply_theme`) must use this instead, or the
+    unresolved ``__CHEVRON_ICON__`` placeholder ends up as a literal
+    (nonexistent) file name and the combo-box arrow silently fails to load.
+    """
+    return _MAIN_WINDOW_STYLESHEET.replace(
+        "__CHEVRON_ICON__", _CHEVRON_ICON_PATH
+    ).replace("__CHEVRON_ICON_HOVER__", _CHEVRON_ICON_HOVER_PATH)
+
+
 def apply_theme(app: QApplication) -> None:
-    app.setStyleSheet(_MAIN_WINDOW_STYLESHEET)
+    app.setStyle(_DelayedTooltipStyle(app.style()))
+    app.setStyleSheet(main_window_stylesheet())

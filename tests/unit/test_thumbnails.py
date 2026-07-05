@@ -136,6 +136,82 @@ def test_set_thumbnail_from_path(tmp_path):
     assert model.item_for_index(model.index(0, 0)).thumbnail is not None
 
 
+def test_set_items_preserves_thumbnail_across_reload(tmp_path):
+    # Регрессия: скачивание файла триггерит reload, который раньше пересобирал
+    # элементы с thumbnail=None → уже показанное превью пропадало. set_items
+    # должен переносить готовую миниатюру на новый элемент того же объекта.
+    _app()
+    png = _write_png(tmp_path / "remote.png")
+    model = ExplorerGridModel(thumb_cache_dir=str(tmp_path / ".thumb_cache"))
+    model.set_items(
+        [ExplorerFileItem(entry=_entry("remote.png", key="k9"), local_exists=False)]
+    )
+    assert model.set_thumbnail_from_path("Photos", "k9", png) is True
+    assert model.item_for_index(model.index(0, 0)).thumbnail is not None
+
+    # Имитируем reload после скачивания: свежий элемент (thumbnail=None) того же
+    # объекта, теперь локальный. Превью должно сохраниться, а не пропасть.
+    fresh = ExplorerFileItem(
+        entry=_entry("remote.png", key="k9"),
+        local_path=str(tmp_path / "dl" / "remote.png"),
+        local_exists=True,
+    )
+    model.set_items([fresh])
+    carried = model.item_for_index(model.index(0, 0))
+    assert carried.thumbnail is not None, (
+        "preview must survive the post-download reload"
+    )
+    assert carried.local_exists is True
+
+
+def test_folder_download_mark_and_carry_over(tmp_path):
+    # Скачанная папка (все файлы внутри локально) помечается тем же значком
+    # "загружено", что и файлы; метка переживает reload и идемпотентна.
+    _app()
+    from app.ui.models_qt import ExplorerFolderItem
+
+    model = ExplorerGridModel(thumb_cache_dir=str(tmp_path / ".thumb_cache"))
+    model.set_items([ExplorerFolderItem(name="Sub", path="Photos/Sub")])
+    idx = model.index(0, 0)
+    plain = model.data(idx, Qt.ItemDataRole.DecorationRole)
+    assert isinstance(plain, QIcon) and not plain.isNull()
+    assert model.folder_paths() == ["Photos/Sub"]
+
+    assert model.set_folder_downloaded("Photos/Sub", True) is True
+    assert model.item_for_index(idx).downloaded is True
+    assert "downloaded" in model.data(idx, Qt.ItemDataRole.ToolTipRole)
+    # Идемпотентно — повторная установка того же значения ничего не меняет.
+    assert model.set_folder_downloaded("Photos/Sub", True) is False
+
+    # Метка переживает reload (как и превью файлов).
+    model.set_items([ExplorerFolderItem(name="Sub", path="Photos/Sub")])
+    assert model.item_for_index(model.index(0, 0)).downloaded is True
+
+    # Снятие метки работает.
+    assert model.set_folder_downloaded("Photos/Sub", False) is True
+    assert model.item_for_index(model.index(0, 0)).downloaded is False
+
+
+def test_set_icon_size_drops_stale_size_thumbnail(tmp_path):
+    # После смены размера иконок старые (другого размера) миниатюры не должны
+    # переноситься carry-over'ом — иначе они заблокируют пересборку под новый размер.
+    _app()
+    png = _write_png(tmp_path / "pic.png")
+    model = ExplorerGridModel(thumb_cache_dir=str(tmp_path / ".thumb_cache"))
+    model.set_items(
+        [ExplorerFileItem(entry=_entry(key="ksz"), local_path=png, local_exists=True)]
+    )
+    assert model.refresh_thumbnails_step(max_items=8) is True
+    assert model.item_for_index(model.index(0, 0)).thumbnail is not None
+
+    model.set_icon_size(128)  # смена размера очищает миниатюры с элементов
+    model.set_items(
+        [ExplorerFileItem(entry=_entry(key="ksz"), local_path=png, local_exists=True)]
+    )
+    # Ничего не перенеслось — миниатюра пересоберётся под новый размер отдельным шагом.
+    assert model.item_for_index(model.index(0, 0)).thumbnail is None
+
+
 def test_clear_dir_files(tmp_path):
     from app.core.utils import clear_dir_files
 
@@ -196,6 +272,16 @@ def test_is_video_name():
     assert is_video_name("clip.MP4")
     assert is_video_name("movie.mkv")
     assert is_video_name("a.webm")
+    # Formats beyond mp4 must also count as video so they get a poster frame
+    # in the grid (regression: user reported avi had no preview).
+    assert is_video_name("old.avi")
+    assert is_video_name("phone.mov")
+    assert is_video_name("cam.flv")
+    assert is_video_name("rec.wmv")
+    assert is_video_name("clip.mpeg")
+    assert is_video_name("clip.mpg")
+    assert is_video_name("clip.m4v")
+    assert is_video_name("clip.3gp")
     assert not is_video_name("pic.png")
     assert not is_video_name("note.txt")
     assert not is_video_name("noext")
@@ -230,6 +316,225 @@ def test_extract_video_poster_png(tmp_path):
     # Построенный постер — валидная картинка → из него строится миниатюра.
     icon = make_thumbnail_icon(str(out), size=58)
     assert isinstance(icon, QIcon) and not icon.isNull()
+
+
+@pytest.mark.skipif(not ffmpeg_available(), reason="ffmpeg not installed")
+def test_extract_video_poster_png_avi(tmp_path):
+    # Regression: avi must get a poster just like mp4. ffmpeg is
+    # format-agnostic, so this verifies the whole pipeline treats avi equally.
+    _app()  # make_thumbnail_icon builds a QPixmap → needs a QApplication
+    vid = _write_test_video(tmp_path / "clip.avi")
+    out = tmp_path / "poster_avi.png"
+    assert extract_video_poster_png(vid, out, box=128) is True
+    assert out.is_file() and out.stat().st_size > 0
+    icon = make_thumbnail_icon(str(out), size=58)
+    assert isinstance(icon, QIcon) and not icon.isNull()
+
+
+@pytest.mark.skipif(not ffmpeg_available(), reason="ffmpeg not installed")
+def test_extract_video_poster_from_prefix_avi_and_mp4(tmp_path):
+    # The remote-poster path only pulls the file's FIRST part (a prefix) and
+    # runs ffmpeg on it. avi keeps frames inline from the start (index at the
+    # end is not needed for a single frame), so a prefix must still decode.
+    for ext in ("avi", "mp4"):
+        vid = _write_test_video(tmp_path / f"clip.{ext}", duration=3, size="320x240")
+        prefix = tmp_path / f"prefix.{ext}.bin"
+        prefix.write_bytes(pathlib_read_prefix(vid, 128 * 1024))
+        out = tmp_path / f"poster_prefix_{ext}.png"
+        # seek_sec=0.0 mirrors _run_video_poster_remote.
+        assert extract_video_poster_png(prefix, out, box=128, seek_sec=0.0) is True, ext
+        assert out.is_file() and out.stat().st_size > 0
+
+
+def pathlib_read_prefix(path: str, n: int) -> bytes:
+    with open(path, "rb") as f:
+        return f.read(n)
+
+
+def _write_test_video_codec(path, *, codec: str, faststart: bool, duration=4) -> str:
+    """Generate an mp4 with the moov atom at the front (faststart) or end."""
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-loglevel",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        f"testsrc=duration={duration}:size=640x480:rate=25",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:v",
+        codec,
+    ]
+    if faststart:
+        cmd += ["-movflags", "+faststart"]
+    cmd += [str(path)]
+    subprocess.run(cmd, check=True)  # noqa: S603
+    return str(path)
+
+
+def test_write_sparse_head_tail_basic(tmp_path):
+    from app.core.utils import write_sparse_head_tail
+
+    head = tmp_path / "head.bin"
+    tail = tmp_path / "tail.bin"
+    head.write_bytes(b"HEAD")
+    tail.write_bytes(b"TAIL")
+    out = tmp_path / "sparse.bin"
+    # total 20 bytes: HEAD at 0..4, hole 4..16, TAIL at 16..20.
+    assert (
+        write_sparse_head_tail(out, head, tail, tail_offset=16, total_size=20) is True
+    )
+    data = out.read_bytes()
+    assert len(data) == 20
+    assert data[0:4] == b"HEAD"
+    assert data[16:20] == b"TAIL"
+    assert data[4:16] == b"\x00" * 12  # the gap is a hole (zeros)
+
+
+def test_write_sparse_head_tail_rejects_bad_geometry(tmp_path):
+    from app.core.utils import write_sparse_head_tail
+
+    head = tmp_path / "h.bin"
+    tail = tmp_path / "t.bin"
+    head.write_bytes(b"HEADHEAD")  # 8 bytes
+    tail.write_bytes(b"TAIL")
+    # tail_offset (4) < len(head) (8) → overlap → refuse.
+    assert (
+        write_sparse_head_tail(
+            tmp_path / "o1.bin", head, tail, tail_offset=4, total_size=100
+        )
+        is False
+    )
+    # tail spilling past total_size → refuse.
+    assert (
+        write_sparse_head_tail(
+            tmp_path / "o2.bin", head, tail, tail_offset=10, total_size=12
+        )
+        is False
+    )
+    # Missing input → False, no exception.
+    assert (
+        write_sparse_head_tail(
+            tmp_path / "o3.bin",
+            tmp_path / "nope.bin",
+            tail,
+            tail_offset=10,
+            total_size=100,
+        )
+        is False
+    )
+
+
+@pytest.mark.skipif(not ffmpeg_available(), reason="ffmpeg not installed")
+def test_remote_poster_fallback_reconstructs_nonfaststart(tmp_path):
+    # The real bug: a non-faststart MP4 (often what a ".avi" actually is) keeps
+    # moov at the END, so a prefix-only poster fails. Reconstructing a sparse
+    # head+tail file (as the worker fallback does) must let ffmpeg decode it.
+    from app.core.utils import write_sparse_head_tail
+
+    vid = _write_test_video_codec(
+        tmp_path / "movie.mp4", codec="mpeg4", faststart=False
+    )
+    with open(vid, "rb") as f:
+        data = f.read()
+    total = len(data)
+    # Real parts are ~32 MB, so moov (a few KB at the tail) always lands wholly
+    # inside the last part. Pick a part size here that preserves that property
+    # while still yielding several parts.
+    part = 100 * 1024
+    nparts = (total + part - 1) // part
+
+    head_path = tmp_path / "part0.bin"
+    head_path.write_bytes(data[0:part])
+    last_off = (nparts - 1) * part
+    tail_path = tmp_path / "partlast.bin"
+    tail_path.write_bytes(data[last_off:])
+
+    # Prefix-only must FAIL for non-faststart (no moov in the head).
+    assert (
+        extract_video_poster_png(head_path, tmp_path / "pfx.png", seek_sec=0.0) is False
+    )
+
+    # Head+tail sparse reconstruction must SUCCEED, including a forward seek
+    # (the ~1s frame's samples live in the head), so the poster isn't limited
+    # to the black first frame.
+    sparse = tmp_path / "sparse.bin"
+    assert write_sparse_head_tail(sparse, head_path, tail_path, last_off, total) is True
+    out = tmp_path / "poster.png"
+    assert extract_video_poster_png(sparse, out, seek_sec=1.0) is True
+    assert out.is_file() and out.stat().st_size > 0
+
+
+def _avg_brightness(png_path) -> float:
+    _app()
+    from PySide6.QtGui import QImage
+
+    img = QImage(str(png_path))
+    assert not img.isNull()
+    img = img.convertToFormat(QImage.Format.Format_Grayscale8)
+    total = 0
+    count = 0
+    for y in range(0, img.height(), 6):
+        for x in range(0, img.width(), 6):
+            total += img.pixelColor(x, y).red()
+            count += 1
+    return total / max(1, count)
+
+
+@pytest.mark.skipif(not ffmpeg_available(), reason="ffmpeg not installed")
+def test_remote_poster_skips_black_intro_frame(tmp_path):
+    # Regression: previews were coming out black because the remote poster used
+    # the very first frame (a black fade-in). A ~1s seek must land on real
+    # content — even through the sparse head+tail reconstruction.
+    from app.core.utils import write_sparse_head_tail
+
+    vid = tmp_path / "blackstart.mp4"
+    subprocess.run(  # noqa: S603
+        [
+            "ffmpeg",
+            "-y",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=black:s=320x240:d=1.5:r=25",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc=duration=3:size=320x240:rate=25",
+            "-filter_complex",
+            "[0:v][1:v]concat=n=2:v=1",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:v",
+            "mpeg4",
+            str(vid),
+        ],
+        check=True,
+    )
+    data = vid.read_bytes()
+    total = len(data)
+    part = 100 * 1024
+    nparts = (total + part - 1) // part
+    head_path = tmp_path / "h.bin"
+    head_path.write_bytes(data[0:part])
+    last_off = (nparts - 1) * part
+    tail_path = tmp_path / "t.bin"
+    tail_path.write_bytes(data[last_off:])
+    sparse = tmp_path / "s.bin"
+    assert write_sparse_head_tail(sparse, head_path, tail_path, last_off, total) is True
+
+    black = tmp_path / "black.png"
+    assert extract_video_poster_png(sparse, black, seek_sec=0.0) is True
+    good = tmp_path / "good.png"
+    assert extract_video_poster_png(sparse, good, seek_sec=1.8) is True
+
+    # Frame 0 is (near) black; the 1.8s frame is bright content.
+    assert _avg_brightness(black) < 16
+    assert _avg_brightness(good) > 60
 
 
 @pytest.mark.skipif(not ffmpeg_available(), reason="ffmpeg not installed")

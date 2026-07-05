@@ -5,8 +5,8 @@ from collections import deque
 from pathlib import Path
 from typing import Any, Callable
 
-from PySide6.QtCore import QEvent, QModelIndex, QSize, Qt, QTimer
-from PySide6.QtGui import QAction
+from PySide6.QtCore import QEvent, QModelIndex, QObject, QSize, Qt, QTimer
+from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QStackedLayout,
     QSystemTrayIcon,
     QToolButton,
+    QToolTip,
     QTreeView,
     QVBoxLayout,
     QWidget,
@@ -37,6 +38,7 @@ from app.core.i18n import (
     saved_language,
 )
 from app.core.types import AppConfig, JobEvent
+from app.core.utils import app_icon_path
 from app.core.worker import TelegramWorker
 from app.db.repo import DbRepo
 from app.ui.job_toasts import JobToastCard, JobToastOverlay
@@ -44,6 +46,7 @@ from app.ui.models_qt import ExplorerGridModel, FolderTreeModel
 from app.ui.widgets import ProgressLogWidget
 from app.ui.panels import (
     ExplorerDropFrame,
+    ExplorerIconDelegate,
     ExplorerListView,
     ExplorerPanelMixin,
     FolderPanelMixin,
@@ -61,6 +64,21 @@ except (
     qta = None
 
 
+class _TooltipMouseMoveHider(QObject):
+    """Hide any visible tooltip as soon as the mouse moves.
+
+    Qt keeps a widget/item-view tooltip on screen until the pointer leaves the
+    item or the tooltip times out — so it lingers while you keep moving over the
+    same icon/button. Installed application-wide, this hides the tooltip on the
+    first movement, so a hint only stays while the pointer is actually still.
+    """
+
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        if event.type() == QEvent.Type.MouseMove and QToolTip.isVisible():
+            QToolTip.hideText()
+        return False
+
+
 class MainWindow(
     FolderPanelMixin,
     ExplorerPanelMixin,
@@ -71,7 +89,9 @@ class MainWindow(
     QMainWindow,
 ):
     _LOCAL_PRESENCE_CACHE_TTL_SEC = 2.0
-    _LOCAL_PRESENCE_CACHE_MAX = 4096
+    # Must comfortably hold the biggest folder's recursive file count, or the
+    # folder-downloaded scan thrashes the cache instead of reusing it.
+    _LOCAL_PRESENCE_CACHE_MAX = 32768
     _EAGER_LOCAL_PRESENCE_LIMIT = 320
     _RELOAD_DEBOUNCE_MS = 260
     _ERROR_DIALOG_DEBOUNCE_MS = 350
@@ -113,6 +133,9 @@ class MainWindow(
         self._pending_upload_jobs: list[dict[str, Any]] = []
         self._job_log_bucket: dict[int, int] = {}
         self._local_presence_cache: dict[str, tuple[float, bool]] = {}
+        # Per-folder "fully downloaded" verdicts (path -> (monotonic_ts, value)).
+        # TTL-throttled so the recursive DB scan doesn't run on every timer tick.
+        self._folder_download_cache: dict[str, tuple[float, bool]] = {}
         self._lazy_presence_mode = False
         self._trash_view = False  # "Trash" mode (soft-deleted objects)
         # Image previews: lazily fetch not-yet-downloaded thumbnails into a temp dir.
@@ -193,6 +216,13 @@ class MainWindow(
         self._wire_events()
         self._apply_dark_theme()
 
+        # Tooltips should vanish the moment the pointer moves, not linger over
+        # the same icon/button until they time out. Installed app-wide.
+        self._tooltip_hider = _TooltipMouseMoveHider(self)
+        app_instance = QApplication.instance()
+        if app_instance is not None:
+            app_instance.installEventFilter(self._tooltip_hider)
+
         # Toast overlay (created after _build_ui so centralWidget exists)
         self._toast_overlay = JobToastOverlay(self.centralWidget())
 
@@ -206,7 +236,12 @@ class MainWindow(
         self._startup_overlay.show_loading(self.tr("Connecting to Telegram…"))
 
         # System tray
-        self._tray = QSystemTrayIcon(self)
+        icon_path = app_icon_path()
+        app_icon = QIcon(str(icon_path)) if icon_path.exists() else self.windowIcon()
+        if not app_icon.isNull():
+            self.setWindowIcon(app_icon)
+        self._tray = QSystemTrayIcon(app_icon, self)
+        self._tray.setToolTip("GlideDrive")
         self._tray_menu = QMenu()
         self._tray_action_show = self._tray_menu.addAction(self.tr("Show"), self.show)
         self._tray_action_quit = self._tray_menu.addAction(
@@ -274,7 +309,6 @@ class MainWindow(
         self.path_bar.setReadOnly(True)
         self.path_bar.setMinimumHeight(36)
         self.path_bar.setPlaceholderText(self.tr("Cloud path"))
-        self.path_bar.setToolTip(self.tr("Current path"))
         top_bar_layout.addWidget(self.path_bar, 1)
 
         self.search_edit = QLineEdit()
@@ -289,9 +323,10 @@ class MainWindow(
         top_bar_layout.addWidget(self.search_edit)
 
         self.search_everywhere_btn = QPushButton(self.tr("Everywhere"))
-        self.search_everywhere_btn.setObjectName("topActionButton")
+        self.search_everywhere_btn.setObjectName("everywhereButton")
         self.search_everywhere_btn.setCheckable(True)
-        self.search_everywhere_btn.setFixedSize(64, 36)
+        self.search_everywhere_btn.setFixedHeight(36)
+        self.search_everywhere_btn.setMinimumWidth(64)
         self.search_everywhere_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.search_everywhere_btn.setToolTip(
             self.tr("Search all nested folders (recursively), not just the current one")
@@ -323,7 +358,6 @@ class MainWindow(
         self.filter_btn.setObjectName("applyFilterButton")
         self.filter_btn.setFixedSize(116, 36)
         self.filter_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.filter_btn.setToolTip(self.tr("Apply the current filters"))
         top_bar_layout.addWidget(self.filter_btn)
 
         top_bar_layout.addSpacing(4)
@@ -412,6 +446,9 @@ class MainWindow(
         self.explorer_view = ExplorerListView()
         self.explorer_view.setObjectName("explorerView")
         self.explorer_view.setModel(self.explorer_model)
+        # Custom delegate: wrap long, space-less file names at any character
+        # instead of eliding them onto one line (they'd waste the cell height).
+        self.explorer_view.setItemDelegate(ExplorerIconDelegate(self.explorer_view))
         self.explorer_view.setViewMode(QListView.ViewMode.IconMode)
         self.explorer_view.setFlow(QListView.Flow.LeftToRight)
         self.explorer_view.setResizeMode(QListView.ResizeMode.Adjust)
@@ -429,9 +466,6 @@ class MainWindow(
         self.explorer_view.setVerticalScrollMode(QListView.ScrollMode.ScrollPerPixel)
         self.explorer_view.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        )
-        self.explorer_view.setToolTip(
-            self.tr("Double-click to download. Right-click for more actions.")
         )
         self.explorer_view.export_paths_provider = self._provide_export_paths_for_drag
         self.explorer_view.export_success_notifier = self._on_export_success
@@ -546,6 +580,18 @@ class MainWindow(
                 )
             )
             button.setIconSize(icon_size)
+
+        self.trash_btn.setText("")
+        self.trash_btn.setIcon(
+            qta.icon(
+                "fa6s.trash",
+                color="#a1a1aa",
+                color_active="#ffffff",
+                color_disabled="#52525b",
+                color_on="#ffffff",
+            )
+        )
+        self.trash_btn.setIconSize(QSize(15, 15))
 
     def _wire_events(self) -> None:
         self.action_create_folder.triggered.connect(lambda: self._on_create_folder())
@@ -917,7 +963,6 @@ class MainWindow(
         self.nav_forward_btn.setToolTip(self.tr("Forward (Alt+Right)"))
         self.nav_up_btn.setToolTip(self.tr("Up (Alt+Up)"))
         self.path_bar.setPlaceholderText(self.tr("Cloud path"))
-        self.path_bar.setToolTip(self.tr("Current path"))
         self.search_edit.setPlaceholderText(self.tr("Search by file name"))
         self.search_edit.setToolTip(
             self.tr("Search files in the current folder (Ctrl+F)")
@@ -929,8 +974,8 @@ class MainWindow(
         self.trash_btn.setToolTip(
             self.tr("Trash: deleted files (restore / delete permanently)")
         )
+        self.status_combo.setToolTip(self.tr("Filter by transfer status"))
         self.filter_btn.setText(self.tr("Apply"))
-        self.filter_btn.setToolTip(self.tr("Apply the current filters"))
         self.btn_reconnect.setToolTip(self.tr("Reconnect Telegram"))
         self.btn_settings.setToolTip(self.tr("Settings"))
         self.btn_accounts.setToolTip(self.tr("Telegram Accounts"))
@@ -949,9 +994,6 @@ class MainWindow(
         self._objects_title_label.setText(self.tr("Files in the cloud"))
         self._objects_hint_label.setText(
             self.tr("Drag files here or right-click for actions")
-        )
-        self.explorer_view.setToolTip(
-            self.tr("Double-click to download. Right-click for more actions.")
         )
 
         self._update_toggle_button_labels()

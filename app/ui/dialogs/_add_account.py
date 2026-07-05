@@ -16,6 +16,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QFormLayout,
     QHBoxLayout,
@@ -180,6 +181,8 @@ class AddAccountDialog(QDialog):
                 padding: 6px 8px;
             }
             QLineEdit:disabled { color: #71717a; }
+            QCheckBox { color: #e4e4e7; spacing: 8px; }
+            QCheckBox:disabled { color: #71717a; }
             QPushButton {
                 background-color: #27272a;
                 color: #e4e4e7;
@@ -247,6 +250,18 @@ class AddAccountDialog(QDialog):
         self.channel_edit.setPlaceholderText("https://t.me/+xxxxx / @username")
         form.addRow(self.tr("Channel:"), self.channel_edit)
 
+        self.saved_messages_check = QCheckBox(
+            self.tr("Use Saved Messages (Favorites) instead of a channel")
+        )
+        self.saved_messages_check.setToolTip(
+            self.tr(
+                "Store uploads in this account's own Saved Messages chat — "
+                "no channel needed"
+            )
+        )
+        self.saved_messages_check.toggled.connect(self._on_saved_messages_toggled)
+        form.addRow("", self.saved_messages_check)
+
         self.proxy_edit = QLineEdit()
         self.proxy_edit.setPlaceholderText(
             self.tr("optional: host:port:user:pass, socks5://…, http://…")
@@ -276,6 +291,15 @@ class AddAccountDialog(QDialog):
 
         layout.addLayout(btn_row)
 
+    def _on_saved_messages_toggled(self, checked: bool) -> None:
+        self.channel_edit.setEnabled(not checked)
+        if checked:
+            self.channel_edit.setPlaceholderText(
+                self.tr("Not needed — using Saved Messages")
+            )
+        else:
+            self.channel_edit.setPlaceholderText("https://t.me/+xxxxx / @username")
+
     # ----- form validation -------------------------------------------------
 
     def _validated_form(self) -> dict | None:
@@ -302,15 +326,19 @@ class AddAccountDialog(QDialog):
             self._warn(self.tr("API Hash is required"))
             return None
 
-        channel = self.channel_edit.text().strip()
-        if not _CHANNEL_RE.match(channel):
-            self._warn(
-                self.tr(
-                    "Invalid channel format. Use https://t.me/+xxxxx, "
-                    "@username or a -100… id"
+        use_saved_messages = self.saved_messages_check.isChecked()
+        if use_saved_messages:
+            channel = "me"
+        else:
+            channel = self.channel_edit.text().strip()
+            if not _CHANNEL_RE.match(channel):
+                self._warn(
+                    self.tr(
+                        "Invalid channel format. Use https://t.me/+xxxxx, "
+                        "@username or a -100… id"
+                    )
                 )
-            )
-            return None
+                return None
 
         proxy = self.proxy_edit.text().strip()
         if proxy:
@@ -392,10 +420,15 @@ class AddAccountDialog(QDialog):
             self.api_id_edit,
             self.api_hash_edit,
             self.channel_edit,
+            self.saved_messages_check,
             self.proxy_edit,
             self.start_btn,
         ):
             widget.setEnabled(enabled)
+        if enabled:
+            # Re-applying the checkbox state: the channel field must stay
+            # disabled if "Saved Messages" is checked, not just blanket-enabled.
+            self.channel_edit.setEnabled(not self.saved_messages_check.isChecked())
 
     def _on_code_requested(self) -> None:
         self.status_label.setText(self.tr("Code sent — check your Telegram app."))

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 import time
@@ -41,6 +41,9 @@ from app.ui.models_qt._icons import (
 class ExplorerFolderItem:
     name: str
     path: str
+    # True when every file under this folder (recursively) exists locally, so the
+    # folder is shown with the same "downloaded" check badge as its files.
+    downloaded: bool = False
 
 
 @dataclass(frozen=True)
@@ -201,6 +204,8 @@ class ExplorerGridModel(QAbstractListModel):
             QStyle.StandardPixmap.SP_MessageBoxWarning
         )
         self._folder_icon = _build_folder_icon(58)
+        # A folder icon carrying the green "downloaded" check (built lazily).
+        self._folder_icon_downloaded: QIcon | None = None
         self._badged_file_icons: dict[tuple[str, str, str, bool, int], QIcon] = {}
         self._recent_exports: dict[tuple[str, str], float] = {}
         self._transfer_states: dict[tuple[str, str], str] = {}
@@ -225,13 +230,63 @@ class ExplorerGridModel(QAbstractListModel):
         self._icon_size = size
         self._thumb_size = size
         self._folder_icon = _build_folder_icon(size)
+        self._folder_icon_downloaded = None  # rebuilt lazily at the new size
         # Invalidate the badged-icon cache — sizes are baked in
         self._badged_file_icons.clear()
         self._thumb_mem.clear()
+        # Drop the now stale-size thumbnails off the current items too, otherwise
+        # set_items' carry-over would re-inject the old-size icons and block the
+        # rebuild at the new size.
+        self._items = [
+            replace(it, thumbnail=None)
+            if isinstance(it, ExplorerFileItem) and it.thumbnail is not None
+            else it
+            for it in self._items
+        ]
         self.beginResetModel()
         self.endResetModel()
 
     def set_items(self, items: list[ExplorerFolderItem | ExplorerFileItem]) -> None:
+        # Carry over already-built thumbnails across reloads. reload_all() runs on
+        # every job completion and rebuilds the item list with thumbnail=None, so
+        # without this a shown preview would vanish the moment a file finishes
+        # downloading (it flips to "local") and only maybe reappear later via the
+        # async thumbnail step. Same object (folder+file_key) = same content =
+        # same preview, so reusing the icon is safe and keeps the grid stable.
+        prior: dict[tuple[str, str], QIcon] = {}
+        prior_folders: dict[str, bool] = {}
+        # Same story for the "downloaded" checkmark: reload_all rebuilds items
+        # with local_exists=False in lazy-presence mode, and the incremental
+        # sweep would take many ticks to re-mark a big folder — so files kept
+        # losing their checkmarks after every finished job. Carry the flag
+        # over; the presence sweep still flips it off if the file is deleted.
+        prior_local: set[tuple[str, str]] = set()
+        for old in self._items:
+            if isinstance(old, ExplorerFileItem):
+                if old.thumbnail is not None:
+                    prior[(old.entry.folder_path, old.entry.file_key)] = old.thumbnail
+                if old.local_exists:
+                    prior_local.add((old.entry.folder_path, old.entry.file_key))
+            elif isinstance(old, ExplorerFolderItem) and old.downloaded:
+                prior_folders[old.path] = True
+        if prior or prior_folders or prior_local:
+            for idx, new in enumerate(items):
+                if isinstance(new, ExplorerFileItem):
+                    key = (new.entry.folder_path, new.entry.file_key)
+                    icon = prior.get(key) if new.thumbnail is None else None
+                    keep_local = not new.local_exists and key in prior_local
+                    if icon is not None or keep_local:
+                        items[idx] = replace(
+                            new,
+                            thumbnail=icon if icon is not None else new.thumbnail,
+                            local_exists=new.local_exists or keep_local,
+                        )
+                elif (
+                    isinstance(new, ExplorerFolderItem)
+                    and not new.downloaded
+                    and prior_folders.get(new.path)
+                ):
+                    items[idx] = replace(new, downloaded=True)
         self.beginResetModel()
         self._items = items
         self._rebuild_row_index()
@@ -514,6 +569,38 @@ class ExplorerGridModel(QAbstractListModel):
                 changed = True
         return changed
 
+    def _folder_icon_for(self, downloaded: bool) -> QIcon:
+        if not downloaded:
+            return self._folder_icon
+        if self._folder_icon_downloaded is None:
+            self._folder_icon_downloaded = _build_file_icon_with_badge(
+                self._folder_icon, "downloaded", size=self._icon_size
+            )
+        return self._folder_icon_downloaded
+
+    def folder_paths(self) -> list[str]:
+        """Paths of the folder items currently shown (for lazy download-mark
+        computation in the panel)."""
+        return [it.path for it in self._items if isinstance(it, ExplorerFolderItem)]
+
+    def set_folder_downloaded(self, path: str, downloaded: bool) -> bool:
+        """Flag a shown folder as fully downloaded (or not) and repaint it.
+        Returns True if anything actually changed."""
+        changed = False
+        for row, it in enumerate(self._items):
+            if isinstance(it, ExplorerFolderItem) and it.path == path:
+                if it.downloaded == bool(downloaded):
+                    return False
+                self._items[row] = replace(it, downloaded=bool(downloaded))
+                idx = self.index(row, 0)
+                self.dataChanged.emit(
+                    idx,
+                    idx,
+                    [Qt.ItemDataRole.DecorationRole, Qt.ItemDataRole.ToolTipRole],
+                )
+                changed = True
+        return changed
+
     def item_for_index(
         self, index: QModelIndex
     ) -> ExplorerFolderItem | ExplorerFileItem | None:
@@ -538,9 +625,10 @@ class ExplorerGridModel(QAbstractListModel):
             if role == Qt.ItemDataRole.DisplayRole:
                 return item.name
             if role == Qt.ItemDataRole.DecorationRole:
-                return self._folder_icon
+                return self._folder_icon_for(item.downloaded)
             if role == Qt.ItemDataRole.ToolTipRole:
-                return f"Folder: {item.path}"
+                mark = "\n(downloaded)" if item.downloaded else ""
+                return f"Folder: {item.path}{mark}"
             if role == Qt.ItemDataRole.ForegroundRole:
                 return QBrush(QColor("#d7c5ff"))
             if role == Qt.ItemDataRole.UserRole:
