@@ -1,34 +1,34 @@
 ========================================================================
- GlideDrive — установка и запуск из исходников (run.py)
+ GlideDrive — install and run from source (run.py)
 ========================================================================
 
-Требуется: Python >= 3.11 (проверено на 3.11–3.14).
-Проверить версию:
+Requires: Python >= 3.11 (tested on 3.11–3.14).
+Check your version:
 
     python --version
 
-Если команды python нет — пробуй python3 (Linux/macOS) или py (Windows).
+If there is no `python` command, try `python3` (Linux/macOS) or `py` (Windows).
 
 
 ------------------------------------------------------------------------
- 1. LINUX / macOS  (оболочка fish)
+ 1. LINUX / macOS  (fish shell)
 ------------------------------------------------------------------------
 
-# перейти в папку проекта
-cd /путь/к/glidedrive
+# go to the project folder
+cd /path/to/glidedrive
 
-# создать виртуальное окружение
+# create a virtual environment
 python -m venv .venv
 
-# активировать (fish)
+# activate (fish)
 source .venv/bin/activate.fish
 #   bash/zsh:  source .venv/bin/activate
 
-# обновить pip и поставить зависимости
+# upgrade pip and install dependencies
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 
-# запустить
+# run
 python run.py
 
 
@@ -36,7 +36,7 @@ python run.py
  2. WINDOWS  (PowerShell)
 ------------------------------------------------------------------------
 
-cd C:\путь\к\TG_bd
+cd C:\path\to\glidedrive
 
 py -m venv .venv
 .venv\Scripts\Activate.ps1
@@ -49,51 +49,51 @@ python run.py
 
 
 ------------------------------------------------------------------------
- 3. TELEGRAM API-КРЕДЫ (api_id / api_hash)
+ 3. TELEGRAM API CREDENTIALS (api_id / api_hash)
 ------------------------------------------------------------------------
 
-Получить на https://my.telegram.org -> API development tools.
-Задать можно ДВУМЯ способами (любой на выбор):
+Get them at https://my.telegram.org -> API development tools.
+You can set them in TWO ways (pick either):
 
-  а) Через GUI: запустить программу и вписать api_id / api_hash
-     в окне настроек (раздел TELEGRAM). Сохраняются в config.json.
+  a) Via the GUI: launch the app and enter api_id / api_hash in the
+     settings window (TELEGRAM section). Saved into config.json.
 
-  б) Через файл .env рядом с run.py (приоритетнее GUI):
-     скопировать .env.example -> .env и заполнить:
+  b) Via a .env file next to run.py (takes priority over the GUI):
+     copy .env.example -> .env and fill it in:
 
         TG_API_ID=123456
-        TG_API_HASH=ваш_api_hash
+        TG_API_HASH=your_api_hash
 
      fish:        cp .env.example .env
      PowerShell:  Copy-Item .env.example .env
 
 
 ------------------------------------------------------------------------
- 4. FFMPEG (опционально, но желательно)
+ 4. FFMPEG (optional, but recommended)
 ------------------------------------------------------------------------
 
-Нужен для транскода не-нативных видео (AVI и т.п.) и превью видео.
-Программа запустится и без него — просто эти функции будут недоступны.
+Needed for transcoding non-native video (AVI, etc.) and video previews.
+The app runs without it — those features are simply unavailable.
 
   Arch/CachyOS:  sudo pacman -S ffmpeg
   Debian/Ubuntu: sudo apt install ffmpeg
   macOS (brew):  brew install ffmpeg
-  Windows:       winget install Gyan.FFmpeg   (или скачать с ffmpeg.org
-                 и добавить папку bin в PATH)
+  Windows:       winget install Gyan.FFmpeg   (or download from ffmpeg.org
+                 and add the bin folder to PATH)
 
-Проверить:  ffmpeg -version
+Check:  ffmpeg -version
 
 
 ------------------------------------------------------------------------
- 5. ПОСЛЕДУЮЩИЕ ЗАПУСКИ
+ 5. SUBSEQUENT RUNS
 ------------------------------------------------------------------------
 
-Окружение уже создано — достаточно активировать и запустить:
+The environment already exists — just activate and run:
 
-  fish:        cd /путь/к/glidedrive; source .venv/bin/activate.fish; python run.py
-  PowerShell:  cd C:\путь\к\TG_bd; .venv\Scripts\Activate.ps1; python run.py
+  fish:        cd /path/to/glidedrive; source .venv/bin/activate.fish; python run.py
+  PowerShell:  cd C:\path\to\glidedrive; .venv\Scripts\Activate.ps1; python run.py
 
-run.py можно запускать из любой рабочей папки — пути к config/var/logs
-привязаны к папке проекта, а не к текущему каталогу.
+run.py can be started from any working directory — the config/var/logs
+paths are tied to the project folder, not the current directory.
 
 ========================================================================

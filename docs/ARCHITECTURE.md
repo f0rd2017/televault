@@ -1,214 +1,218 @@
-# Архитектура проекта — гайд по директориям
+# Project architecture — a directory guide
 
-**GlideDrive** — десктоп-приложение на PySide6 +
-Telethon: использует пользовательские аккаунты Telegram как облачное хранилище,
-ведёт локальный SQLite-индекс загруженных файлов. UI на русском.
+**GlideDrive** is a desktop app built on PySide6 + Telethon: it uses Telegram
+user accounts as cloud storage and keeps a local SQLite index of uploaded files.
+The UI defaults to English (Russian and Ukrainian also available).
 
-Этот документ — карта «что где». Краткое описание каждого модуля и поток данных.
-
----
-
-## С чего начать чтение
-1. `app/main.py` — точка входа: загрузка конфига, создание `MainWindow`, запуск Qt.
-2. `app/ui/window_main.py` — `MainWindow`, собирается из mixin'ов `app/ui/panels/`.
-3. `app/core/worker.py` — `TelegramWorker`: мост между UI-джобами и операциями Telegram.
-4. `app/tg/upload/` и `app/tg/download/` — ядро загрузки/выгрузки.
+This document is a "what lives where" map — a short description of each module
+and the data flow.
 
 ---
 
-## Дерево `app/`
+## Where to start reading
+1. `app/main.py` — entry point: load config, create `MainWindow`, start Qt.
+2. `app/ui/window_main.py` — `MainWindow`, composed from the mixins in `app/ui/panels/`.
+3. `app/core/worker.py` — `TelegramWorker`: the bridge between UI jobs and Telegram operations.
+4. `app/tg/upload/` and `app/tg/download/` — the upload/download core.
+
+---
+
+## The `app/` tree
 
 ```
 app/
-├── main.py                  Точка входа: конфиг → MainWindow → Qt event loop
+├── main.py                  Entry point: config → MainWindow → Qt event loop
 │
 ├── config/
-│   ├── config.py            Загрузка/сохранение config.json + .env (API id/hash)
-│   └── defaults.py          Значения по умолчанию
+│   ├── config.py            Load/save config.json + .env (API id/hash)
+│   └── defaults.py          Default values
 │
-├── core/                    Бизнес-логика, не зависящая от Qt и Telethon напрямую
-│   ├── worker.py            TelegramWorker (QThread): выполняет джобы upload/download/delete/scan
-│   ├── jobs.py              JobManager, JobContext, CancelToken — очередь и отмена джоб
-│   ├── accounts.py          AccountManager, ConnectedAccount — мультиаккаунт, пул клиентов
-│   ├── cache.py             CacheManager — локальный кэш скачанных файлов
-│   ├── transfer_progress.py TransferProgressAggregator — агрегирует прогресс частей → проценты
-│   ├── rate_limiter.py      AdaptiveRateLimiter — адаптивный лимит запросов к Telegram
-│   ├── types.py             Датаклассы: AppConfig, TelegramAccount, PartRecord, JobEvent, …
-│   ├── utils.py             Хелперы: sha256, AES-GCM шифрование, пути, имена файлов
-│   ├── logging.py           Настройка логирования
-│   └── i18n.py              Реестр языков (en/ru/uk), QSettings-персистентность, install_language()
+├── core/                    Business logic, not directly tied to Qt or Telethon
+│   ├── worker.py            TelegramWorker (QThread): runs upload/download/delete/scan jobs
+│   ├── jobs.py              JobManager, JobContext, CancelToken — job queue and cancellation
+│   ├── accounts.py          AccountManager, ConnectedAccount — multi-account, client pool
+│   ├── cache.py             CacheManager — local cache of downloaded files
+│   ├── transfer_progress.py TransferProgressAggregator — aggregates part progress → percent
+│   ├── rate_limiter.py      AdaptiveRateLimiter — adaptive request limit against Telegram
+│   ├── types.py             Dataclasses: AppConfig, TelegramAccount, PartRecord, JobEvent, …
+│   ├── utils.py             Helpers: sha256, AES-GCM encryption, paths, file names
+│   ├── logging.py           Logging setup
+│   └── i18n.py              Language registry (en/ru/uk), QSettings persistence, install_language()
 │
-├── db/                      Локальный SQLite-индекс
-│   ├── database.py          Подключение/инициализация БД
-│   ├── repo/                DbRepo — все операции с индексом (папки, объекты, части, джобы, батчи, аккаунты); см. ниже
-│   └── models.py            Описание строк/таблиц
+├── db/                      Local SQLite index
+│   ├── database.py          DB connection/initialization
+│   ├── repo/                DbRepo — all index operations (folders, objects, parts, jobs, batches, accounts); see below
+│   └── models.py            Row/table definitions
 │
-├── tg/                      Работа с Telegram (Telethon)
+├── tg/                      Telegram integration (Telethon)
 │   ├── client.py            TgClientManager / TgSession / TgClientEndpoint / ChannelAccessCheck
-│   ├── scan.py              TgScanner — скан канала, восстановление индекса из сообщений
-│   ├── parser.py            Сборка/разбор подписей (caption) сообщений-частей
-│   ├── delete/              TgDeleter — удаление/переименование на стороне Telegram; см. ниже
-│   ├── adaptive.py          _AdaptiveUploadController / _AdaptiveDownloadController (адаптив параллелизма)
-│   ├── compression.py       zip / 7z-MT / архив батча мелких файлов (для upload)
-│   ├── partition.py         Математика разбиения файла на логические части (для upload)
-│   ├── upload/              Пакет загрузки (см. ниже)
-│   └── download/            Пакет выгрузки (см. ниже)
+│   ├── scan.py              TgScanner — channel scan, index recovery from messages
+│   ├── parser.py            Build/parse message-part captions
+│   ├── delete/              TgDeleter — delete/rename on the Telegram side; see below
+│   ├── adaptive.py          _AdaptiveUploadController / _AdaptiveDownloadController (adaptive parallelism)
+│   ├── compression.py       zip / 7z-MT / small-file batch archive (for upload)
+│   ├── partition.py         Math for splitting a file into logical parts (for upload)
+│   ├── upload/              Upload package (see below)
+│   └── download/            Download package (see below)
 │
-└── ui/                      GUI на PySide6
-    ├── window_main.py       MainWindow (композиция mixin'ов из panels/)
-    ├── models_qt/           Qt-модели проводника: FolderTreeModel, ExplorerGridModel, items; см. ниже
-    ├── dialogs/             SetupDialog, SettingsDialog, CreateFolder/Rename/Confirm, свойства файла/папки, AccountsDialog; см. ниже
-    ├── text_editor/         Встроенный текстовый редактор + подсветка синтаксиса; см. ниже
-    ├── media_viewer.py      Просмотр изображений/видео
-    ├── job_toasts.py        Всплывающие карточки прогресса джоб
-    ├── theme.py             Общий stylesheet приложения (не только MainWindow)
-    ├── widgets.py           Переиспользуемые виджеты (ProgressLogWidget)
-    └── panels/              Mixin'ы MainWindow (тот же паттерн, что в tg/upload,download)
-        ├── folder_panel.py    FolderPanelMixin — дерево папок
-        ├── explorer_panel.py  ExplorerPanelMixin — сетка файлов
-        ├── upload_drop.py     UploadDropMixin — drag&drop загрузка
-        ├── transfer_ops.py    TransferOpsMixin — запуск/контроль трансферов + watchdog
-        ├── job_events.py      JobEventsMixin — обработка событий джоб
-        ├── misc.py            MiscMixin — прочие действия меню/тулбара
-        └── drag_export.py     ExplorerListView / ExplorerDropFrame — drag-export наружу
+└── ui/                      PySide6 GUI
+    ├── window_main.py       MainWindow (composition of mixins from panels/)
+    ├── models_qt/           Qt explorer models: FolderTreeModel, ExplorerGridModel, items; see below
+    ├── dialogs/             SetupDialog, SettingsDialog, CreateFolder/Rename/Confirm, file/folder properties, AccountsDialog; see below
+    ├── text_editor/         Built-in text editor + syntax highlighting; see below
+    ├── media_viewer.py      Image/video viewer
+    ├── job_toasts.py        Popup job-progress cards
+    ├── theme.py             App-wide stylesheet (not just MainWindow)
+    ├── widgets.py           Reusable widgets (ProgressLogWidget)
+    └── panels/              MainWindow mixins (same pattern as tg/upload,download)
+        ├── folder_panel.py    FolderPanelMixin — folder tree
+        ├── explorer_panel.py  ExplorerPanelMixin — file grid
+        ├── upload_drop.py     UploadDropMixin — drag&drop upload
+        ├── transfer_ops.py    TransferOpsMixin — start/control transfers + watchdog
+        ├── job_events.py      JobEventsMixin — job event handling
+        ├── misc.py            MiscMixin — other menu/toolbar actions
+        └── drag_export.py     ExplorerListView / ExplorerDropFrame — drag-export outward
 ```
 
-Начиная с этого разреза, «god-модули» с широким публичным API (`DbRepo`, `TgDeleter`,
-UI-диалоги, модели проводника, текстовый редактор) разложены как подпакеты
-`имя/` с тонким фасадом в `__init__.py` и приватными `_часть.py` внутри —
-тот же приём, что и в `tg/upload`/`tg/download`/`ui/panels`. Публичный путь
-импорта (`from app.db.repo import DbRepo` и т.п.) не меняется.
+From this slice onward, the "god modules" with a wide public API (`DbRepo`,
+`TgDeleter`, UI dialogs, explorer models, text editor) are split into `name/`
+subpackages with a thin facade in `__init__.py` and private `_part.py` files
+inside — the same technique as in `tg/upload`/`tg/download`/`ui/panels`. The
+public import path (`from app.db.repo import DbRepo`, etc.) does not change.
 
 ---
 
-## Паттерн больших классов: mixin'ы
-Крупные классы разбиты на mixin-модули, а композиционный класс наследует их.
-Это уже принято в проекте для `MainWindow` (`app/ui/panels/`) и применено к
-`TgUploader` и `TgDownloader`. Все константы и `__init__` — на композиционном
-классе; mixin'ы содержат только методы (`self.*`/`cls.*` резолвятся по MRO).
-Чисто-функциональные хелперы без `self` вынесены отдельными модулями
-(`compression.py`, `partition.py`, `*/merge.py`, `*/_common.py`).
+## The large-class pattern: mixins
+Large classes are split into mixin modules, and a composition class inherits
+them. This is already used in the project for `MainWindow` (`app/ui/panels/`) and
+applied to `TgUploader` and `TgDownloader`. All constants and `__init__` live on
+the composition class; mixins contain only methods (`self.*`/`cls.*` resolve via
+the MRO). Pure-functional helpers without `self` are extracted into separate
+modules (`compression.py`, `partition.py`, `*/merge.py`, `*/_common.py`).
 
-### `app/tg/upload/` — загрузка
-| Модуль | Роль |
+### `app/tg/upload/` — upload
+| Module | Role |
 |---|---|
 | `__init__.py` | re-export `TgUploader`, `_AdaptiveUploadController` |
-| `uploader.py` | core: `__init__`, `chunked_upload` (главный конвейер), пул клиентов/чатов, лимиты, ключи |
-| `send.py` | `_UploadSendMixin` — отправка в Telegram с ретраями |
-| `parallel.py` | `_ParallelUploadMixin` — параллельная заливка частей big-file |
-| `multipart.py` | `_MultipartUploadMixin` — multipart для огромных файлов (части с диска) |
-| `single.py` | `_SinglePartUploadMixin` — путь одиночной части |
-| `batch.py` | `_SmallBatchMixin` — батч мелких файлов в один архив + индексация |
-| `analytics.py` | `_UploadAnalyticsMixin._build_upload_analytics` — единый сборщик блока `analytics` для всех трёх веток (single / in-memory multipart / disk-multipart) |
-| `records.py` | `_UploadRecordBuffer` — батч-буфер записи частей в `DbRepo` (`add()`/`flush()`, БД-работа вне локов) |
-| `_common.py` | `_is_retryable_error` (предикат ретрая) |
+| `uploader.py` | core: `__init__`, `chunked_upload` (main pipeline), client/chat pool, limits, keys |
+| `send.py` | `_UploadSendMixin` — send to Telegram with retries |
+| `parallel.py` | `_ParallelUploadMixin` — parallel upload of big-file parts |
+| `multipart.py` | `_MultipartUploadMixin` — multipart for huge files (parts from disk) |
+| `single.py` | `_SinglePartUploadMixin` — single-part path |
+| `batch.py` | `_SmallBatchMixin` — batch small files into one archive + indexing |
+| `analytics.py` | `_UploadAnalyticsMixin._build_upload_analytics` — single builder for the `analytics` block across all three branches (single / in-memory multipart / disk-multipart) |
+| `records.py` | `_UploadRecordBuffer` — batch buffer for writing parts to `DbRepo` (`add()`/`flush()`, DB work outside locks) |
+| `_common.py` | `_is_retryable_error` (retry predicate) |
 
-### `app/tg/download/` — выгрузка
-| Модуль | Роль |
+### `app/tg/download/` — download
+| Module | Role |
 |---|---|
 | `__init__.py` | re-export `TgDownloader`, `_AdaptiveDownloadController` |
-| `downloader.py` | core: `__init__`, `chunked_download` (главный конвейер), маршруты, stride-стратегия |
-| `fetch.py` | `_DownloadFetchMixin` — выкачка частей/сообщений с ретраями, strided-стримы |
-| `batch.py` | `_DownloadBatchMixin` — извлечение одного файла из батч-архива |
-| `merge.py` | `_DownloadMergeMixin` — манифест, сборка частей, расшифровка, проверка sha256 (одна часть → `os.replace` без копии) |
-| `analytics.py` | `_DownloadAnalyticsMixin._build_download_analytics` — единый сборщик блока `analytics` для `chunked_download` и `_download_batch_member` |
+| `downloader.py` | core: `__init__`, `chunked_download` (main pipeline), routes, stride strategy |
+| `fetch.py` | `_DownloadFetchMixin` — fetch parts/messages with retries, strided streams |
+| `batch.py` | `_DownloadBatchMixin` — extract one file from a batch archive |
+| `merge.py` | `_DownloadMergeMixin` — manifest, part assembly, decryption, sha256 verification (single part → `os.replace`, no copy) |
+| `analytics.py` | `_DownloadAnalyticsMixin._build_download_analytics` — single builder for the `analytics` block for `chunked_download` and `_download_batch_member` |
 | `_common.py` | `_is_retryable_error`, `_SHA_PREFIX_RE`, `_preallocate_file`, `_sha256_file_sync` |
 
-### `app/db/repo/` — локальный индекс
-| Модуль | Роль |
+### `app/db/repo/` — local index
+| Module | Role |
 |---|---|
-| `__init__.py` | фасад `DbRepo(_IndexMixin, _ObjectsMixin, _TrashShareSyncMixin, _JobsMixin, _BatchMixin, _TailMixin)` |
-| `_index.py` | `_IndexMixin` — состояние сканов, папки, индекс сообщений |
-| `_objects.py` | `_ObjectsMixin` — объекты и их агрегаты |
-| `_trash.py` | `_TrashShareSyncMixin` — корзина, шеринг, синхронизация папок, ссылки, батч-блоб-ключи |
-| `_jobs.py` | `_JobsMixin` — фоновые задания (jobs) |
-| `_batch.py` | `_BatchMixin` — батч-блобы и их участники |
-| `_tail.py` | `_TailMixin` — переименование/удаление объектов, аккаунты |
-| `_sql.py` | SQL-константы, общие для нескольких миксинов |
+| `__init__.py` | facade `DbRepo(_IndexMixin, _ObjectsMixin, _TrashShareSyncMixin, _JobsMixin, _BatchMixin, _TailMixin)` |
+| `_index.py` | `_IndexMixin` — scan state, folders, message index |
+| `_objects.py` | `_ObjectsMixin` — objects and their aggregates |
+| `_trash.py` | `_TrashShareSyncMixin` — trash, sharing, folder sync, links, batch-blob keys |
+| `_jobs.py` | `_JobsMixin` — background jobs |
+| `_batch.py` | `_BatchMixin` — batch blobs and their members |
+| `_tail.py` | `_TailMixin` — object rename/delete, accounts |
+| `_sql.py` | SQL constants shared by several mixins |
 
-### `app/tg/delete/` — удаление/переименование в Telegram
-| Модуль | Роль |
+### `app/tg/delete/` — delete/rename in Telegram
+| Module | Role |
 |---|---|
-| `__init__.py` | фасад `TgDeleter(_OpsMixin, _RetryMixin, _RoutesMixin)` — `__init__`, регистрация маршрутов по чатам |
+| `__init__.py` | facade `TgDeleter(_OpsMixin, _RetryMixin, _RoutesMixin)` — `__init__`, per-chat route registration |
 | `_ops.py` | `_OpsMixin` — `delete_remote`, `delete_folder`, `rename_file` |
-| `_retry.py` | `_RetryMixin` — обёртки с ретраями поверх операций из `_ops.py` |
-| `_routes.py` | `_RoutesMixin` — построение/выбор маршрута (`client`, `chat`) по `chat_id` |
-| `_helpers.py` | общие функциональные хелперы без `self` |
+| `_retry.py` | `_RetryMixin` — retry wrappers over the operations in `_ops.py` |
+| `_routes.py` | `_RoutesMixin` — build/pick a route (`client`, `chat`) by `chat_id` |
+| `_helpers.py` | shared functional helpers without `self` |
 
-### `app/ui/dialogs/` — диалоги (все классы — `QDialog`)
-| Модуль | Роль |
+### `app/ui/dialogs/` — dialogs (all classes are `QDialog`)
+| Module | Role |
 |---|---|
 | `__init__.py` | `SetupDialog`, `SettingsDialog`, `CreateFolderDialog`, `RenameDialog`, `ConfirmDialog` |
 | `_properties.py` | `FilePropertiesDialog`, `ShareLinkDialog`, `FolderPropertiesDialog` |
-| `_accounts.py` | `AccountsDialog` + `_StatusProbe` (фоновая проверка живости прокси/аккаунтов) |
-| `_add_account.py` | `AddAccountDialog` + `_AuthWorker` — добавление и авторизация нового аккаунта прямо в GUI (телефон → код → 2FA) |
-| `_style.py` | `_DIALOG_STYLESHEET` — общий стиль, используется `__init__.py` и `_properties.py` |
+| `_accounts.py` | `AccountsDialog` + `_StatusProbe` (background liveness probe for proxies/accounts) |
+| `_add_account.py` | `AddAccountDialog` + `_AuthWorker` — add and authorize a new account right in the GUI (phone → code → 2FA) |
+| `_style.py` | `_DIALOG_STYLESHEET` — shared style, used by `__init__.py` and `_properties.py` |
 
-### `app/ui/models_qt/` — Qt-модели проводника
-| Модуль | Роль |
+### `app/ui/models_qt/` — Qt explorer models
+| Module | Role |
 |---|---|
-| `__init__.py` | `FolderTreeModel`, `ExplorerGridModel`, `ExplorerFileItem`, `ExplorerFolderItem` и т.д. |
-| `_icons.py` | рендер-слой иконок (типовые/бейджи/миниатюры), детекторы типа файла (`is_video_name`, `is_pdf_name`, …) |
+| `__init__.py` | `FolderTreeModel`, `ExplorerGridModel`, `ExplorerFileItem`, `ExplorerFolderItem`, etc. |
+| `_icons.py` | icon render layer (type icons/badges/thumbnails), file-type detectors (`is_video_name`, `is_pdf_name`, …) |
 
-### `app/ui/text_editor/` — встроенный текстовый редактор
-| Модуль | Роль |
+### `app/ui/text_editor/` — built-in text editor
+| Module | Role |
 |---|---|
 | `__init__.py` | `TextEditorWindow`, `CodeEditor`, `open_text_editor` |
-| `_highlighter.py` | `CodeHighlighter(QSyntaxHighlighter)` — подсветка синтаксиса |
+| `_highlighter.py` | `CodeHighlighter(QSyntaxHighlighter)` — syntax highlighting |
 
 ---
 
-## Поток данных
+## Data flow
 
-**Загрузка:**
-UI (drag&drop / меню) → `JobManager` ставит джобу → `TelegramWorker` берёт её →
-`TgUploader.chunked_upload[_group]`: при необходимости сжатие (`compression`),
-разбиение на части (`partition`), параллельная отправка через пул аккаунтов
-(`send`/`parallel`/`multipart`/`single`) → запись частей в `DbRepo` →
-прогресс через `TransferProgressAggregator` обратно в UI.
+**Upload:**
+UI (drag&drop / menu) → `JobManager` enqueues a job → `TelegramWorker` picks it up →
+`TgUploader.chunked_upload[_group]`: compression if needed (`compression`),
+splitting into parts (`partition`), parallel sending across the account pool
+(`send`/`parallel`/`multipart`/`single`) → writing parts to `DbRepo` →
+progress via `TransferProgressAggregator` back to the UI.
 
-**Выгрузка:**
-UI → джоба → `TelegramWorker` → `TgDownloader.chunked_download`: ищет части в
-`DbRepo`, качает их (`fetch`, при поддержке — strided-стримы), затем
-`merge` собирает файл, расшифровывает (AES-GCM) и сверяет sha256 → файл в
-`cache/`/назначение, прогресс в UI.
+**Download:**
+UI → job → `TelegramWorker` → `TgDownloader.chunked_download`: finds parts in
+`DbRepo`, fetches them (`fetch`, strided streams where supported), then `merge`
+assembles the file, decrypts it (AES-GCM) and verifies sha256 → the file lands in
+`cache/`/destination, progress to the UI.
 
-**Адаптив:** скорость/флуд-вейты во время трансфера управляют параллелизмом
-через `_AdaptiveUploadController` / `_AdaptiveDownloadController` (`adaptive.py`).
+**Adaptivity:** speed/flood-waits during a transfer control parallelism via
+`_AdaptiveUploadController` / `_AdaptiveDownloadController` (`adaptive.py`).
 
-**Надёжность (закрытые дыры):**
-- **Upload resume** (`app/tg/upload/resume.py`): при перезапуске уже залитые части
-  (есть в `msg_index` с тем же `parts_total` + payload-sha256 из подписи)
-  пропускаются. Для случайного ключа `file_key` восстанавливается из sidecar
-  `cache_dir/.upload_resume/`. Симметрия с download-resume.
-- **Proxy fallback chain** (`accounts.py`): у аккаунта есть `proxy` и
-  `proxy_backup`; при коннекте идём primary→backup→direct
-  (`utils.select_working_proxy_from_chain`), на лету —
-  `AccountManager.escalate_proxy` через Telethon `set_proxy`.
-- **Статус объекта** (`app/core/object_state.py` `classify_object_state`):
-  complete / incomplete (не дозалит) / offline (аккаунт части не подключён) /
-  damaged (`msg_index.lost_ts` выставлен и аккаунт онлайн = сообщение пропало).
-  Потерю помечает `repo.mark_messages_lost_refs` (download при missing-message).
-  В сетке состояние накладывается «на лету» через `object_state.display_state`
-  (дешёвые агрегаты `repo.get_part_chat_ids_by_folder`/`get_lost_file_keys_by_folder`
-  + живые аккаунты): иконка-тинт + подпись-минипометка под именем.
-  Свойства файла «что где лежит» + ручная заметка — `FilePropertiesDialog`
-  (контекст-меню «Свойства»); заметки в таблице `object_notes`.
+**Reliability (closed gaps):**
+- **Upload resume** (`app/tg/upload/resume.py`): on restart, already-uploaded
+  parts (present in `msg_index` with the same `parts_total` + payload sha256 from
+  the caption) are skipped. For a random `file_key`, it is recovered from the
+  sidecar in `cache_dir/.upload_resume/`. Symmetric with download resume.
+- **Proxy fallback chain** (`accounts.py`): an account has `proxy` and
+  `proxy_backup`; on connect it goes primary→backup→direct
+  (`utils.select_working_proxy_from_chain`), and on the fly via
+  `AccountManager.escalate_proxy` through Telethon `set_proxy`.
+- **Object state** (`app/core/object_state.py` `classify_object_state`):
+  complete / incomplete (not fully uploaded) / offline (the part's account is not
+  connected) / damaged (`msg_index.lost_ts` is set and the account is online =
+  the message is gone). Loss is marked by `repo.mark_messages_lost_refs`
+  (download on a missing message). In the grid, state is overlaid on the fly via
+  `object_state.display_state` (cheap aggregates
+  `repo.get_part_chat_ids_by_folder`/`get_lost_file_keys_by_folder` + live
+  accounts): an icon tint + a small caption note under the name. The "what lives
+  where" file properties + a manual note live in `FilePropertiesDialog` (context
+  menu → "Properties"); notes are in the `object_notes` table.
 
-**Производительность (инварианты, которые легко сломать):**
-- Телеметрия использует `psutil.cpu_percent(interval=None)` — не блокирует
-  event-loop; `interval>0` вернул бы синхронный стопор и заморозку трансфера.
-- Запись `manifest.json` при выгрузке троттлится (`_MANIFEST_WRITE_THROTTLE_SEC`)
-  с финальным flush; resume и так перепроверяет part-файлы на диске.
-- `merge` для **одной** части делает `os.replace` (rename), а не копию —
-  лишнего полного прохода чтения+записи нет. Для multi-part склейка обязательна.
-- Resume-контракт: при сбое part-файлы (`part_*.bin`) сохраняются и
-  восстановление возможно даже без `manifest.json` — не ломать «download прямо
-  в финальный файл по смещениям» без явного решения сменить эту гарантию.
+**Performance (invariants that are easy to break):**
+- Telemetry uses `psutil.cpu_percent(interval=None)` — it does not block the
+  event loop; `interval>0` would introduce a synchronous stall and freeze the
+  transfer.
+- Writing `manifest.json` during download is throttled
+  (`_MANIFEST_WRITE_THROTTLE_SEC`) with a final flush; resume re-checks part files
+  on disk anyway.
+- `merge` for a **single** part does `os.replace` (rename), not a copy — no extra
+  full read+write pass. For multi-part, assembly is mandatory.
+- Resume contract: on failure, part files (`part_*.bin`) are kept and recovery is
+  possible even without `manifest.json` — don't break "download straight into the
+  final file by offsets" without an explicit decision to change that guarantee.
 
 ---
 
-## Тесты и качество
-- Запуск: `QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -o addopts= -p no:warnings -q`
-- Линтер: `ruff check app/ tests/ scripts/` (enforced через save-hook).
-- End-to-end загрузки/выгрузки: `tests/integration_mock/test_upload_download_mock.py`.
+## Tests and quality
+- Run: `QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -o addopts= -p no:warnings -q`
+- Linter: `ruff check app/ tests/ scripts/` (enforced via a save hook).
+- End-to-end upload/download: `tests/integration_mock/test_upload_download_mock.py`.

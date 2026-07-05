@@ -1,11 +1,11 @@
-# Локальный REST API
+# Local REST API
 
-Тонкий HTTP-сервер поверх ядра (`app/api/`). На stdlib `http.server` — **без
-новых зависимостей**. **Выключен по умолчанию.**
+A thin HTTP server on top of the core (`app/api/`). Built on the stdlib
+`http.server` — **no extra dependencies**. **Disabled by default.**
 
-## Включение
+## Enabling
 
-В настройках приложения секция **REST API** (или вручную в `config.json`):
+In the app settings, section **REST API** (or manually in `config.json`):
 
 ```json
 "api": {
@@ -16,58 +16,58 @@
 }
 ```
 
-Применяется после перезапуска приложения.
+Takes effect after an app restart.
 
-- `host` — `127.0.0.1` означает доступ только с этого компьютера (рекомендуется).
-- `token` пустой → **авторизация отключена** (полагаемся на привязку к localhost).
-  Если задан — каждый запрос (кроме `/api/health`) требует заголовок
-  `Authorization: Bearer <token>` (или `?token=<token>`).
+- `host` — `127.0.0.1` means access from this machine only (recommended).
+- An empty `token` → **authorization is disabled** (relying on the localhost
+  binding). If set, every request (except `/api/health`) requires the header
+  `Authorization: Bearer <token>` (or `?token=<token>`).
 
-## Эндпоинты
+## Endpoints
 
-| Метод | Путь | Описание |
-|-------|------|----------|
-| GET | `/api/health` | Живость (без авторизации) |
-| GET | `/api/folders` | Список папок |
-| GET | `/api/files?folder=&search=&recursive=0\|1&status=` | Список объектов |
-| GET | `/api/jobs?limit=N` | Последние джобы |
-| GET | `/api/jobs/{id}` | Одна джоба (для опроса прогресса) |
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/health` | Liveness (no auth) |
+| GET | `/api/folders` | List folders |
+| GET | `/api/files?folder=&search=&recursive=0\|1&status=` | List objects |
+| GET | `/api/jobs?limit=N` | Recent jobs |
+| GET | `/api/jobs/{id}` | A single job (for polling progress) |
 | POST | `/api/upload` | `{"paths": ["/abs/file", ...], "folder": "Docs"}` |
 | POST | `/api/download` | `{"folder": "Docs", "file_key": "...", "allow_incomplete": false}` |
-| POST | `/api/delete` | `{"folder": "Docs", "file_key": "..."}` — удаление из облака |
-| POST | `/api/shares` | создать шар-ссылку: `{"folder","file_key","password"?,"expires_in_sec"?}` |
-| GET | `/api/shares` | список шар-ссылок |
-| POST | `/api/shares/{token}/revoke` | отозвать ссылку (перестаёт работать) |
-| DELETE | `/api/shares/{token}` | удалить запись ссылки |
-| GET | `/share/{token}` | **публично** (без API-токена): скачать файл по ссылке. `?pw=` если задан пароль. Поддерживает `Range` (стрим/перемотка) |
+| POST | `/api/delete` | `{"folder": "Docs", "file_key": "..."}` — delete from the cloud |
+| POST | `/api/shares` | create a share link: `{"folder","file_key","password"?,"expires_in_sec"?}` |
+| GET | `/api/shares` | list share links |
+| POST | `/api/shares/{token}/revoke` | revoke a link (stops working) |
+| DELETE | `/api/shares/{token}` | delete the link record |
+| GET | `/share/{token}` | **public** (no API token): download the file by link. `?pw=` if a password is set. Supports `Range` (streaming/seeking) |
 
-Запись (`upload`/`download`/`delete`) ставит задачу в очередь и возвращает
-`202 {"accepted": true}`. Задача исполняется тем же путём, что и из GUI
-(`worker.submit_job`). **Id задачи синхронно не возвращается** (постановка
-асинхронна) — прогресс отслеживается опросом `GET /api/jobs`.
+A write (`upload`/`download`/`delete`) enqueues a job and returns
+`202 {"accepted": true}`. The job runs through the same path as from the GUI
+(`worker.submit_job`). **The job id is not returned synchronously** (enqueue is
+asynchronous) — track progress by polling `GET /api/jobs`.
 
-### Шар-ссылки
+### Share links
 
-`POST /api/shares` → `201 {"token","url","has_password","expires_ts"}`. Раздаётся
-по `GET /share/{token}` тем же сервером: файл собирается из зашифрованных чанков
-(или берётся уже скачанный/собранный) и отдаётся с поддержкой HTTP Range —
-браузерный плеер может стримить/перематывать. Токен — это и есть секрет, поэтому
-`/share/` публичный; пароль (`?pw=`) и срок (`expires_in_sec`) — опциональны.
-**Ссылки работают только при включённом API** (тот же HTTP-сервер).
+`POST /api/shares` → `201 {"token","url","has_password","expires_ts"}`. Served at
+`GET /share/{token}` by the same server: the file is assembled from encrypted
+chunks (or taken already-downloaded/assembled) and returned with HTTP Range
+support — a browser player can stream/seek. The token itself is the secret, so
+`/share/` is public; a password (`?pw=`) and an expiry (`expires_in_sec`) are
+optional. **Links work only while the API is enabled** (the same HTTP server).
 
-### Стрим без полного скачивания
+### Streaming without a full download
 
-Для чанкованных объектов `/share/{token}` отдаёт **настоящий стрим**: по
-заголовку `Range` сервер скачивает и расшифровывает ТОЛЬКО те части, что
-перекрывают запрошенный диапазон — а не весь файл. Перемотка видео тянет
-1–2 части, а не гигабайты. Plaintext-смещения частей выводятся из индекса без
-скачивания (зашифрованная часть хранит на 32 байта больше plaintext:
-`ENC1`+nonce+GCM-tag). Расшифрованные части кэшируются на время сессии
-(`.share_cache/.stream/<file_key>`), так что соседние Range-запросы их
-переиспользуют. Для мелких файлов в общем blob (batch-member) и неполных
-объектов сервер откатывается на полную сборку файла (тоже с Range).
+For chunked objects, `/share/{token}` returns a **real stream**: based on the
+`Range` header the server downloads and decrypts ONLY the parts that overlap the
+requested range — not the whole file. Seeking in a video pulls 1–2 parts, not
+gigabytes. Plaintext part offsets are derived from the index without downloading
+(an encrypted part stores 32 bytes more than the plaintext:
+`ENC1`+nonce+GCM-tag). Decrypted parts are cached for the session
+(`.share_cache/.stream/<file_key>`), so adjacent Range requests reuse them. For
+small files inside a shared blob (batch member) and for incomplete objects, the
+server falls back to a full file assembly (also with Range).
 
-## Примеры (curl)
+## Examples (curl)
 
 ```bash
 TOKEN=secret
@@ -81,9 +81,9 @@ curl -H "Authorization: Bearer $TOKEN" -X POST localhost:20451/api/download \
 curl -H "Authorization: Bearer $TOKEN" "localhost:20451/api/jobs?limit=10"
 ```
 
-## Безопасность
+## Security
 
-- По умолчанию выключен; по умолчанию слушает только `127.0.0.1`.
-- Без токена API даёт полный доступ к хранилищу любому локальному процессу —
-  для общей машины **задайте token** и не выставляйте `host` наружу.
-- Тело запроса ограничено 1 МБ.
+- Disabled by default; by default listens on `127.0.0.1` only.
+- Without a token, the API gives full access to the storage to any local process —
+  on a shared machine **set a token** and don't expose `host` externally.
+- The request body is capped at 1 MB.

@@ -16,25 +16,25 @@ async def authorize(phone: str, session_path: str, api_id: int, api_hash: str) -
     from telethon import TelegramClient
     from telethon.errors import SessionPasswordNeededError
 
-    print(f"Подключаюсь к Telegram (API: {api_id})...")
+    print(f"Connecting to Telegram (API: {api_id})...")
     client = TelegramClient(session_path, api_id, api_hash)
     await client.connect()
 
     if await client.is_user_authorized():
-        print("✅ Сессия уже авторизована!")
+        print("✅ Session already authorized!")
     else:
-        print(f"Отправляю код на {phone}...")
+        print(f"Sending a code to {phone}...")
         try:
             await client.send_code_request(phone)
         except Exception as e:
-            print(f"❌ Ошибка отправки кода: {e}")
+            print(f"❌ Failed to send the code: {e}")
             await client.disconnect()
             return False
 
-        print("Проверьте приложение Telegram на вашем устройстве.")
-        code = input("Введите код подтверждения: ").strip()
+        print("Check the Telegram app on your device.")
+        code = input("Enter the confirmation code: ").strip()
         if not code:
-            print("❌ Код не введён")
+            print("❌ No code entered")
             await client.disconnect()
             return False
 
@@ -42,28 +42,28 @@ async def authorize(phone: str, session_path: str, api_id: int, api_hash: str) -
             await client.sign_in(phone, code)
         except SessionPasswordNeededError:
             # Two-factor authentication (cloud password) is enabled on the account.
-            print("Требуется пароль двухфакторной аутентификации (2FA).")
+            print("Two-factor authentication (2FA) password required.")
             for _ in range(3):
-                password = getpass("Введите пароль 2FA: ").strip()
+                password = getpass("Enter your 2FA password: ").strip()
                 if not password:
-                    print("❌ Пароль не введён")
+                    print("❌ No password entered")
                     continue
                 try:
                     await client.sign_in(password=password)
                     break
                 except Exception as e:
-                    print(f"❌ Неверный пароль 2FA: {e}")
+                    print(f"❌ Wrong 2FA password: {e}")
             else:
-                print("❌ Не удалось пройти 2FA")
+                print("❌ Could not pass 2FA")
                 await client.disconnect()
                 return False
         except Exception as e:
-            print(f"❌ Ошибка входа: {e}")
+            print(f"❌ Sign-in error: {e}")
             await client.disconnect()
             return False
 
         if not await client.is_user_authorized():
-            print("❌ Авторизация не прошла")
+            print("❌ Authorization failed")
             await client.disconnect()
             return False
 
@@ -77,9 +77,9 @@ async def authorize(phone: str, session_path: str, api_id: int, api_hash: str) -
         "premium": bool(getattr(me, "premium", False)),
     }
 
-    print(f"\n✅ Авторизован: {info['username'] or info['id']}")
-    print(f"   Телефон: {info['phone']}")
-    print(f"   Premium: {'Да' if info['premium'] else 'Нет'}")
+    print(f"\n✅ Authorized: {info['username'] or info['id']}")
+    print(f"   Phone: {info['phone']}")
+    print(f"   Premium: {'Yes' if info['premium'] else 'No'}")
 
     # Save the info
     session_dir = Path(session_path).parent
@@ -93,9 +93,7 @@ async def authorize(phone: str, session_path: str, api_id: int, api_hash: str) -
 
 def main():
     if len(sys.argv) < 5:
-        print(
-            "Использование: auth_session.py <phone> <session_path> <api_id> <api_hash>"
-        )
+        print("Usage: auth_session.py <phone> <session_path> <api_id> <api_hash>")
         sys.exit(1)
 
     phone = sys.argv[1]

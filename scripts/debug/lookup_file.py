@@ -1,6 +1,6 @@
 """Inspect a file in the local index by file_key: raw SQL + via DbRepo.
 
-Example: .venv/bin/python scripts/debug/lookup_file.py 1e99bca377ae --folder main/TG_bd
+Example: .venv/bin/python scripts/debug/lookup_file.py 1e99bca377ae --folder main
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from app.db.repo import DbRepo  # noqa: E402
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("file_key")
-    parser.add_argument("--folder", default="main/TG_bd")
+    parser.add_argument("--folder", default="main")
     parser.add_argument("--db", default="var/data/index.sqlite3")
     args = parser.parse_args()
 
@@ -32,7 +32,7 @@ def main() -> None:
     for row in rows:
         print(dict(row))
     if not rows:
-        print("не найдено в batch_members")
+        print("not found in batch_members")
 
     print("--- raw SQL: objects ---")
     rows = conn.execute(
@@ -41,7 +41,7 @@ def main() -> None:
     for row in rows:
         print(dict(row))
     if not rows:
-        print("не найдено в objects")
+        print("not found in objects")
 
     repo = DbRepo(conn)
 

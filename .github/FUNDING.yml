@@ -1,5 +1,5 @@
-# Кнопка "Sponsor" на странице репозитория.
-# GitHub принимает здесь только URL — крипто-адреса лежат в README
-# (секция «Поддержать проект»), сюда ставим ссылку на неё.
+# "Sponsor" button on the repository page.
+# GitHub only accepts a URL here — the crypto addresses live in the README
+# ("Support the project" section), so this points to it.
 custom:
-  - "https://github.com/f0rd2017/glidedrive#-поддержать-проект"
+  - "https://github.com/f0rd2017/glidedrive#-support-the-project"
