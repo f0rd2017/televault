@@ -125,13 +125,13 @@ class SetupDialog(QDialog):
         self.channels_label.setStyleSheet("color: #7a6fa0; font-size: 11px;")
         self.channels_label.setToolTip(
             self.tr(
-                "Channels are configured per account in the Accounts dialog.\n"
-                "Open Settings > Accounts to add/edit them."
+                "Channels are configured per account in the Accounts window.\n"
+                "Open it from the toolbar (the accounts icon) to add/edit them."
             )
         )
 
         self.main_route_spin = QSpinBox()
-        self.main_route_spin.setRange(1, 4)
+        self.main_route_spin.setRange(1, max(1, len(account_channels)))
         self.main_route_spin.setValue(initial_main_channel_index + 1)
         self.main_route_spin.setToolTip(
             self.tr("Number of the main channel from the list above (starting at 1).")

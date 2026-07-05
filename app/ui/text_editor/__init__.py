@@ -781,6 +781,14 @@ class TextEditorWindow(QWidget):
         self._add_shortcut(
             QKeySequence("Ctrl+H"), lambda: self._replace_btn.setChecked(True)
         )
+        # returnPressed on _find_edit only ever searches forward, so Shift+Enter
+        # (advertised by the "Previous" button's tooltip) needs its own shortcut.
+        self._add_shortcut(
+            QKeySequence("Shift+Return"), lambda: self._find(forward=False)
+        )
+        self._add_shortcut(
+            QKeySequence("Shift+Enter"), lambda: self._find(forward=False)
+        )
         self._add_shortcut(QKeySequence("Ctrl+/"), self._active_toggle_comment)
         self._add_shortcut(QKeySequence("Ctrl+D"), self._active_duplicate_line)
         self._add_shortcut(
