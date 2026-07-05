@@ -37,10 +37,9 @@
 
 ## Screenshots
 
-<!-- TODO: add screenshots -->
-| Explorer | Media viewer |
-|---|---|
-| *coming soon* | *coming soon* |
+![GlideDrive file explorer](docs/screenshots/explorer.png)
+
+*The file explorer: folders on the left, cloud contents on the right, with per-item "downloaded" badges.*
 
 ## How it works
 
