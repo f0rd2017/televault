@@ -336,6 +336,7 @@ class TgDownloader(
                             start_offset=current_size,
                             end_byte=target_len,
                             msg_id=int(part.msg_id),
+                            streams=per_part_streams,
                         )
                 result[int(part.part_index)] = str(out_path)
 

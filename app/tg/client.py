@@ -446,6 +446,29 @@ async def check_channels_access(
         user_permissions = "no_access"
         error: str | None = None
 
+        # Saved Messages (self-chat): the entity is a User, not a Channel, so the
+        # channel-specific requests below would raise and produce misleading
+        # "❌ UNAVAILABLE" log noise. Report it cleanly instead.
+        if getattr(chat_obj, "is_self", False) or str(target).strip().lower() in (
+            "me",
+            "self",
+        ):
+            results.append(
+                ChannelAccessCheck(
+                    channel_index=idx,
+                    chat_id=chat_id,
+                    target=target,
+                    accessible=True,
+                    title="Saved Messages",
+                    members_count=1,
+                    is_group=False,
+                    is_channel=False,
+                    user_permissions="admin",
+                    error=None,
+                )
+            )
+            continue
+
         try:
             full = await client(
                 functions.channels.GetFullChannelRequest(channel=chat_obj)

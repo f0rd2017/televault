@@ -337,6 +337,7 @@ class _DownloadFetchMixin:
         start_offset: int,
         end_byte: int,
         msg_id: int,
+        streams: int = 1,
     ) -> int:
         """Grow the local file ``target_path`` to ``end_byte`` bytes of the
         message's prefix (only for UNencrypted parts — the plaintext matches
@@ -344,12 +345,21 @@ class _DownloadFetchMixin:
         full part). Bytes already present (``start_offset``) are not
         re-downloaded — this uses ``iter_download(offset=..., limit=...)``
         rather than a full ``download_media``. Returns the resulting file size
-        on disk."""
+        on disk.
+
+        ``streams``: when the prefix window spans several request-size chunks
+        (a 12 MB stream window is ≈24 of them), download those chunks over N
+        parallel stride streams instead of one sequential stream. The window is
+        fetched blocking before the player gets any bytes, so this directly
+        cuts the time-to-first-frame from ``window`` down to ≈``window/N``. A
+        single-chunk window (e.g. a small tail range while hunting for moov)
+        stays on one stream."""
         request_size = self._tg_request_size
         aligned_offset = (max(0, start_offset) // request_size) * request_size
         chunks_needed = max(0, -(-(end_byte - aligned_offset) // request_size))
         if chunks_needed <= 0:
             return start_offset
+        n_streams = max(1, min(int(streams), chunks_needed))
 
         target_path.parent.mkdir(parents=True, exist_ok=True)
         flood_wait_count = 0
@@ -362,34 +372,26 @@ class _DownloadFetchMixin:
                     reraise=True,
                 ):
                     with attempt:
-                        await self._get_file_limiter.acquire()
-                        written = aligned_offset
-                        mode = (
-                            "r+b"
-                            if aligned_offset > 0 and target_path.exists()
-                            else "wb"
-                        )
-                        with open(target_path, mode) as f:
-                            f.seek(aligned_offset)
-                            f.truncate(aligned_offset)
-                            async for chunk in client.iter_download(
+                        if n_streams <= 1:
+                            return await self._fetch_prefix_linear(
+                                client,
                                 message,
-                                offset=aligned_offset,
+                                target_path,
+                                aligned_offset=aligned_offset,
+                                chunks_needed=chunks_needed,
                                 request_size=request_size,
-                                limit=chunks_needed,
-                            ):
-                                await self._download_bandwidth.acquire(len(chunk))
-                                f.write(chunk)
-                                written += len(chunk)
-                        self._get_file_limiter.record_success()
-                        logger.debug(
-                            "Prefix fetch done: msg_id=%s bytes=%d..%d target=%s",
-                            msg_id,
-                            aligned_offset,
-                            written,
-                            str(target_path),
+                                msg_id=msg_id,
+                            )
+                        return await self._fetch_prefix_strided(
+                            client,
+                            message,
+                            target_path,
+                            aligned_offset=aligned_offset,
+                            chunks_needed=chunks_needed,
+                            request_size=request_size,
+                            streams=n_streams,
+                            msg_id=msg_id,
                         )
-                        return written
             except (ConnectionError, TimeoutError) as exc:
                 await self._on_persistent_connection_failure(client, exc)
                 raise
@@ -397,6 +399,9 @@ class _DownloadFetchMixin:
                 wait_seconds = float(max(0, int(getattr(exc, "seconds", 0))))
                 self._get_file_limiter.record_flood_wait(wait_seconds)
                 flood_wait_count += 1
+                # Parallel streams multiply getFile pressure — after a FloodWait
+                # collapse the window back onto a single stream for the retry.
+                n_streams = 1
                 if flood_wait_count > max(1, int(self.config.retry.max_attempts)):
                     raise
                 logger.warning(
@@ -406,6 +411,118 @@ class _DownloadFetchMixin:
                     flood_wait_count,
                 )
                 await asyncio.sleep(wait_seconds + self._FLOOD_WAIT_BUFFER_SECONDS)
+
+    async def _fetch_prefix_linear(
+        self,
+        client,
+        message,
+        target_path: Path,
+        *,
+        aligned_offset: int,
+        chunks_needed: int,
+        request_size: int,
+        msg_id: int,
+    ) -> int:
+        """Single-stream prefix fetch (see :meth:`_fetch_prefix_with_retry`)."""
+        await self._get_file_limiter.acquire()
+        written = aligned_offset
+        mode = "r+b" if aligned_offset > 0 and target_path.exists() else "wb"
+        with open(target_path, mode) as f:
+            f.seek(aligned_offset)
+            f.truncate(aligned_offset)
+            async for chunk in client.iter_download(
+                message,
+                offset=aligned_offset,
+                request_size=request_size,
+                limit=chunks_needed,
+            ):
+                await self._download_bandwidth.acquire(len(chunk))
+                f.write(chunk)
+                written += len(chunk)
+        self._get_file_limiter.record_success()
+        logger.debug(
+            "Prefix fetch done: msg_id=%s bytes=%d..%d target=%s",
+            msg_id,
+            aligned_offset,
+            written,
+            str(target_path),
+        )
+        return written
+
+    async def _fetch_prefix_strided(
+        self,
+        client,
+        message,
+        target_path: Path,
+        *,
+        aligned_offset: int,
+        chunks_needed: int,
+        request_size: int,
+        streams: int,
+        msg_id: int,
+    ) -> int:
+        """Fetch the prefix window ``[aligned_offset, aligned_offset +
+        chunks_needed*request_size)`` over ``streams`` parallel stride streams.
+
+        Stream ``i`` owns the request-size chunks whose index ``j`` satisfies
+        ``j % streams == i`` (offsets ``aligned_offset + i*rs``, then stepping by
+        ``streams*rs``), so together the streams tile the window with no gaps or
+        overlap. The result stays request-size aligned exactly like the linear
+        path, so a later window can grow it without re-downloading (the growth
+        starts on a chunk boundary)."""
+        n = max(2, int(streams))
+        stride = n * request_size
+        doc_size = int(getattr(getattr(message, "file", None), "size", 0) or 0)
+        end_target = aligned_offset + chunks_needed * request_size
+        if doc_size > 0:
+            end_target = min(end_target, doc_size)
+
+        # Pre-size the file so the parallel writers can seek to their own offsets
+        # in one shared file. When growing, existing leading bytes
+        # [0, aligned_offset) are preserved (r+b, not wb); the streams then fully
+        # cover [aligned_offset, end_target), so no zero-holes remain.
+        def _presize() -> None:
+            mode = "r+b" if aligned_offset > 0 and target_path.exists() else "wb"
+            with open(target_path, mode) as f:
+                f.truncate(end_target)
+
+        await asyncio.to_thread(_presize)
+        await self._get_file_limiter.acquire()
+
+        async def _one_stream(idx: int) -> None:
+            count_i = (chunks_needed - idx + n - 1) // n  # chunks with j % n == idx
+            if count_i <= 0:
+                return
+            off0 = aligned_offset + idx * request_size
+            write_off = off0
+            with open(target_path, "r+b") as f:
+                async for chunk in client.iter_download(
+                    message,
+                    offset=off0,
+                    stride=stride,
+                    request_size=request_size,
+                    limit=count_i,
+                ):
+                    await self._download_bandwidth.acquire(len(chunk))
+                    f.seek(write_off)
+                    f.write(chunk)
+                    write_off += stride
+
+        await asyncio.gather(*(_one_stream(i) for i in range(n)))
+        self._get_file_limiter.record_success()
+        try:
+            written = int(target_path.stat().st_size)
+        except OSError:
+            written = int(end_target)
+        logger.debug(
+            "Prefix fetch done (strided x%d): msg_id=%s bytes=%d..%d target=%s",
+            n,
+            msg_id,
+            aligned_offset,
+            written,
+            str(target_path),
+        )
+        return written
 
     async def _download_strided(
         self,
