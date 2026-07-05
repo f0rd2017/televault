@@ -47,7 +47,7 @@
 Требуется Python **3.11+**.
 
 ```bash
-git clone https://github.com/YOUR_NAME/glidedrive
+git clone https://github.com/f0rd2017/glidedrive
 cd glidedrive
 
 # через uv (рекомендуется)
