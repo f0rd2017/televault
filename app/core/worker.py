@@ -20,6 +20,12 @@ from app.tg.upload import TgUploader
 
 logger = logging.getLogger(__name__)
 
+# Poster frame offset for not-yet-downloaded videos: skip the very first frame
+# (often a black fade-in) and grab one ~1s in. The prefix/head we fetch holds
+# many seconds, and extract_video_poster_png falls back to frame 0 for shorter
+# clips, so this is safe.
+_REMOTE_POSTER_SEEK_SEC = 1.0
+
 
 class TelegramWorker(QThread):
     job_event = Signal(object)
@@ -49,6 +55,8 @@ class TelegramWorker(QThread):
         self._deleter: TgDeleter | None = None
         self._account_manager: AccountManager | None = None
         self._upload_accounts: list[ConnectedAccount] = []
+        # (client_by_chat_id, chat_by_chat_id) for blob manifest recovery
+        self._recovery_ctx: tuple[dict[str, object], dict[str, object]] | None = None
         self._accepting_jobs = False
         self._stop_requested = False
         self._restart_requested = False
@@ -248,6 +256,27 @@ class TelegramWorker(QThread):
             )
         except Exception as e:
             logger.error("Automatic reconcile failed: %s", e)
+
+        chat_by_chat_id: dict[str, object] = {
+            all_scan_chat_ids[idx]: all_scan_chats[idx] for idx in all_scan_chats
+        }
+        with self._state_lock:
+            self._recovery_ctx = (dict(client_by_chat_id), chat_by_chat_id)
+
+        # Blobs scanned from Telegram may have no local manifest (fresh
+        # database / another machine) — rebuild member lists from the zips
+        # themselves so files inside blobs are never tied to one local DB.
+        try:
+            recovery_stats = await self._run_blob_manifest_recovery()
+            if recovery_stats.get("recovered"):
+                logger.info(
+                    "✅ Blob manifests recovered: blobs=%d files=%d failed=%d",
+                    recovery_stats.get("recovered", 0),
+                    recovery_stats.get("members", 0),
+                    recovery_stats.get("failed", 0),
+                )
+        except Exception as e:
+            logger.error("Blob manifest recovery failed: %s", e)
 
         # Initialize core components
 
@@ -806,10 +835,23 @@ class TelegramWorker(QThread):
             dest.mkdir(parents=True, exist_ok=True)
             out_png = str(dest / f"vp_{file_key}.png")
             loop = asyncio.get_running_loop()
+            # Grab a frame ~1s in (not the very first, which is often a black
+            # fade-in) — the prefix holds many seconds of video, and
+            # extract_video_poster_png falls back to frame 0 for short clips.
             ok = await loop.run_in_executor(
                 None,
-                lambda: extract_video_poster_png(prefix_path, out_png, seek_sec=0.0),
+                lambda: extract_video_poster_png(
+                    prefix_path, out_png, seek_sec=_REMOTE_POSTER_SEEK_SEC
+                ),
             )
+            if not ok:
+                # The prefix alone couldn't be decoded — typically a
+                # non-faststart MP4 (frequently what a ".avi" actually is) whose
+                # moov atom lives at the END of the file. Pull the LAST part too
+                # and rebuild a sparse head+tail file so ffmpeg can read moov.
+                ok = await self._try_remote_poster_with_tail(
+                    folder_path, file_key, prefix_path, str(prefix_cache), out_png
+                )
             if ok:
                 self.thumbnail_ready.emit(folder_path, file_key, out_png)
             else:
@@ -831,6 +873,64 @@ class TelegramWorker(QThread):
                     prefix_cache,
                     str(exc),
                 )
+
+    async def _try_remote_poster_with_tail(
+        self,
+        folder_path: str,
+        file_key: str,
+        prefix_path: str,
+        cache_dir: str,
+        out_png: str,
+    ) -> bool:
+        """Fallback for a not-downloaded video whose metadata sits at the end:
+        fetch the LAST part and reconstruct a sparse head+tail file so ffmpeg
+        can find the moov/index. Returns True if a poster was produced."""
+        from pathlib import Path
+
+        from app.core.utils import extract_video_poster_png, write_sparse_head_tail
+
+        # Encryption changes on-disk part sizes vs. the plaintext byte offsets
+        # that the container's index expects, so the sparse offsets wouldn't
+        # line up. Only attempt this for unencrypted objects (the default).
+        if self.config.crypto.enabled:
+            return False
+
+        parts = self.repo.get_parts_for_object(
+            folder_path=folder_path, file_key=file_key
+        )
+        if not parts:
+            return False
+        sizes = {int(p.part_index): int(p.file_size or 0) for p in parts}
+        last_idx = max(sizes)
+        if last_idx <= 0 or any(sizes[i] <= 0 for i in sizes):
+            return False  # single part (already tried) or unknown sizes
+
+        tail_offset = sum(sizes[i] for i in range(last_idx))
+        total_size = sum(sizes.values())
+
+        tail_paths = await self._downloader.fetch_parts_decrypted(
+            folder_path, file_key, [last_idx], cache_dir
+        )
+        tail_path = tail_paths.get(last_idx)
+        if not tail_path:
+            return False
+
+        sparse_path = str(Path(cache_dir) / f"sparse_{file_key}.bin")
+        loop = asyncio.get_running_loop()
+
+        def _build_and_extract() -> bool:
+            if not write_sparse_head_tail(
+                sparse_path, prefix_path, tail_path, tail_offset, total_size
+            ):
+                return False
+            # The ~1s frame's samples sit at the start of mdat (inside the head
+            # we fetched), so seeking forward decodes from the sparse file and
+            # avoids a black first frame.
+            return extract_video_poster_png(
+                sparse_path, out_png, seek_sec=_REMOTE_POSTER_SEEK_SEC
+            )
+
+        return await loop.run_in_executor(None, _build_and_extract)
 
     async def _enqueue(self, job_type: str, payload: dict[str, Any]) -> None:
         with self._state_lock:
@@ -870,6 +970,41 @@ class TelegramWorker(QThread):
                         db_job_id,
                         str(e),
                     )
+
+    async def _run_blob_manifest_recovery(
+        self, cancel_token: Any = None
+    ) -> dict[str, int]:
+        """Rebuild missing batch-blob manifests from Telegram (see
+        app.tg.blob_recovery). No-op when no clients are connected."""
+        with self._state_lock:
+            ctx = self._recovery_ctx
+        if ctx is None:
+            return {"orphans": 0, "recovered": 0, "members": 0, "failed": 0}
+        client_by_chat_id, chat_by_chat_id = ctx
+
+        from app.tg.blob_recovery import recover_blob_manifests
+
+        return await recover_blob_manifests(
+            self.repo,
+            self.config,
+            client_by_chat_id=client_by_chat_id,
+            chat_by_chat_id=chat_by_chat_id,
+            cancel_token=cancel_token,
+        )
+
+    async def _recover_blob_manifests_safe(self, cancel_token: Any = None) -> None:
+        """Recovery variant for scan jobs: never fails the parent job."""
+        try:
+            stats = await self._run_blob_manifest_recovery(cancel_token)
+            if stats.get("recovered"):
+                logger.info(
+                    "Blob manifests recovered after scan: blobs=%d files=%d failed=%d",
+                    stats.get("recovered", 0),
+                    stats.get("members", 0),
+                    stats.get("failed", 0),
+                )
+        except Exception as exc:  # noqa: BLE001 — recovery must not break scans
+            logger.warning("Blob manifest recovery after scan failed: %s", exc)
 
     def _build_runner(self, job_type: str, payload: dict[str, Any]):
         if self._downloader is None or self._uploader is None:
@@ -1075,6 +1210,7 @@ class TelegramWorker(QThread):
                 stats = await self._scanner.refresh_incremental(
                     cancel_token=ctx.cancel_token
                 )
+                await self._recover_blob_manifests_safe(ctx.cancel_token)
                 await ctx.report_progress(100, f"Indexed parts: {stats.indexed_parts}")
                 return {
                     "processed_messages": stats.processed_messages,
@@ -1091,6 +1227,7 @@ class TelegramWorker(QThread):
             async def reindex_runner(ctx: JobContext) -> Any:
                 await ctx.report_progress(10, "Scanning Telegram history")
                 stats = await self._scanner.refresh_full(cancel_token=ctx.cancel_token)
+                await self._recover_blob_manifests_safe(ctx.cancel_token)
                 await ctx.report_progress(100, f"Indexed parts: {stats.indexed_parts}")
                 return {
                     "processed_messages": stats.processed_messages,
@@ -1107,6 +1244,7 @@ class TelegramWorker(QThread):
             async def reconcile_runner(ctx: JobContext) -> Any:
                 await ctx.report_progress(10, "Reconciling index with Telegram")
                 stats = await self._scanner.reconcile(cancel_token=ctx.cancel_token)
+                await self._recover_blob_manifests_safe(ctx.cancel_token)
                 await ctx.report_progress(
                     100,
                     f"Reconcile indexed parts: {stats.indexed_parts}; "
@@ -1228,6 +1366,7 @@ class TelegramWorker(QThread):
             self._deleter = None
             self._account_manager = None
             self._upload_accounts = []
+            self._recovery_ctx = None
             self._accepting_jobs = False
             self._stop_requested = False
         self._job_persist_progress.clear()

@@ -176,6 +176,39 @@ class _ObjectsMixin:
             key=lambda item: (-int(item.last_seen_ts), str(item.orig_name).lower()),
         )
 
+    def count_objects_recursive(self, folder_path: str) -> int:
+        """Cheap COUNT of visible files under a folder (regular objects +
+        batch members, minus trash), mirroring list_objects_unified filters.
+        Used by the UI to skip expensive scans on very large trees without
+        materializing every row first."""
+        normalized_folder = normalize_folder_path(folder_path)
+        params = (normalized_folder, f"{normalized_folder}/%")
+        regular = self.conn.execute(
+            """
+            SELECT COUNT(*) FROM objects
+            WHERE (folder_path = ? OR folder_path LIKE ?)
+              AND NOT EXISTS (SELECT 1 FROM batch_blobs bb
+                              WHERE bb.blob_key = objects.file_key AND bb.is_deleted = 0)
+              AND NOT EXISTS (SELECT 1 FROM trash tr
+                              WHERE tr.folder_path = objects.folder_path
+                                AND tr.file_key = objects.file_key)
+            """,
+            params,
+        ).fetchone()[0]
+        members = self.conn.execute(
+            """
+            SELECT COUNT(*) FROM batch_members bm
+            JOIN batch_blobs bb ON bb.blob_key = bm.blob_key
+            WHERE bm.deleted_ts IS NULL AND bb.is_deleted = 0
+              AND (bm.folder_path = ? OR bm.folder_path LIKE ?)
+              AND NOT EXISTS (SELECT 1 FROM trash tr
+                              WHERE tr.folder_path = bm.folder_path
+                                AND tr.file_key = bm.file_key)
+            """,
+            params,
+        ).fetchone()[0]
+        return int(regular) + int(members)
+
     def get_parts_for_object(self, folder_path: str, file_key: str) -> list[PartRecord]:
         query = """
         WITH latest AS (

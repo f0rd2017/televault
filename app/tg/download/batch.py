@@ -61,8 +61,21 @@ class _DownloadBatchMixin:
                 ):
                     selected_manifest_member = item
                     break
+        # The network phase dominates the job: map the blob download onto
+        # 0-90% of the progress bar so the UI shows live speed instead of
+        # staying silent until extraction.
+        blob_progress = None
+        if progress_cb is not None:
+
+            async def blob_progress(percent: float, message: str) -> None:
+                await progress_cb(max(0.0, min(100.0, percent)) * 0.9, message)
+
         cache_path, blob_reused = await self._ensure_blob_cached(
-            blob, member.blob_key, cancel_token, dest_root=dest_root
+            blob,
+            member.blob_key,
+            cancel_token,
+            dest_root=dest_root,
+            progress_cb=blob_progress,
         )
 
         extract_started = time.monotonic()
@@ -149,6 +162,7 @@ class _DownloadBatchMixin:
         blob_key: str,
         cancel_token: CancelToken,
         dest_root: str | None = None,
+        progress_cb=None,
     ) -> tuple[Path, bool]:
         """Download the blob archive once into the shared blob cache (locked) and
         return (cache_path, reused). Reused = it was already cached."""
@@ -175,7 +189,7 @@ class _DownloadBatchMixin:
                     allow_incomplete=False,
                     integrity_mode="fast",
                     cancel_token=cancel_token,
-                    progress_cb=None,
+                    progress_cb=progress_cb,
                     _storage_override="regular",
                     dest_root=dest_root,
                 )
@@ -187,7 +201,10 @@ class _DownloadBatchMixin:
                         f"Blob cache source not found: {blob_output_path}"
                     )
                 if blob_output_path != cache_path:
-                    shutil.copyfile(blob_output_path, cache_path)
+                    # Move, not copy: the zip landing in the user-visible download
+                    # folder is a transport artifact — leaving it there doubles
+                    # disk usage and litters the folder with batch_*.zip files.
+                    shutil.move(str(blob_output_path), str(cache_path))
         cancel_token.raise_if_cancelled()
         return cache_path, blob_reused
 
@@ -265,8 +282,17 @@ class _DownloadBatchMixin:
         if not members:
             raise ValueError("No batch members to download for this blob")
 
+        # Network phase = 0-85% of the job (live speed from the transfer
+        # aggregator), extraction = 85-100%. Without this the UI sees zero
+        # events for the whole multi-second blob download.
+        blob_progress = None
+        if progress_cb is not None:
+
+            async def blob_progress(percent: float, message: str) -> None:
+                await progress_cb(max(0.0, min(100.0, percent)) * 0.85, message)
+
         cache_path, blob_reused = await self._ensure_blob_cached(
-            blob, blob_key, cancel_token
+            blob, blob_key, cancel_token, progress_cb=blob_progress
         )
 
         total = len(members)
@@ -297,7 +323,7 @@ class _DownloadBatchMixin:
                 extracted += 1
                 if progress_cb is not None:
                     await progress_cb(
-                        100.0 * extracted / total,
+                        85.0 + 15.0 * extracted / total,
                         f"Extracted {extracted}/{total} from blob",
                     )
         extract_elapsed = max(0.0, time.monotonic() - extract_started)

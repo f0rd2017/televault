@@ -184,6 +184,27 @@ class _BatchMixin:
             for row in rows
         ]
 
+    def list_all_blob_keys(self) -> list[str]:
+        rows = self.conn.execute("SELECT blob_key FROM batch_blobs").fetchall()
+        return [str(row["blob_key"]) for row in rows]
+
+    def list_blob_caption_rows(self) -> list[Any]:
+        """Live msg_index rows whose caption marks them as batch blobs.
+
+        Used by manifest recovery to find blobs that exist in Telegram but
+        have no batch_blobs row in this database.
+        """
+        return self.conn.execute(
+            """
+            SELECT chat_id, msg_id, folder_path, file_key, caption_raw, file_size
+            FROM msg_index
+            WHERE is_deleted = 0
+              AND (caption_raw LIKE '%"kind":"tgccm_batch_blob"%'
+                   OR caption_raw LIKE '%"t":"tgccm_batch_blob"%')
+            ORDER BY chat_id, msg_id
+            """
+        ).fetchall()
+
     def resolve_object_storage(self, folder_path: str, file_key: str) -> str:
         normalized_folder = normalize_folder_path(folder_path)
         batch_row = self.conn.execute(

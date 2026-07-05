@@ -22,6 +22,7 @@ from app.core.utils import file_key_from_sha256
 from app.db.database import connect_db
 from app.db.repo import DbRepo
 from app.tg.client import TgClientEndpoint
+from app.tg.compression import BATCH_MANIFEST_ARC_NAME
 from app.tg.download import TgDownloader
 from app.tg.parser import parse_caption
 from app.tg.upload import TgUploader
@@ -426,6 +427,85 @@ async def test_fetch_parts_decrypted_prefix_grows_without_full_redownload(
     assert all(call["offset"] >= first_size for call in new_calls), (
         "не должен перекачивать уже полученные байты префикса заново"
     )
+
+
+@pytest.mark.asyncio
+async def test_fetch_parts_decrypted_prefix_downloads_striped_in_parallel(
+    tmp_path,
+) -> None:
+    """Окно стрима (≈12 МБ) раньше качалось ОДНИМ последовательным потоком —
+    это и был главный вклад в задержку до первого кадра. Теперь многочанковый
+    префикс раскладывается на несколько параллельных stride-потоков, а собранные
+    байты должны в точности совпадать с началом файла (без дыр/перехлёста)."""
+    from app.core.types import PartMeta
+    from app.tg.parser import build_caption
+
+    config = AppConfig(
+        tg_api_id=1,
+        tg_api_hash="x",
+        tg_session_path="./data/session.session",
+        cache_dir=str(tmp_path / "cache"),
+        chunk_size_mb=1,
+        upload_compression_mode="off",
+        retry=RetryConfig(max_attempts=2, base_delay=0.01),
+        crypto=CryptoConfig(enabled=False, key_env="TG_CRYPTO_KEY_B64"),
+    )
+
+    # Детерминированный контент, заметно больше префикса, чтобы последний чанк
+    # был полным (никаких коротких хвостов у границы файла).
+    payload = bytes(range(256)) * 24_000  # 6,144,000 байт
+    db = connect_db(tmp_path / "index.sqlite3")
+    repo = DbRepo(db)
+    client = FakeClient()
+
+    folder, file_key = "Anime/Cache", "stripedprefix"
+    meta = PartMeta(
+        folder_path=folder,
+        file_key=file_key,
+        part_index=0,
+        parts_total=1,
+        orig_name="huge.mp4",
+    )
+    sent = await client.send_file(
+        object(), payload, caption=build_caption(meta, extra={"enc": False})
+    )
+    part = PartRecord(
+        msg_id=sent.id,
+        chat_id="1",
+        folder_path=folder,
+        file_key=file_key,
+        part_index=0,
+        parts_total=1,
+        orig_name="huge.mp4",
+        file_size=len(payload),
+        caption_raw=sent.caption,
+        date_ts=1,
+    )
+    repo.upsert_msg_parts_bulk([part])
+
+    downloader = TgDownloader(config, repo, client, chat=object(), chat_id="1")
+    stream_cache = tmp_path / "stream_cache"
+
+    # Нужен префикс в несколько request-size чанков (524288 Б каждый).
+    parts = await downloader.fetch_parts_decrypted(
+        folder, file_key, [0], str(stream_cache), prefix_bytes={0: 3_000_000}
+    )
+    cached = Path(parts[0])
+    size = cached.stat().st_size
+    assert 3_000_000 <= size < len(payload)
+    # Байты собраны верно — потоки уложили чанки без дыр и перехлёста.
+    assert cached.read_bytes() == payload[:size]
+
+    # Скачивание шло параллельными stride-потоками, а не одним последовательным.
+    striped = [c for c in client.iter_download_calls if c["stride"] is not None]
+    assert len(striped) >= 2, (
+        f"ожидались параллельные stride-потоки, а вызовы были: "
+        f"{client.iter_download_calls}"
+    )
+    request_size = 524288
+    assert all(c["stride"] == len(striped) * request_size for c in striped)
+    offsets = sorted(c["offset"] for c in striped)
+    assert offsets == [i * request_size for i in range(len(striped))]
 
     # Третий запрос требует часть целиком — должен докачать хвост.
     parts3 = await downloader.fetch_parts_decrypted(
@@ -876,7 +956,9 @@ async def test_upload_group_batches_small_files_into_single_archive(tmp_path) ->
     sent = next(iter(client.sent.values()))
     with zipfile.ZipFile(io.BytesIO(sent.payload), "r") as archive:
         names = sorted(archive.namelist())
-        assert len(names) == 2
+        # 2 members + the embedded recovery manifest
+        assert names[-1] == BATCH_MANIFEST_ARC_NAME
+        assert len(names) == 3
         first_name = next(name for name in names if name.endswith("first.txt"))
         second_name = next(name for name in names if name.endswith("second.txt"))
         assert archive.read(first_name) == one.read_bytes()
@@ -916,7 +998,10 @@ async def test_upload_group_skips_missing_file_uploads_rest(tmp_path) -> None:
     assert result["small_batch"]["files_count"] == 2
     sent = next(iter(client.sent.values()))
     with zipfile.ZipFile(io.BytesIO(sent.payload), "r") as archive:
-        assert len(archive.namelist()) == 2
+        member_names = [
+            name for name in archive.namelist() if name != BATCH_MANIFEST_ARC_NAME
+        ]
+        assert len(member_names) == 2
 
 
 @pytest.mark.asyncio

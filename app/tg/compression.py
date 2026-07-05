@@ -9,6 +9,7 @@ cancel token.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from pathlib import Path
@@ -33,6 +34,11 @@ ZIP_MT_TOOL_NAMES = ("7z", "7za")
 ZIP_MT_POLL_INTERVAL_SEC = 0.1
 ZIP_MT_ENV_PATH = "GLIDEDRIVE_7Z_PATH"
 ZIP_MT_ENV_THREADS = "GLIDEDRIVE_7Z_THREADS"
+# Manifest entry embedded into every batch-blob zip so member lists can be
+# recovered from Telegram alone (no dependency on the uploader's local DB).
+# The name must sort AFTER the "NNNNN_..." member entries ('_' > digits in
+# ASCII), keeping index-based member resolution in downloads intact.
+BATCH_MANIFEST_ARC_NAME = "_tgccm_manifest.json"
 AUTO_SKIP_EXTENSIONS = frozenset(
     {
         ".7z",
@@ -362,6 +368,20 @@ def build_group_archive(
                         if not chunk:
                             break
                         dst.write(chunk)
+
+            manifest_payload = {
+                "version": 2,
+                "kind": "tgccm_batch_blob_manifest",
+                "members_count": len(members),
+                "members": [
+                    {key: value for key, value in item.items() if key != "source_path"}
+                    for item in members
+                ],
+            }
+            archive.writestr(
+                BATCH_MANIFEST_ARC_NAME,
+                json.dumps(manifest_payload, ensure_ascii=False, separators=(",", ":")),
+            )
     except Exception:
         archive_path.unlink(missing_ok=True)
         raise
