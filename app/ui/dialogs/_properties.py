@@ -27,42 +27,42 @@ from app.ui.dialogs._style import _DIALOG_STYLESHEET
 
 _ACCOUNT_TABLE_STYLESHEET = """
     QTableWidget {
-        background: #0f1420;
-        color: #f3f1ff;
-        border: 1px solid #2f3850;
+        background: #18181b;
+        color: #e4e4e7;
+        border: 1px solid #27272a;
         border-radius: 8px;
-        gridline-color: #1e2740;
+        gridline-color: #27272a;
     }
     QTableWidget::item {
         padding: 6px 8px;
     }
     QTableWidget::item:selected {
-        background: #1c2638;
-        color: #f3f1ff;
+        background: #3b0764;
+        color: #ffffff;
     }
     QHeaderView::section {
-        background: #151d30;
-        color: #9b8fc0;
+        background: #09090b;
+        color: #a1a1aa;
         border: none;
-        border-bottom: 1px solid #2f3850;
+        border-bottom: 1px solid #27272a;
         padding: 6px 8px;
         font-weight: 600;
         font-size: 12px;
     }
     QTableWidget QScrollBar:vertical {
-        background: #12192a;
+        background: #18181b;
         width: 10px;
         margin: 3px 2px 3px 2px;
         border: none;
         border-radius: 5px;
     }
     QTableWidget QScrollBar::handle:vertical {
-        background: #4f5f80;
+        background: #52525b;
         min-height: 20px;
         border-radius: 5px;
     }
     QTableWidget QScrollBar::handle:vertical:hover {
-        background: #6577a3;
+        background: #71717a;
     }
     QTableWidget QScrollBar::add-line:vertical,
     QTableWidget QScrollBar::sub-line:vertical,
