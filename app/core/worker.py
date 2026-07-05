@@ -140,7 +140,7 @@ class TelegramWorker(QThread):
         if not upload_accounts and tg_session is None:
             self.fatal_error.emit(
                 "No user accounts configured and main session unavailable. "
-                "Add accounts via: python scripts/manage_accounts.py"
+                "Add accounts in the app: menu → Accounts → Add account."
             )
             return
 
@@ -214,7 +214,7 @@ class TelegramWorker(QThread):
         if not all_scan_chats:
             self.fatal_error.emit(
                 "No channels available for scanning. "
-                "Add user accounts via: python scripts/manage_accounts.py"
+                "Add user accounts in the app: menu → Accounts → Add account."
             )
             if tg_session:
                 await tg_manager.stop()

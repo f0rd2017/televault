@@ -84,7 +84,12 @@ class MiscMixin:
         from app.ui.dialogs._accounts import AccountsDialog
 
         before = self._accounts_signature()
-        dlg = AccountsDialog(self.repo, parent=self)
+        dlg = AccountsDialog(
+            self.repo,
+            parent=self,
+            default_api_id=int(getattr(self.config, "tg_api_id", 0) or 0),
+            default_api_hash=str(getattr(self.config, "tg_api_hash", "") or ""),
+        )
         dlg.exec()
         after = self._accounts_signature()
         if before == after:

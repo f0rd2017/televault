@@ -1,6 +1,7 @@
 """
 Simple window for managing Telegram accounts.
-Just a table + management buttons. Authorization happens via the terminal.
+A table + management buttons; new accounts are added and authorized via
+the built-in AddAccountDialog (no terminal needed).
 """
 
 from __future__ import annotations
@@ -172,9 +173,18 @@ class AccountsDialog(QDialog):
     COL_PROXY_STATUS = 8
     COL_ACC_STATUS = 9
 
-    def __init__(self, repo: DbRepo, parent=None):
+    def __init__(
+        self,
+        repo: DbRepo,
+        parent=None,
+        *,
+        default_api_id: int = 0,
+        default_api_hash: str = "",
+    ):
         super().__init__(parent)
         self.repo = repo
+        self._default_api_id = default_api_id
+        self._default_api_hash = default_api_hash
         self._accounts: list[TelegramAccount] = []
         self._probe: _StatusProbe | None = None
         self.setWindowTitle(self.tr("Telegram Accounts"))
@@ -275,9 +285,8 @@ class AccountsDialog(QDialog):
 
         desc = QLabel(
             self.tr(
-                "To add a new account, run: python scripts/manage_accounts.py\n"
-                "Here you can choose the primary account, change the target channel, "
-                "configure a proxy, or disable an account."
+                "Add and authorize new accounts, choose the primary account, "
+                "change the target channel, configure a proxy, or disable an account."
             )
         )
         desc.setWordWrap(True)
@@ -317,8 +326,13 @@ class AccountsDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.setSpacing(8)
 
+        self.add_btn = QPushButton(self.tr("➕ Add account"))
+        self.add_btn.setObjectName("primaryBtn")
+        self.add_btn.clicked.connect(self._on_add)
+        self.add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_layout.addWidget(self.add_btn)
+
         self.primary_btn = QPushButton(self.tr("Set as primary"))
-        self.primary_btn.setObjectName("primaryBtn")
         self.primary_btn.clicked.connect(self._on_set_primary)
         self.primary_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_layout.addWidget(self.primary_btn)
@@ -356,14 +370,6 @@ class AccountsDialog(QDialog):
         btn_layout.addWidget(self.check_btn)
 
         btn_layout.addStretch()
-
-        self.copy_cmd_btn = QPushButton(self.tr("Copy add-account command"))
-        self.copy_cmd_btn.clicked.connect(self._on_copy_command)
-        self.copy_cmd_btn.setToolTip(
-            self.tr("Copy the add-account command to the clipboard")
-        )
-        self.copy_cmd_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_layout.addWidget(self.copy_cmd_btn)
 
         self.close_btn = QPushButton(self.tr("Close"))
         self.close_btn.clicked.connect(self.accept)
@@ -715,12 +721,14 @@ class AccountsDialog(QDialog):
             self, self.tr("Done"), self.tr("Account '{0}' deleted").format(acc.label)
         )
 
-    def _on_copy_command(self):
-        from PySide6.QtWidgets import QApplication
+    def _on_add(self):
+        from app.ui.dialogs._add_account import AddAccountDialog
 
-        cmd = "python scripts/manage_accounts.py"
-        clipboard = QApplication.clipboard()
-        clipboard.setText(cmd)
-        QMessageBox.information(
-            self, self.tr("Copied"), self.tr("Command copied:\n\n{0}").format(cmd)
+        dlg = AddAccountDialog(
+            self.repo,
+            default_api_id=self._default_api_id,
+            default_api_hash=self._default_api_hash,
+            parent=self,
         )
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self._load_accounts()
