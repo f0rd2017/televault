@@ -10,7 +10,7 @@ build/
 dist/
 *.spec
 # Курируемый spec сборки — под контролем версий
-!TG_Cloud_Cache_Manager.spec
+!GlideDrive.spec
 
 # Virtualenv
 .venv/

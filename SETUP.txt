@@ -1,5 +1,5 @@
 ========================================================================
- TG Cloud Cache Manager — установка и запуск из исходников (run.py)
+ GlideDrive — установка и запуск из исходников (run.py)
 ========================================================================
 
 Требуется: Python >= 3.11 (проверено на 3.11–3.14).
@@ -15,7 +15,7 @@
 ------------------------------------------------------------------------
 
 # перейти в папку проекта
-cd /путь/к/tg-cloud-cache-manager
+cd /путь/к/glidedrive
 
 # создать виртуальное окружение
 python -m venv .venv
@@ -90,7 +90,7 @@ python run.py
 
 Окружение уже создано — достаточно активировать и запустить:
 
-  fish:        cd /путь/к/tg-cloud-cache-manager; source .venv/bin/activate.fish; python run.py
+  fish:        cd /путь/к/glidedrive; source .venv/bin/activate.fish; python run.py
   PowerShell:  cd C:\путь\к\TG_bd; .venv\Scripts\Activate.ps1; python run.py
 
 run.py можно запускать из любой рабочей папки — пути к config/var/logs

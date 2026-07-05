@@ -7,7 +7,7 @@
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
 ![Qt](https://img.shields.io/badge/UI-PySide6-41cd52)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
-![Tests](https://img.shields.io/badge/tests-474%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-513%20passed-brightgreen)
 ![Languages](https://img.shields.io/badge/UI-EN%20%7C%20RU%20%7C%20UA-informational)
 
 ---
@@ -47,8 +47,8 @@
 Требуется Python **3.11+**.
 
 ```bash
-git clone https://github.com/YOUR_NAME/tg-cloud-cache-manager
-cd tg-cloud-cache-manager
+git clone https://github.com/YOUR_NAME/glidedrive
+cd glidedrive
 
 # через uv (рекомендуется)
 uv sync
@@ -98,7 +98,7 @@ app/
 ## Тесты
 
 ```bash
-uv run pytest          # 474 теста
+uv run pytest          # 513 тестов
 uv run ruff check .    # линтер
 ```
 
