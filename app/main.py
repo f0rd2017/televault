@@ -19,7 +19,7 @@ from app.config.config import (
     save_public_config,
 )
 from app.core.logging import setup_logging
-from app.core.utils import ensure_dir, ensure_parent_dir
+from app.core.utils import app_icon_path, ensure_dir, ensure_parent_dir
 from app.core.worker import TelegramWorker
 from app.db.database import connect_db
 from app.db.repo import DbRepo
@@ -37,17 +37,6 @@ def _database_path_from_session(session_path: str) -> Path:
     return base / "index.sqlite3"
 
 
-def _resolve_app_icon_path() -> Path:
-    candidates = [
-        Path(__file__).resolve().parent / "assets" / "icon.png",
-        Path.cwd() / "icon.png",
-    ]
-    for candidate in candidates:
-        if candidate.exists() and candidate.is_file():
-            return candidate
-    return candidates[0]
-
-
 def _show_error(text: str) -> None:
     logger.error(text)
     print(text, file=sys.stderr)
@@ -61,6 +50,17 @@ def run() -> int:
         or "--debug" in sys.argv
     )
     setup_logging(debug=debug_enabled)
+
+    from telethon.crypto import aes as _tg_aes
+
+    if _tg_aes.cryptg is not None:
+        logger.info("MTProto AES backend: cryptg (fast native encryption)")
+    else:
+        logger.warning(
+            "MTProto AES backend: cryptg is missing — transfers will be slow. "
+            "Install it with: uv add cryptg"
+        )
+
     app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName("GlideDrive")
 
@@ -75,7 +75,7 @@ def run() -> int:
     app.i18n_path = i18n_dir()
 
     apply_theme(app)
-    icon_path = _resolve_app_icon_path()
+    icon_path = app_icon_path()
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
     # Not cwd: a frozen build is launched from an arbitrary directory — look
