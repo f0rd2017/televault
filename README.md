@@ -1,4 +1,4 @@
-# TG Cloud Cache Manager
+# GlideDrive
 
 > **Unlimited personal cloud storage on top of Telegram.** Desktop app (PySide6 + Telethon) that turns your own Telegram accounts and private channels into a file storage with a local index, multi-account parallel transfers, encryption, streaming and a REST API.
 

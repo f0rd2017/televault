@@ -91,7 +91,7 @@ class MainWindow(
         parent=None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Telegram Cloud Cache Manager")
+        self.setWindowTitle("GlideDrive")
         self.resize(1440, 920)
 
         self.config = config
@@ -350,6 +350,7 @@ class MainWindow(
         top_bar_layout.addWidget(self.btn_accounts)
 
         self._build_language_switcher(top_bar_layout)
+        self._build_hotkeys_button(top_bar_layout)
         self._apply_top_bar_icons()
 
         root.addWidget(top_bar)
@@ -510,6 +511,17 @@ class MainWindow(
         current = language_by_code(saved_language())
         self.lang_button.setText(f"{current.flag} {current.code[:2].upper()}")
 
+    def _build_hotkeys_button(self, top_bar_layout: QHBoxLayout) -> None:
+        """A button, next to the language switcher, that opens the keyboard
+        shortcuts reference (also reachable via F1)."""
+        self.hotkeys_btn = QPushButton("⌨")
+        self.hotkeys_btn.setObjectName("topActionButton")
+        self.hotkeys_btn.setFixedSize(36, 36)
+        self.hotkeys_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.hotkeys_btn.setToolTip(self.tr("Keyboard shortcuts (F1)"))
+        self.hotkeys_btn.clicked.connect(self._on_show_hotkeys)
+        top_bar_layout.addWidget(self.hotkeys_btn)
+
     def _apply_top_bar_icons(self) -> None:
         if qta is None:
             return
@@ -521,6 +533,7 @@ class MainWindow(
             (self.btn_reconnect, "fa6s.arrows-rotate", QSize(16, 16)),
             (self.btn_settings, "fa6s.sliders", QSize(16, 16)),
             (self.btn_accounts, "fa6s.user-group", QSize(16, 16)),
+            (self.hotkeys_btn, "fa6s.keyboard", QSize(16, 16)),
         )
         for button, icon_name, icon_size in icon_specs:
             button.setText("")
@@ -923,6 +936,7 @@ class MainWindow(
         self.btn_accounts.setToolTip(self.tr("Telegram Accounts"))
         self.lang_button.setToolTip(self.tr("Change interface language"))
         self._update_language_button_label()
+        self.hotkeys_btn.setToolTip(self.tr("Keyboard shortcuts (F1)"))
 
         idx = self.status_combo.currentIndex()
         self.status_combo.setItemText(0, self.tr("All"))

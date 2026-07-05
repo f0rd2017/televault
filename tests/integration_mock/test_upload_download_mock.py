@@ -2525,7 +2525,7 @@ async def test_upload_auto_multipart_stripes_small_pool_file_when_threshold_hit(
 async def test_upload_prefers_direct_mode_for_large_file_with_client_pool(
     tmp_path, monkeypatch
 ) -> None:
-    monkeypatch.delenv("TGCCM_FORCE_POOL_MULTIPART", raising=False)
+    monkeypatch.delenv("GLIDEDRIVE_FORCE_POOL_MULTIPART", raising=False)
 
     class BotClient(FakeClient):
         def __init__(self) -> None:
@@ -2597,7 +2597,7 @@ async def test_upload_prefers_direct_mode_for_large_file_with_client_pool(
 async def test_upload_can_force_multipart_for_large_file_with_client_pool(
     tmp_path, monkeypatch
 ) -> None:
-    monkeypatch.setenv("TGCCM_FORCE_POOL_MULTIPART", "1")
+    monkeypatch.setenv("GLIDEDRIVE_FORCE_POOL_MULTIPART", "1")
 
     class BotClient(FakeClient):
         def __init__(self) -> None:
@@ -2669,7 +2669,7 @@ async def test_upload_can_force_multipart_for_large_file_with_client_pool(
 async def test_upload_auto_multipart_stripings_huge_file_with_client_pool(
     tmp_path, monkeypatch
 ) -> None:
-    monkeypatch.delenv("TGCCM_FORCE_POOL_MULTIPART", raising=False)
+    monkeypatch.delenv("GLIDEDRIVE_FORCE_POOL_MULTIPART", raising=False)
     monkeypatch.setattr(TgUploader, "_AUTO_POOL_MULTIPART_MIN_BYTES", 1)
 
     class BotClient(FakeClient):

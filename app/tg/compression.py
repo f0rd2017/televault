@@ -31,8 +31,8 @@ AUTO_COMPRESSION_MIN_GAIN_BYTES = 1 * 1024 * 1024
 PREHASH_CHUNK_SIZE = 16 * 1024 * 1024
 ZIP_MT_TOOL_NAMES = ("7z", "7za")
 ZIP_MT_POLL_INTERVAL_SEC = 0.1
-ZIP_MT_ENV_PATH = "TGCCM_7Z_PATH"
-ZIP_MT_ENV_THREADS = "TGCCM_7Z_THREADS"
+ZIP_MT_ENV_PATH = "GLIDEDRIVE_7Z_PATH"
+ZIP_MT_ENV_THREADS = "GLIDEDRIVE_7Z_THREADS"
 AUTO_SKIP_EXTENSIONS = frozenset(
     {
         ".7z",
@@ -125,7 +125,7 @@ def compress_file_to_temp_zip(
         return mt_archive
 
     temp_file = tempfile.NamedTemporaryFile(
-        prefix="tgccm_zip_", suffix=".zip", delete=False
+        prefix="glidedrive_zip_", suffix=".zip", delete=False
     )
     temp_path = Path(temp_file.name)
     temp_file.close()
@@ -172,7 +172,7 @@ def _compress_file_to_temp_zip_mt_7z(
         return None
 
     temp_file = tempfile.NamedTemporaryFile(
-        prefix="tgccm_zip_mt_", suffix=".zip", delete=False
+        prefix="glidedrive_zip_mt_", suffix=".zip", delete=False
     )
     temp_path = Path(temp_file.name)
     temp_file.close()

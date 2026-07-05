@@ -113,7 +113,7 @@ class _SmallBatchMixin:
                 payload_bytes=_payload_bytes(normalized_items),
             )
 
-        temp_dir = Path(tempfile.mkdtemp(prefix="tgccm_small_batch_"))
+        temp_dir = Path(tempfile.mkdtemp(prefix="glidedrive_small_batch_"))
         archive_name = sanitize_filename(
             f"batch_{len(normalized_items)}_files_{int(time.time() * 1000)}.zip"
         )

@@ -15,7 +15,7 @@ from pathlib import Path
 from PySide6.QtCore import QSettings, QTranslator
 from PySide6.QtWidgets import QApplication
 
-SETTINGS_ORG = "TGCCM"
+SETTINGS_ORG = "GlideDrive"
 SETTINGS_APP = "App"
 SETTINGS_KEY = "language"
 

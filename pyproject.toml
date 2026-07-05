@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "telegram-cloud-cache-manager"
+name = "glidedrive"
 version = "0.1.0"
-description = "Desktop Telegram Cloud Cache Manager"
+description = "GlideDrive — desktop cloud storage backed by Telegram"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

@@ -12,9 +12,9 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            asset_name: TG_Cloud_Cache_Manager-linux-x64
+            asset_name: GlideDrive-linux-x64
           - os: windows-latest
-            asset_name: TG_Cloud_Cache_Manager-windows-x64
+            asset_name: GlideDrive-windows-x64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -35,17 +35,17 @@ jobs:
         run: python -m pip install -e .[dev]
 
       - name: Build with PyInstaller
-        run: python -m PyInstaller --noconfirm TG_Cloud_Cache_Manager.spec
+        run: python -m PyInstaller --noconfirm GlideDrive.spec
 
       - name: Package artifact (Linux)
         if: runner.os == 'Linux'
         run: |
           cd dist
-          tar -czf ../${{ matrix.asset_name }}.tar.gz TG_Cloud_Cache_Manager
+          tar -czf ../${{ matrix.asset_name }}.tar.gz GlideDrive
 
       - name: Package artifact (Windows)
         if: runner.os == 'Windows'
-        run: Compress-Archive -Path dist/TG_Cloud_Cache_Manager -DestinationPath ${{ matrix.asset_name }}.zip
+        run: Compress-Archive -Path dist/GlideDrive -DestinationPath ${{ matrix.asset_name }}.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
