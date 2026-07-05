@@ -164,7 +164,7 @@ class TelegramWorker(QThread):
                 {
                     "label": str(ca.account.label),
                     "chat_target": str(ca.account.chat_target),
-                    "reason": "канал не виден (аккаунт не вступил в канал?)",
+                    "reason": "channel not visible (account has not joined the channel?)",
                 }
                 for ca in connected
                 if ca.chat_obj is None
@@ -236,16 +236,18 @@ class TelegramWorker(QThread):
         )
 
         try:
-            logger.info("🚀 Запуск автоматической сверки базы данных с Telegram...")
+            logger.info(
+                "🚀 Starting automatic reconcile of the database with Telegram..."
+            )
             # Pass None, since scanner expects a CancelToken, not an asyncio.Event
             stats = await scanner.reconcile(cancel_token=None)
             logger.info(
-                "✅ Сверка завершена: удалено записей: %d, проиндексировано: %d",
+                "✅ Reconcile finished: records removed: %d, parts indexed: %d",
                 stats.deleted_marked,
                 stats.indexed_parts,
             )
         except Exception as e:
-            logger.error("Ошибка при автоматической сверке: %s", e)
+            logger.error("Automatic reconcile failed: %s", e)
 
         # Initialize core components
 

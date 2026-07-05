@@ -360,21 +360,21 @@ def _humanize_auth_error(exc: Exception) -> str:
     base = str(exc).strip()
 
     mapping = {
-        "ApiIdInvalidError": "Неверный TG_API_ID или TG_API_HASH.",
-        "PhoneNumberInvalidError": "Неверный формат номера телефона.",
-        "PhoneNumberBannedError": "Этот номер заблокирован в Telegram.",
-        "PhoneNumberFloodError": "Слишком много попыток входа. Подожди и попробуй позже.",
-        "PhoneCodeInvalidError": "Неверный код подтверждения.",
-        "PhoneCodeExpiredError": "Код подтверждения истёк. Запроси новый код.",
-        "PasswordHashInvalidError": "Неверный пароль 2FA.",
-        "FloodWaitError": "Telegram временно ограничил запросы (FloodWait). Подожди и повтори.",
+        "ApiIdInvalidError": "Invalid TG_API_ID or TG_API_HASH.",
+        "PhoneNumberInvalidError": "Invalid phone number format.",
+        "PhoneNumberBannedError": "This phone number is banned in Telegram.",
+        "PhoneNumberFloodError": "Too many sign-in attempts. Wait and try again later.",
+        "PhoneCodeInvalidError": "Invalid confirmation code.",
+        "PhoneCodeExpiredError": "The confirmation code has expired. Request a new one.",
+        "PasswordHashInvalidError": "Invalid 2FA password.",
+        "FloodWaitError": "Telegram temporarily rate-limited requests (FloodWait). Wait and retry.",
     }
     message = mapping.get(name)
     if message:
         return f"{message} [{name}]"
     if base:
-        return f"Ошибка авторизации Telegram: {base} [{name}]"
-    return f"Ошибка авторизации Telegram [{name}]"
+        return f"Telegram authorization error: {base} [{name}]"
+    return f"Telegram authorization error [{name}]"
 
 
 def _humanize_entity_error(chat_target: str, exc: Exception) -> str:
@@ -383,21 +383,21 @@ def _humanize_entity_error(chat_target: str, exc: Exception) -> str:
 
     mapping = {
         "ChannelPrivateError": (
-            "Доступ к чату/каналу закрыт. "
-            "Убедись, что аккаунт добавлен в этот private чат/канал и имеет доступ."
+            "Access to the chat/channel is denied. "
+            "Make sure the account was added to this private chat/channel and has access."
         ),
         "UsernameNotOccupiedError": (
-            "Указанный @username не существует или уже не занят."
+            "The specified @username does not exist or is no longer taken."
         ),
         "InviteHashExpiredError": (
-            "Ссылка-приглашение истекла. Используй новую invite ссылку."
+            "The invite link has expired. Use a fresh invite link."
         ),
         "InviteHashInvalidError": (
-            "Неверная ссылка-приглашение. Проверь chat_target в аккаунте (БД)."
+            "Invalid invite link. Check the chat_target of the account (DB)."
         ),
         "ValueError": (
-            "Не удалось распознать chat_target. "
-            "Используй @username, numeric id вида -100..., или ссылку t.me/..."
+            "Could not parse chat_target. "
+            "Use a @username, a numeric id like -100..., or a t.me/... link."
         ),
     }
     mapped = mapping.get(name)
@@ -406,13 +406,13 @@ def _humanize_entity_error(chat_target: str, exc: Exception) -> str:
 
     if "Cannot find any entity corresponding to" in base:
         return (
-            "Не удалось найти чат/канал. "
-            f"Текущее значение chat_target: {chat_target!r}. "
-            "Укажи корректный @username, numeric id вида -100..., или ссылку t.me/..."
+            "Could not find the chat/channel. "
+            f"Current chat_target value: {chat_target!r}. "
+            "Provide a valid @username, a numeric id like -100..., or a t.me/... link."
         )
     if base:
-        return f"Ошибка выбора чата/канала: {base} [{name}]"
-    return f"Ошибка выбора чата/канала [{name}]"
+        return f"Chat/channel resolution error: {base} [{name}]"
+    return f"Chat/channel resolution error [{name}]"
 
 
 @dataclass(slots=True)
@@ -484,12 +484,12 @@ async def check_channels_access(
             except ChannelPrivateError:
                 user_permissions = "no_access"
                 accessible = False
-                error = "Нет доступа к каналу (закрытый или удалён)"
+                error = "No access to the channel (private or deleted)"
             except Exception as e:
                 user_permissions = "restricted"
-                error = f"Не удалось определить права: {e}"
+                error = f"Could not determine permissions: {e}"
                 logger.warning(
-                    "Не удалось определить права участника для канала %s: %s",
+                    "Could not determine participant permissions for channel %s: %s",
                     chat_id,
                     str(e),
                 )
@@ -497,13 +497,13 @@ async def check_channels_access(
             accessible = False
             is_channel = True
             title = getattr(chat_obj, "title", "") or target
-            error = f"Канал приватный или недоступен: {e}"
+            error = f"Channel is private or unavailable: {e}"
             user_permissions = "no_access"
         except Exception as e:
             accessible = False
-            error = f"Ошибка проверки: {e}"
+            error = f"Access check error: {e}"
             title = getattr(chat_obj, "title", "") or target
-            logger.warning("Ошибка проверки доступа к каналу %s: %s", chat_id, str(e))
+            logger.warning("Channel access check failed for %s: %s", chat_id, str(e))
 
         results.append(
             ChannelAccessCheck(
@@ -532,25 +532,25 @@ def log_access_report(
     logger.info("🔐 TELEGRAM ACCOUNT INFO")
     logger.info("=" * 60)
     logger.info(
-        "Аккаунт: %s (ID: %s, Premium: %s)",
+        "Account: %s (ID: %s, Premium: %s)",
         getattr(me, "username", "<no username>") or f"ID: {getattr(me, 'id', '?')}",
         getattr(me, "id", "?"),
-        "Да ✅" if is_premium else "Нет",
+        "Yes ✅" if is_premium else "No",
     )
     if hasattr(me, "phone") and getattr(me, "phone"):
         phone = str(me.phone)
         masked = phone[:-4] + "****" if len(phone) > 4 else "****"
-        logger.info("Телефон: %s", masked)
+        logger.info("Phone: %s", masked)
     logger.info("")
 
     logger.info("=" * 60)
-    logger.info("📡 КАНАЛЫ (куда отправляются файлы)")
+    logger.info("📡 CHANNELS (upload destinations)")
     logger.info("=" * 60)
     all_accessible = True
     for check in channel_checks:
-        status = "✅ ДОСТУПЕН" if check.accessible else "❌ НЕДОСТУПЕН"
+        status = "✅ ACCESSIBLE" if check.accessible else "❌ UNAVAILABLE"
         logger.info(
-            "Канал #%d: %s | %s | Участников: %d | Права: %s",
+            "Channel #%d: %s | %s | Members: %d | Permissions: %s",
             check.channel_index + 1,
             status,
             check.title,
@@ -563,9 +563,9 @@ def log_access_report(
 
     logger.info("")
     if all_accessible:
-        logger.info("✅ Все каналы доступны, файлы будут отправляться корректно")
+        logger.info("✅ All channels are accessible; files will be uploaded correctly")
     else:
         logger.warning(
-            "⚠️ Некоторые каналы недоступны — файлы не смогут быть отправлены туда!"
+            "⚠️ Some channels are unavailable — files cannot be uploaded there!"
         )
     logger.info("=" * 60)

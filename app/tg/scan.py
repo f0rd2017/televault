@@ -139,8 +139,8 @@ class TgScanner:
             orphaned = all_db_chat_ids - scanned_chat_ids
             if orphaned:
                 logger.warning(
-                    "⚠️ Найдено %d чатов в базе данных, которые не сканируются текущими аккаунтами: %s. "
-                    "Файлы из этих чатов могут быть неактуальными и не будут автоматически удалены при сверке.",
+                    "⚠️ Found %d chats in the database that are not scanned by the current accounts: %s. "
+                    "Files from these chats may be stale and will not be removed automatically during reconcile.",
                     len(orphaned),
                     ", ".join(list(orphaned)[:5])
                     + ("..." if len(orphaned) > 5 else ""),
