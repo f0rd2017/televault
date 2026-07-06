@@ -3,6 +3,7 @@
 > **Turn your own Telegram accounts and private channels into unlimited personal cloud storage.**
 > A desktop app (PySide6 + Telethon) with a file explorer, a local index, multi-account parallel transfers, optional encryption, video streaming, and a REST API.
 
+[![GitHub release](https://img.shields.io/github/v/release/f0rd2017/televault?label=Download&color=success)](https://github.com/f0rd2017/televault/releases/latest)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
 ![Qt](https://img.shields.io/badge/UI-PySide6-41cd52)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow)
@@ -52,7 +53,18 @@ TeleVault uses your **regular Telegram user accounts** (via the MTProto API) and
 
 With several accounts attached, transfers are **striped** across them in parallel, multiplying throughput while each account stays within its own rate limits.
 
-## Quick start
+## Download
+
+Portable builds — no Python required, just unpack and run:
+
+| Platform | Download |
+|---|---|
+| **Windows 10/11 (x64)** | [`TeleVault-windows-x64.zip`](https://github.com/f0rd2017/televault/releases/latest/download/TeleVault-windows-x64.zip) |
+| **Linux (x64)** | [`TeleVault-linux-x64.tar.gz`](https://github.com/f0rd2017/televault/releases/latest/download/TeleVault-linux-x64.tar.gz) |
+
+All versions: [Releases](https://github.com/f0rd2017/televault/releases). The app is fully portable — `config.json` and all data live next to the executable, so the folder can be moved between machines.
+
+## Run from source
 
 Requires Python **3.11+**.
 
