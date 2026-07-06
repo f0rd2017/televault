@@ -183,48 +183,6 @@ wheels = [
 ]
 
 [[package]]
-name = "glidedrive"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "aiofiles" },
-    { name = "cryptg" },
-    { name = "cryptography" },
-    { name = "psutil" },
-    { name = "pyside6" },
-    { name = "python-dotenv" },
-    { name = "python-socks" },
-    { name = "qtawesome" },
-    { name = "telethon" },
-    { name = "tenacity" },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "pyinstaller" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiofiles", specifier = ">=24.1,<25.0" },
-    { name = "cryptg", specifier = ">=0.6.0" },
-    { name = "cryptography", specifier = ">=44.0,<46.0" },
-    { name = "psutil", specifier = ">=5.9,<7.0" },
-    { name = "pyinstaller", marker = "extra == 'dev'", specifier = ">=6.4" },
-    { name = "pyside6", specifier = ">=6.8,<7.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0,<9.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23,<1.0" },
-    { name = "python-dotenv", specifier = ">=1.0,<2.0" },
-    { name = "python-socks", specifier = ">=2.8,<3.0" },
-    { name = "qtawesome", specifier = ">=1.4,<2.0" },
-    { name = "telethon", specifier = ">=1.36,<2.0" },
-    { name = "tenacity", specifier = ">=9.0,<10.0" },
-]
-provides-extras = ["dev"]
-
-[[package]]
 name = "iniconfig"
 version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -532,6 +490,48 @@ sdist = { url = "https://files.pythonhosted.org/packages/49/e2/d4137e598db0ba50e
 wheels = [
     { url = "https://files.pythonhosted.org/packages/82/fd/4ad621d7a4b8655dfc964ee1c1267407496ec6fd10c91901a64ea29c16c8/telethon-1.44.0-py3-none-any.whl", hash = "sha256:52fc49efb67a4916c2aedcb295ad286f4afa2aba9bf15d83ed2acdc64af0c718", size = 789786, upload-time = "2026-06-15T15:47:41.534Z" },
 ]
+
+[[package]]
+name = "televault"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "aiofiles" },
+    { name = "cryptg" },
+    { name = "cryptography" },
+    { name = "psutil" },
+    { name = "pyside6" },
+    { name = "python-dotenv" },
+    { name = "python-socks" },
+    { name = "qtawesome" },
+    { name = "telethon" },
+    { name = "tenacity" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "pyinstaller" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiofiles", specifier = ">=24.1,<25.0" },
+    { name = "cryptg", specifier = ">=0.6.0" },
+    { name = "cryptography", specifier = ">=44.0,<46.0" },
+    { name = "psutil", specifier = ">=5.9,<7.0" },
+    { name = "pyinstaller", marker = "extra == 'dev'", specifier = ">=6.4" },
+    { name = "pyside6", specifier = ">=6.8,<7.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0,<9.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23,<1.0" },
+    { name = "python-dotenv", specifier = ">=1.0,<2.0" },
+    { name = "python-socks", specifier = ">=2.8,<3.0" },
+    { name = "qtawesome", specifier = ">=1.4,<2.0" },
+    { name = "telethon", specifier = ">=1.36,<2.0" },
+    { name = "tenacity", specifier = ">=9.0,<10.0" },
+]
+provides-extras = ["dev"]
 
 [[package]]
 name = "tenacity"

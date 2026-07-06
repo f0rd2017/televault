@@ -77,7 +77,7 @@ _ACCENT_HOVER = "#1177bb"
 
 
 def _get_saved_font_size() -> int:
-    settings = QSettings("TGBD", "TextEditor")
+    settings = QSettings("TeleVault", "TextEditor")
     val = settings.value("fontSize", _DEFAULT_FONT_PT)
     try:
         if val is None:
@@ -88,7 +88,7 @@ def _get_saved_font_size() -> int:
 
 
 def _save_font_size(size: int) -> None:
-    settings = QSettings("TGBD", "TextEditor")
+    settings = QSettings("TeleVault", "TextEditor")
     settings.setValue("fontSize", int(size))
 
 

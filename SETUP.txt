@@ -1,5 +1,5 @@
 ========================================================================
- GlideDrive — install and run from source (run.py)
+ TeleVault — install and run from source (run.py)
 ========================================================================
 
 Requires: Python >= 3.11 (tested on 3.11–3.14).
@@ -15,7 +15,7 @@ If there is no `python` command, try `python3` (Linux/macOS) or `py` (Windows).
 ------------------------------------------------------------------------
 
 # go to the project folder
-cd /path/to/glidedrive
+cd /path/to/televault
 
 # create a virtual environment
 python -m venv .venv
@@ -36,7 +36,7 @@ python run.py
  2. WINDOWS  (PowerShell)
 ------------------------------------------------------------------------
 
-cd C:\path\to\glidedrive
+cd C:\path\to\televault
 
 py -m venv .venv
 .venv\Scripts\Activate.ps1
@@ -90,8 +90,8 @@ Check:  ffmpeg -version
 
 The environment already exists — just activate and run:
 
-  fish:        cd /path/to/glidedrive; source .venv/bin/activate.fish; python run.py
-  PowerShell:  cd C:\path\to\glidedrive; .venv\Scripts\Activate.ps1; python run.py
+  fish:        cd /path/to/televault; source .venv/bin/activate.fish; python run.py
+  PowerShell:  cd C:\path\to\televault; .venv\Scripts\Activate.ps1; python run.py
 
 run.py can be started from any working directory — the config/var/logs
 paths are tied to the project folder, not the current directory.

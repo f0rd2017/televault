@@ -234,7 +234,7 @@ class StartupLoadingOverlay(QWidget):
         self._spinner = _ArcSpinner(self)
         root.addWidget(self._spinner, 0, Qt.AlignmentFlag.AlignHCenter)
 
-        self._title = QLabel("GlideDrive", self)
+        self._title = QLabel("TeleVault", self)
         self._title.setObjectName("startupTitle")
         self._title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         root.addWidget(self._title)

@@ -10,7 +10,7 @@ build/
 dist/
 *.spec
 # Curated build spec — kept under version control
-!GlideDrive.spec
+!TeleVault.spec
 
 # Virtualenv
 .venv/

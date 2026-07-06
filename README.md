@@ -1,4 +1,4 @@
-# GlideDrive
+# TeleVault
 
 > **Turn your own Telegram accounts and private channels into unlimited personal cloud storage.**
 > A desktop app (PySide6 + Telethon) with a file explorer, a local index, multi-account parallel transfers, optional encryption, video streaming, and a REST API.
@@ -37,13 +37,13 @@
 
 ## Screenshots
 
-![GlideDrive file explorer](docs/screenshots/explorer.png)
+![TeleVault file explorer](docs/screenshots/explorer.png)
 
 *The file explorer: folders on the left, cloud contents on the right, with per-item "downloaded" badges.*
 
 ## How it works
 
-GlideDrive uses your **regular Telegram user accounts** (via the MTProto API) and a **private channel per account** as a storage backend:
+TeleVault uses your **regular Telegram user accounts** (via the MTProto API) and a **private channel per account** as a storage backend:
 
 1. **Upload.** Each file is chunked into parts sized for Telegram's per-message limit, optionally encrypted, and sent as messages to a channel. Many small files are packed into a single compressed *blob* to avoid flooding the channel with tiny messages.
 2. **Index.** Every part is recorded in a local SQLite index (folder path, original name, size, SHA-256, message IDs). The index is a **cache, not the source of truth** — if you lose it or move to a new machine, `reconcile` rebuilds it by rescanning the channel, and blob contents are recoverable from an embedded manifest inside each blob.
@@ -57,8 +57,8 @@ With several accounts attached, transfers are **striped** across them in paralle
 Requires Python **3.11+**.
 
 ```bash
-git clone https://github.com/f0rd2017/glidedrive
-cd glidedrive
+git clone https://github.com/f0rd2017/televault
+cd televault
 
 # with uv (recommended)
 uv sync
@@ -180,7 +180,7 @@ uv run ruff check .    # linter
 
 ## ⚠️ Disclaimer
 
-GlideDrive works through ordinary Telegram user accounts (the MTProto API). Heavy automation may violate the [Telegram Terms of Service](https://core.telegram.org/api/terms) and could, in theory, get an account limited. Use at your own risk, never keep the only copy of important data here, and don't use your main account.
+TeleVault works through ordinary Telegram user accounts (the MTProto API). Heavy automation may violate the [Telegram Terms of Service](https://core.telegram.org/api/terms) and could, in theory, get an account limited. Use at your own risk, never keep the only copy of important data here, and don't use your main account.
 
 ## 💖 Support the project
 

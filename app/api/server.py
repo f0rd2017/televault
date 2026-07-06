@@ -237,7 +237,7 @@ def _route(
 
 
 class _Handler(BaseHTTPRequestHandler):
-    server_version = "TGBD-API/1"
+    server_version = "TeleVault-API/1"
     protocol_version = "HTTP/1.1"
     # Never serve more than this amount of data in a single Range response —
     # otherwise an open-ended `Range: bytes=0-` from the player expands to

@@ -111,7 +111,7 @@ class MainWindow(
         parent=None,
     ) -> None:
         super().__init__(parent)
-        self.setWindowTitle("GlideDrive")
+        self.setWindowTitle("TeleVault")
         self.resize(1440, 920)
 
         self.config = config
@@ -241,7 +241,7 @@ class MainWindow(
         if not app_icon.isNull():
             self.setWindowIcon(app_icon)
         self._tray = QSystemTrayIcon(app_icon, self)
-        self._tray.setToolTip("GlideDrive")
+        self._tray.setToolTip("TeleVault")
         self._tray_menu = QMenu()
         self._tray_action_show = self._tray_menu.addAction(self.tr("Show"), self.show)
         self._tray_action_quit = self._tray_menu.addAction(

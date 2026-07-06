@@ -388,7 +388,7 @@ class _MultipartUploadMixin:
                 expected_bytes = int(part_sizes[part_index])
 
                 temp_file = tempfile.NamedTemporaryFile(
-                    prefix=f"glidedrive_slice_{part_index:04d}_",
+                    prefix=f"televault_slice_{part_index:04d}_",
                     suffix=".bin",
                     delete=False,
                 )

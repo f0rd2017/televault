@@ -369,7 +369,7 @@ class JobEventsMixin:
                 # uploads enqueue many jobs — this avoids per-file spam).
                 if not still_busy:
                     self._tray.showMessage(
-                        "TG Cloud",
+                        "TeleVault",
                         self.tr("Operation completed"),
                         QSystemTrayIcon.MessageIcon.Information,
                         3000,
@@ -393,7 +393,7 @@ class JobEventsMixin:
                 # dialog still lists every failure).
                 if not still_busy:
                     self._tray.showMessage(
-                        "TG Cloud",
+                        "TeleVault",
                         self.tr("Operation completed with errors"),
                         QSystemTrayIcon.MessageIcon.Warning,
                         3000,

@@ -45,7 +45,7 @@ def _show_error(text: str) -> None:
 
 def run() -> int:
     debug_enabled = (
-        str(os.getenv("GLIDEDRIVE_DEBUG", "")).strip().lower()
+        str(os.getenv("TELEVAULT_DEBUG", "")).strip().lower()
         in {"1", "true", "yes", "on"}
         or "--debug" in sys.argv
     )
@@ -62,7 +62,7 @@ def run() -> int:
         )
 
     app = QApplication.instance() or QApplication(sys.argv)
-    app.setApplicationName("GlideDrive")
+    app.setApplicationName("TeleVault")
 
     from PySide6.QtCore import QTranslator
 
@@ -94,8 +94,8 @@ def run() -> int:
         _show_error(str(exc))
         return 1
 
-    # Logging was already set up at the very start of run() (var/logs/glidedrive.log,
-    # with rotation). This used to call setup_logging(..., cache_dir/glidedrive.log)
+    # Logging was already set up at the very start of run() (var/logs/televault.log,
+    # with rotation). This used to call setup_logging(..., cache_dir/televault.log)
     # a second time here "to keep logs next to the data" — but setup_logging
     # fully replaces the handlers, so instead of moving the log it produced
     # TWO files: the old one (var/logs/) with a couple of lines before the

@@ -33,7 +33,7 @@ def setup_logging(
     log_path = (
         Path(log_file)
         if log_file is not None
-        else (app_base_dir() / "var" / "logs" / "glidedrive.log")
+        else (app_base_dir() / "var" / "logs" / "televault.log")
     )
     log_path.parent.mkdir(parents=True, exist_ok=True)
     file_handler = RotatingFileHandler(

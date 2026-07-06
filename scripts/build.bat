@@ -10,7 +10,7 @@ if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 
 echo ==^> Building with PyInstaller (from spec)
-.venv\Scripts\python -m PyInstaller --noconfirm GlideDrive.spec || exit /b 1
+.venv\Scripts\python -m PyInstaller --noconfirm TeleVault.spec || exit /b 1
 
-echo ==^> Done! Build output is in dist\GlideDrive\
+echo ==^> Done! Build output is in dist\TeleVault\
 echo     The app is portable: config.json and var\ are created next to the exe.

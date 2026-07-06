@@ -1,6 +1,6 @@
 # Project architecture — a directory guide
 
-**GlideDrive** is a desktop app built on PySide6 + Telethon: it uses Telegram
+**TeleVault** is a desktop app built on PySide6 + Telethon: it uses Telegram
 user accounts as cloud storage and keeps a local SQLite index of uploaded files.
 The UI defaults to English (Russian and Ukrainian also available).
 

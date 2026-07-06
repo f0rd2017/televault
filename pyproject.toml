@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "glidedrive"
+name = "televault"
 version = "0.1.0"
-description = "GlideDrive — desktop cloud storage backed by Telegram"
+description = "TeleVault — desktop cloud storage backed by Telegram"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -29,7 +29,7 @@ dev = [
 ]
 
 [project.scripts]
-tg-cloud-cache-manager = "app.main:run"
+televault = "app.main:run"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
