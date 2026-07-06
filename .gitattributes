@@ -1,0 +1,9 @@
+# Normalize line endings: store as LF in the repo, check out LF everywhere.
+# Keeps diffs clean across Linux/Windows contributors.
+* text=auto eol=lf
+
+# Binary assets — never normalize or diff.
+*.png binary
+
+# Keep documentation out of the language statistics.
+docs/** linguist-documentation
