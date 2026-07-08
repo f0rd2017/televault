@@ -55,9 +55,14 @@ With several accounts attached, transfers are **striped** across them in paralle
 
 ## Download
 
-No portable builds published yet — the first release is coming soon. In the meantime, run from source: see [Quick start](#quick-start) below.
+Portable builds — no Python required, just unpack and run:
 
-Once published, prebuilt Windows and Linux binaries will be available on the [Releases](https://github.com/f0rd2017/televault/releases) page. The app is fully portable — `config.json` and all data live next to the executable, so the folder can be moved between machines.
+| Platform | Download |
+|---|---|
+| **Windows 10/11 (x64)** | [`TeleVault-windows-x64.zip`](https://github.com/f0rd2017/televault/releases/latest/download/TeleVault-windows-x64.zip) |
+| **Linux (x64)** | [`TeleVault-linux-x64.tar.gz`](https://github.com/f0rd2017/televault/releases/latest/download/TeleVault-linux-x64.tar.gz) |
+
+All versions: [Releases](https://github.com/f0rd2017/televault/releases). The app is fully portable — `config.json` and all data live next to the executable, so the folder can be moved between machines.
 
 ## Run from source
 
