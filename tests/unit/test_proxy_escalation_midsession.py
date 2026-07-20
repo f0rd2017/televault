@@ -51,7 +51,9 @@ async def test_cooldown_limits_escalation_rate(monkeypatch) -> None:
     guard = _Guard()
     client = object()
     fake_now = [1000.0]
-    monkeypatch.setattr("televault.tg.proxy_escalation.time.monotonic", lambda: fake_now[0])
+    monkeypatch.setattr(
+        "televault.tg.proxy_escalation.time.monotonic", lambda: fake_now[0]
+    )
 
     await guard._on_persistent_connection_failure(client, ConnectionError("x"))
     await guard._on_persistent_connection_failure(client, ConnectionError("x"))

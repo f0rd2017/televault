@@ -67,9 +67,13 @@ def _build_window(
     tmp_path, monkeypatch, config_overrides: dict | None = None
 ) -> MainWindow:
     app = QApplication.instance() or QApplication([])
-    monkeypatch.setattr("televault.ui.window_main.QTimer.singleShot", lambda *_args: None)
+    monkeypatch.setattr(
+        "televault.ui.window_main.QTimer.singleShot", lambda *_args: None
+    )
     # Suppress system tray in headless testing
-    monkeypatch.setattr("televault.ui.window_main.QSystemTrayIcon.show", lambda self: None)
+    monkeypatch.setattr(
+        "televault.ui.window_main.QSystemTrayIcon.show", lambda self: None
+    )
 
     config_payload = {
         "tg_api_id": 1,
@@ -2162,7 +2166,9 @@ def test_watchdog_logs_stalled_jobs(tmp_path, monkeypatch) -> None:
         window._active_jobs.add(job_id)
         window._running_jobs.add(job_id)
         window._job_last_update_ts[job_id] = 0.0
-        monkeypatch.setattr("televault.ui.panels.transfer_ops.time.monotonic", lambda: 500.0)
+        monkeypatch.setattr(
+            "televault.ui.panels.transfer_ops.time.monotonic", lambda: 500.0
+        )
         window._check_stalled_jobs()
         text = window.progress_widget.logs.toPlainText().lower()
         assert "watchdog" in text
@@ -2177,7 +2183,9 @@ def test_watchdog_ignores_non_running_jobs(tmp_path, monkeypatch) -> None:
         job_id = 88
         window._active_jobs.add(job_id)
         window._job_last_update_ts[job_id] = 0.0
-        monkeypatch.setattr("televault.ui.panels.transfer_ops.time.monotonic", lambda: 500.0)
+        monkeypatch.setattr(
+            "televault.ui.panels.transfer_ops.time.monotonic", lambda: 500.0
+        )
         window._check_stalled_jobs()
         text = window.progress_widget.logs.toPlainText().lower()
         assert "watchdog" not in text

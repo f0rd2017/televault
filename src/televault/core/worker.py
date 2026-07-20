@@ -887,7 +887,10 @@ class TelegramWorker(QThread):
         can find the moov/index. Returns True if a poster was produced."""
         from pathlib import Path
 
-        from televault.core.utils import extract_video_poster_png, write_sparse_head_tail
+        from televault.core.utils import (
+            extract_video_poster_png,
+            write_sparse_head_tail,
+        )
 
         # Encryption changes on-disk part sizes vs. the plaintext byte offsets
         # that the container's index expects, so the sparse offsets wouldn't

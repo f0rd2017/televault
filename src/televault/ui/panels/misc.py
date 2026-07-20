@@ -216,7 +216,10 @@ class MiscMixin:
     @staticmethod
     def _run_cache_cleanup(repo, cache_dir: str, cache_max_bytes: int) -> None:
         """Background thread callback for cache cleanup with active job awareness."""
-        from televault.core.cache import CacheManager, get_active_download_keys_from_repo
+        from televault.core.cache import (
+            CacheManager,
+            get_active_download_keys_from_repo,
+        )
 
         active_keys = get_active_download_keys_from_repo(repo)
         CacheManager().cleanup(

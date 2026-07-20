@@ -97,7 +97,9 @@ async def test_connect_account_uses_backup_when_primary_dead(monkeypatch, tmp_pa
         proxy_backup="backup",
         session_path=str(tmp_path / "s.session"),
     )
-    with patch("televault.core.accounts.TelegramClient", return_value=_connect_client()):
+    with patch(
+        "televault.core.accounts.TelegramClient", return_value=_connect_client()
+    ):
         ca = await mgr.connect_account(acc)
     assert ca is not None
     assert ca.proxy_tier == 1
@@ -114,7 +116,9 @@ async def test_connect_account_falls_back_to_direct(monkeypatch, tmp_path):
         proxy_backup="backup",
         session_path=str(tmp_path / "s.session"),
     )
-    with patch("televault.core.accounts.TelegramClient", return_value=_connect_client()):
+    with patch(
+        "televault.core.accounts.TelegramClient", return_value=_connect_client()
+    ):
         ca = await mgr.connect_account(acc)
     assert ca is not None
     assert ca.proxy_tier == 2  # len(chain) => direct

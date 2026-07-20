@@ -18,7 +18,11 @@ from PySide6.QtWidgets import (
 )
 
 from televault.core.types import ObjectEntry
-from televault.ui.models_qt import ExplorerFileItem, ExplorerFolderItem, ExplorerGridModel
+from televault.ui.models_qt import (
+    ExplorerFileItem,
+    ExplorerFolderItem,
+    ExplorerGridModel,
+)
 from televault.ui.panels.explorer_delegate import ExplorerIconDelegate
 
 
