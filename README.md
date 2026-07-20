@@ -42,6 +42,10 @@
 
 *The file explorer: folders on the left, cloud contents on the right, with per-item "downloaded" badges.*
 
+![TeleVault built-in text editor](docs/screenshots/editor.png)
+
+*The built-in text editor, editing a file straight from the cloud with syntax highlighting.*
+
 ## How it works
 
 TeleVault uses your **regular Telegram user accounts** (via the MTProto API) and a **private channel per account** as a storage backend:
