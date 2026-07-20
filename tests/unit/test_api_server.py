@@ -7,8 +7,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.api.server import ApiContext, ApiServer, dispatch
-from app.core.types import ApiConfig, FolderEntry, ObjectEntry
+from televault.api.server import ApiContext, ApiServer, dispatch
+from televault.core.types import ApiConfig, FolderEntry, ObjectEntry
 
 
 class FakeRepo:

@@ -11,9 +11,9 @@ import subprocess
 
 import pytest
 
-from app.core.types import ObjectEntry
-from app.core.utils import extract_video_poster_png, ffmpeg_available
-from app.ui.models_qt import (
+from televault.core.types import ObjectEntry
+from televault.core.utils import extract_video_poster_png, ffmpeg_available
+from televault.ui.models_qt import (
     ExplorerFileItem,
     ExplorerGridModel,
     is_image_name,
@@ -168,7 +168,7 @@ def test_folder_download_mark_and_carry_over(tmp_path):
     # A downloaded folder (all files inside are local) is marked with the same
     # "downloaded" badge as files; the mark survives reload and is idempotent.
     _app()
-    from app.ui.models_qt import ExplorerFolderItem
+    from televault.ui.models_qt import ExplorerFolderItem
 
     model = ExplorerGridModel(thumb_cache_dir=str(tmp_path / ".thumb_cache"))
     model.set_items([ExplorerFolderItem(name="Sub", path="Photos/Sub")])
@@ -213,7 +213,7 @@ def test_set_icon_size_drops_stale_size_thumbnail(tmp_path):
 
 
 def test_clear_dir_files(tmp_path):
-    from app.core.utils import clear_dir_files
+    from televault.core.utils import clear_dir_files
 
     d = tmp_path / "fetch"
     d.mkdir()
@@ -229,7 +229,7 @@ def test_evict_dir_to_limit(tmp_path):
     import os
     import time
 
-    from app.core.utils import evict_dir_to_limit
+    from televault.core.utils import evict_dir_to_limit
 
     d = tmp_path / "cache"
     d.mkdir()
@@ -375,7 +375,7 @@ def _write_test_video_codec(path, *, codec: str, faststart: bool, duration=4) ->
 
 
 def test_write_sparse_head_tail_basic(tmp_path):
-    from app.core.utils import write_sparse_head_tail
+    from televault.core.utils import write_sparse_head_tail
 
     head = tmp_path / "head.bin"
     tail = tmp_path / "tail.bin"
@@ -394,7 +394,7 @@ def test_write_sparse_head_tail_basic(tmp_path):
 
 
 def test_write_sparse_head_tail_rejects_bad_geometry(tmp_path):
-    from app.core.utils import write_sparse_head_tail
+    from televault.core.utils import write_sparse_head_tail
 
     head = tmp_path / "h.bin"
     tail = tmp_path / "t.bin"
@@ -432,7 +432,7 @@ def test_remote_poster_fallback_reconstructs_nonfaststart(tmp_path):
     # The real bug: a non-faststart MP4 (often what a ".avi" actually is) keeps
     # moov at the END, so a prefix-only poster fails. Reconstructing a sparse
     # head+tail file (as the worker fallback does) must let ffmpeg decode it.
-    from app.core.utils import write_sparse_head_tail
+    from televault.core.utils import write_sparse_head_tail
 
     vid = _write_test_video_codec(
         tmp_path / "movie.mp4", codec="mpeg4", faststart=False
@@ -488,7 +488,7 @@ def test_remote_poster_skips_black_intro_frame(tmp_path):
     # Regression: previews were coming out black because the remote poster used
     # the very first frame (a black fade-in). A ~1s seek must land on real
     # content — even through the sparse head+tail reconstruction.
-    from app.core.utils import write_sparse_head_tail
+    from televault.core.utils import write_sparse_head_tail
 
     vid = tmp_path / "blackstart.mp4"
     subprocess.run(  # noqa: S603

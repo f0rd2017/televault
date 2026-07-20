@@ -6,7 +6,7 @@ import asyncio
 
 import pytest
 
-from app.core.jobs import CancelToken, JobCancelledError, JobContext, JobManager
+from televault.core.jobs import CancelToken, JobCancelledError, JobContext, JobManager
 
 
 # ── CancelToken ─────────────────────────────────────────────────────

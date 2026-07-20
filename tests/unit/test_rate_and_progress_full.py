@@ -6,8 +6,8 @@ import time
 
 import pytest
 
-from app.core.rate_limiter import AdaptiveRateLimiter
-from app.core.transfer_progress import TransferProgressAggregator
+from televault.core.rate_limiter import AdaptiveRateLimiter
+from televault.core.transfer_progress import TransferProgressAggregator
 
 
 # ── AdaptiveRateLimiter ─────────────────────────────────────────────

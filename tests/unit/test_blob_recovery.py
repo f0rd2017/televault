@@ -8,19 +8,19 @@ from pathlib import Path
 
 import pytest
 
-from app.core.jobs import CancelToken
-from app.core.types import AppConfig, BatchBlobCaption, PartRecord
-from app.core.utils import sha256_file
-from app.db.database import connect_db
-from app.db.repo import DbRepo
-from app.tg import compression
-from app.tg.blob_recovery import (
+from televault.core.jobs import CancelToken
+from televault.core.types import AppConfig, BatchBlobCaption, PartRecord
+from televault.core.utils import sha256_file
+from televault.db.database import connect_db
+from televault.db.repo import DbRepo
+from televault.tg import compression
+from televault.tg.blob_recovery import (
     MANIFEST_ARC_NAME,
     _NeedMoreTail,
     parse_members_from_zip_tail,
     recover_blob_manifests,
 )
-from app.tg.parser import build_batch_blob_caption
+from televault.tg.parser import build_batch_blob_caption
 
 
 @pytest.fixture()

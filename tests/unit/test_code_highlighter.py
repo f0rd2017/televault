@@ -5,7 +5,7 @@ from PySide6.QtWidgets import QApplication
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from app.ui.text_editor._highlighter import CodeHighlighter
+from televault.ui.text_editor._highlighter import CodeHighlighter
 
 
 @pytest.fixture

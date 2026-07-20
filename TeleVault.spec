@@ -2,10 +2,10 @@
 
 
 a = Analysis(
-    ['run.py'],
-    pathex=[],
+    ['src/televault/__main__.py'],
+    pathex=['src'],
     binaries=[],
-    datas=[('app/assets', 'app/assets'), ('app/i18n', 'app/i18n')],
+    datas=[('src/televault/assets', 'televault/assets'), ('src/televault/i18n', 'televault/i18n')],
     hiddenimports=['cryptg'],
     hookspath=[],
     hooksconfig={},

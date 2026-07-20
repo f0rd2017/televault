@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from app.core.types import PartRecord
-from app.db.database import connect_db
-from app.db.repo import DbRepo
+from televault.core.types import PartRecord
+from televault.db.database import connect_db
+from televault.db.repo import DbRepo
 
 
 def test_repo_rebuild_complete(tmp_path) -> None:

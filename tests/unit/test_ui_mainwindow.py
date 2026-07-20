@@ -8,7 +8,7 @@ from PySide6.QtCore import QPoint, QPointF, QThread, Qt, Signal
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QApplication, QDialog, QListView, QMessageBox
 
-from app.core.types import (
+from televault.core.types import (
     AppConfig,
     CryptoConfig,
     JobEvent,
@@ -17,11 +17,11 @@ from app.core.types import (
     PartRecord,
     RetryConfig,
 )
-from app.db.database import connect_db
-from app.db.repo import DbRepo
-from app.ui.dialogs import ConfirmDialog
-from app.ui.models_qt import ExplorerFileItem, ExplorerFolderItem
-from app.ui.window_main import MainWindow
+from televault.db.database import connect_db
+from televault.db.repo import DbRepo
+from televault.ui.dialogs import ConfirmDialog
+from televault.ui.models_qt import ExplorerFileItem, ExplorerFolderItem
+from televault.ui.window_main import MainWindow
 
 
 class MockWorker(QThread):
@@ -67,9 +67,9 @@ def _build_window(
     tmp_path, monkeypatch, config_overrides: dict | None = None
 ) -> MainWindow:
     app = QApplication.instance() or QApplication([])
-    monkeypatch.setattr("app.ui.window_main.QTimer.singleShot", lambda *_args: None)
+    monkeypatch.setattr("televault.ui.window_main.QTimer.singleShot", lambda *_args: None)
     # Suppress system tray in headless testing
-    monkeypatch.setattr("app.ui.window_main.QSystemTrayIcon.show", lambda self: None)
+    monkeypatch.setattr("televault.ui.window_main.QSystemTrayIcon.show", lambda self: None)
 
     config_payload = {
         "tg_api_id": 1,
@@ -369,7 +369,7 @@ def test_eta_speed_is_stable_under_bursty_events(tmp_path, monkeypatch) -> None:
     try:
         clock = {"t": 1000.0}
         monkeypatch.setattr(
-            "app.ui.panels.transfer_ops.time.monotonic", lambda: clock["t"]
+            "televault.ui.panels.transfer_ops.time.monotonic", lambda: clock["t"]
         )
 
         mb = 1024 * 1024
@@ -1327,7 +1327,7 @@ def test_mouse_move_triggers_export_drag(tmp_path, monkeypatch) -> None:
 
 
 def test_sync_folder_only_downloads_missing_or_changed(tmp_path, monkeypatch) -> None:
-    from app.core.utils import build_safe_output_path
+    from televault.core.utils import build_safe_output_path
 
     QApplication.instance() or QApplication([])
     window = _build_window(tmp_path, monkeypatch)
@@ -1478,7 +1478,7 @@ def test_mass_download_asks_confirmation(tmp_path, monkeypatch) -> None:
             questions.append(text)
             return QMessageBox.StandardButton.No
 
-        import app.ui.panels.transfer_ops as transfer_ops_mod
+        import televault.ui.panels.transfer_ops as transfer_ops_mod
 
         monkeypatch.setattr(
             transfer_ops_mod.QMessageBox, "question", staticmethod(_fake_question)
@@ -1540,7 +1540,7 @@ def test_double_click_file_does_not_download(tmp_path, monkeypatch) -> None:
         window._set_current_folder("Anime/Cache", push_history=True, sync_tree=True)
         app.processEvents()
 
-        from app.ui.models_qt import ExplorerFileItem
+        from televault.ui.models_qt import ExplorerFileItem
 
         downloads: list[object] = []
         monkeypatch.setattr(window, "_on_download", lambda *a, **k: downloads.append(a))
@@ -2162,7 +2162,7 @@ def test_watchdog_logs_stalled_jobs(tmp_path, monkeypatch) -> None:
         window._active_jobs.add(job_id)
         window._running_jobs.add(job_id)
         window._job_last_update_ts[job_id] = 0.0
-        monkeypatch.setattr("app.ui.panels.transfer_ops.time.monotonic", lambda: 500.0)
+        monkeypatch.setattr("televault.ui.panels.transfer_ops.time.monotonic", lambda: 500.0)
         window._check_stalled_jobs()
         text = window.progress_widget.logs.toPlainText().lower()
         assert "watchdog" in text
@@ -2177,7 +2177,7 @@ def test_watchdog_ignores_non_running_jobs(tmp_path, monkeypatch) -> None:
         job_id = 88
         window._active_jobs.add(job_id)
         window._job_last_update_ts[job_id] = 0.0
-        monkeypatch.setattr("app.ui.panels.transfer_ops.time.monotonic", lambda: 500.0)
+        monkeypatch.setattr("televault.ui.panels.transfer_ops.time.monotonic", lambda: 500.0)
         window._check_stalled_jobs()
         text = window.progress_widget.logs.toPlainText().lower()
         assert "watchdog" not in text
@@ -2848,7 +2848,7 @@ def test_recent_export_marker_auto_expires(tmp_path, monkeypatch) -> None:
     window = _build_window(tmp_path, monkeypatch)
     try:
         clock = {"t": 100.0}
-        monkeypatch.setattr("app.ui.models_qt.time.monotonic", lambda: clock["t"])
+        monkeypatch.setattr("televault.ui.models_qt.time.monotonic", lambda: clock["t"])
 
         window.repo.upsert_folder("Anime/Cache")
         window.repo.upsert_msg_part(

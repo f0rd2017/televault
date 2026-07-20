@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from app.core.jobs import JobManager
+from televault.core.jobs import JobManager
 
 
 @pytest.mark.asyncio

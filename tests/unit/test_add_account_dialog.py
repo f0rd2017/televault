@@ -10,8 +10,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import pytest
 from PySide6.QtWidgets import QApplication
 
-from app.core.types import TelegramAccount
-from app.ui.dialogs._add_account import AddAccountDialog
+from televault.core.types import TelegramAccount
+from televault.ui.dialogs._add_account import AddAccountDialog
 
 
 class _FakeRepo:
@@ -30,7 +30,7 @@ def app():
 @pytest.fixture(autouse=True)
 def _mute_warnings(monkeypatch):
     # QMessageBox.warning is modal and would hang the offscreen test run.
-    from app.ui.dialogs import _add_account
+    from televault.ui.dialogs import _add_account
 
     monkeypatch.setattr(
         _add_account.QMessageBox, "warning", staticmethod(lambda *a, **k: None)

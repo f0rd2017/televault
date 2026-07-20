@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.tg.upload import _AdaptiveUploadController
+from televault.tg.upload import _AdaptiveUploadController
 
 
 def test_adaptive_upload_controller_ignores_short_low_speed_spikes_when_ema_is_high() -> (

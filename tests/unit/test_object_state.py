@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.core.object_state import (
+from televault.core.object_state import (
     STATE_COMPLETE,
     STATE_DAMAGED,
     STATE_INCOMPLETE,
@@ -8,7 +8,7 @@ from app.core.object_state import (
     classify_object_state,
     display_state,
 )
-from app.core.types import PartRecord
+from televault.core.types import PartRecord
 
 
 def _part(part_index: int, *, chat_id: str, lost_ts: int | None = None) -> PartRecord:

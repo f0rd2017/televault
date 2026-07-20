@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.config.config import (
+from televault.config.config import (
     _deep_merge,
     _normalize_string_list,
     config_exists,

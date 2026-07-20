@@ -16,17 +16,17 @@ from telethon.errors import (
 from telethon import functions as tl_functions
 from telethon import types as tl_types
 
-from app.core.jobs import CancelToken, JobCancelledError
-from app.core.types import AppConfig, CryptoConfig, RetryConfig, TgTransferLimits
-from app.core.utils import file_key_from_sha256
-from app.db.database import connect_db
-from app.db.repo import DbRepo
-from app.tg.client import TgClientEndpoint
-from app.tg.compression import BATCH_MANIFEST_ARC_NAME
-from app.tg.download import TgDownloader
-from app.tg.parser import parse_caption
-from app.tg.upload import TgUploader
-from app.core.types import PartRecord
+from televault.core.jobs import CancelToken, JobCancelledError
+from televault.core.types import AppConfig, CryptoConfig, RetryConfig, TgTransferLimits
+from televault.core.utils import file_key_from_sha256
+from televault.db.database import connect_db
+from televault.db.repo import DbRepo
+from televault.tg.client import TgClientEndpoint
+from televault.tg.compression import BATCH_MANIFEST_ARC_NAME
+from televault.tg.download import TgDownloader
+from televault.tg.parser import parse_caption
+from televault.tg.upload import TgUploader
+from televault.core.types import PartRecord
 
 
 @dataclass
@@ -286,8 +286,8 @@ async def test_fetch_parts_decrypted_downloads_parts_concurrently(tmp_path) -> N
         crypto=CryptoConfig(enabled=False, key_env="TG_CRYPTO_KEY_B64"),
     )
 
-    from app.core.types import PartMeta
-    from app.tg.parser import build_caption
+    from televault.core.types import PartMeta
+    from televault.tg.parser import build_caption
 
     payloads = [b"A" * 1_000_000, b"B" * 1_000_000, b"C" * 600_000]
     payload = b"".join(payloads)
@@ -356,8 +356,8 @@ async def test_fetch_parts_decrypted_prefix_grows_without_full_redownload(
     part to download if only a small slice at the start is needed now. prefix_bytes
     must fetch only the prefix and GROW it as the window expands, not re-fetching
     already-received bytes again."""
-    from app.core.types import PartMeta
-    from app.tg.parser import build_caption
+    from televault.core.types import PartMeta
+    from televault.tg.parser import build_caption
 
     config = AppConfig(
         tg_api_id=1,
@@ -437,8 +437,8 @@ async def test_fetch_parts_decrypted_prefix_downloads_striped_in_parallel(
     that was the main contributor to the time-to-first-frame. Now the multi-chunk
     prefix is spread across several parallel stride streams, and the assembled
     bytes must exactly match the start of the file (no gaps/overlap)."""
-    from app.core.types import PartMeta
-    from app.tg.parser import build_caption
+    from televault.core.types import PartMeta
+    from televault.tg.parser import build_caption
 
     config = AppConfig(
         tg_api_id=1,
@@ -522,10 +522,10 @@ async def test_fetch_parts_decrypted_ignores_prefix_hint_when_encrypted(
     decrypting it whole (the AES-GCM tag is verified over the entire ciphertext) —
     prefix_bytes must be ignored, the part is fetched and decrypted
     in full, as before."""
-    from app.core.types import CryptoConfig as _CryptoConfig
-    from app.core.types import PartMeta
-    from app.core.utils import encrypt_bytes
-    from app.tg.parser import build_caption
+    from televault.core.types import CryptoConfig as _CryptoConfig
+    from televault.core.types import PartMeta
+    from televault.core.utils import encrypt_bytes
+    from televault.tg.parser import build_caption
 
     monkeypatch_key = base64.urlsafe_b64encode(os.urandom(32)).decode()
     os.environ["TG_CRYPTO_KEY_B64_TEST_PREFIX"] = monkeypatch_key
@@ -1164,7 +1164,7 @@ async def test_download_blob_members_extracts_many_in_one_job(tmp_path) -> None:
     blob_key = rows[0].blob_key
     assert blob_key and all(r.blob_key == blob_key for r in rows)
 
-    from app.core.jobs import CancelToken
+    from televault.core.jobs import CancelToken
 
     progress: list[float] = []
 
@@ -1185,7 +1185,7 @@ async def test_download_blob_members_extracts_many_in_one_job(tmp_path) -> None:
     one_calls = len(client.iter_download_calls)
 
     # Verify each extracted file matches the original.
-    from app.core.utils import build_safe_output_path
+    from televault.core.utils import build_safe_output_path
 
     for src in (one, two, three):
         out = build_safe_output_path(config.cache_dir, "Anime/Cache", src.name)

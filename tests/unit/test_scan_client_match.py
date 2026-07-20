@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import pytest
 
-from app.core.types import AppConfig
-from app.tg.scan import TgScanner
+from televault.core.types import AppConfig
+from televault.tg.scan import TgScanner
 
 
 def _make_config() -> AppConfig:

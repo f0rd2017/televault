@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from app.tg.client import _build_transfer_limits
+from televault.tg.client import _build_transfer_limits
 
 
 def test_build_transfer_limits_regular_account() -> None:

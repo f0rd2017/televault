@@ -1,5 +1,5 @@
 ========================================================================
- TeleVault — install and run from source (run.py)
+ TeleVault — install and run from source
 ========================================================================
 
 Requires: Python >= 3.11 (tested on 3.11–3.14).
@@ -24,12 +24,12 @@ python -m venv .venv
 source .venv/bin/activate.fish
 #   bash/zsh:  source .venv/bin/activate
 
-# upgrade pip and install dependencies
+# upgrade pip and install the app (pulls dependencies from pyproject.toml)
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install -e .
 
 # run
-python run.py
+televault
 
 
 ------------------------------------------------------------------------
@@ -43,9 +43,9 @@ py -m venv .venv
 #   cmd.exe:  .venv\Scripts\activate.bat
 
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install -e .
 
-python run.py
+televault
 
 
 ------------------------------------------------------------------------
@@ -58,7 +58,7 @@ You can set them in TWO ways (pick either):
   a) Via the GUI: launch the app and enter api_id / api_hash in the
      settings window (TELEGRAM section). Saved into config.json.
 
-  b) Via a .env file next to run.py (takes priority over the GUI):
+  b) Via a .env file at the project root (takes priority over the GUI):
      copy .env.example -> .env and fill it in:
 
         TG_API_ID=123456
@@ -90,10 +90,10 @@ Check:  ffmpeg -version
 
 The environment already exists — just activate and run:
 
-  fish:        cd /path/to/televault; source .venv/bin/activate.fish; python run.py
-  PowerShell:  cd C:\path\to\televault; .venv\Scripts\Activate.ps1; python run.py
+  fish:        cd /path/to/televault; source .venv/bin/activate.fish; televault
+  PowerShell:  cd C:\path\to\televault; .venv\Scripts\Activate.ps1; televault
 
-run.py can be started from any working directory — the config/var/logs
+televault can be started from any working directory — the config/var/logs
 paths are tied to the project folder, not the current directory.
 
 ========================================================================

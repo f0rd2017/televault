@@ -9,7 +9,7 @@ from PySide6.QtGui import QPainter, QPdfWriter
 from PySide6.QtPdf import QPdfDocument
 from PySide6.QtWidgets import QApplication
 
-from app.ui.media_viewer import PdfViewerWindow
+from televault.ui.media_viewer import PdfViewerWindow
 
 # Keep the windows alive until the end of the test — otherwise shiboken collects them before the assertions.
 _KEEP_ALIVE: list[PdfViewerWindow] = []

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from app.core import proxy as proxy_mod
-from app.core.utils import (
+from televault.core import proxy as proxy_mod
+from televault.core.utils import (
     build_telethon_proxy,
     is_mtproxy,
     parse_mtproxy,

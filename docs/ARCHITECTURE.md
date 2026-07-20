@@ -10,17 +10,17 @@ and the data flow.
 ---
 
 ## Where to start reading
-1. `app/main.py` — entry point: load config, create `MainWindow`, start Qt.
-2. `app/ui/window_main.py` — `MainWindow`, composed from the mixins in `app/ui/panels/`.
-3. `app/core/worker.py` — `TelegramWorker`: the bridge between UI jobs and Telegram operations.
-4. `app/tg/upload/` and `app/tg/download/` — the upload/download core.
+1. `src/televault/main.py` — entry point: load config, create `MainWindow`, start Qt.
+2. `src/televault/ui/window_main.py` — `MainWindow`, composed from the mixins in `src/televault/ui/panels/`.
+3. `src/televault/core/worker.py` — `TelegramWorker`: the bridge between UI jobs and Telegram operations.
+4. `src/televault/tg/upload/` and `src/televault/tg/download/` — the upload/download core.
 
 ---
 
-## The `app/` tree
+## The `src/televault/` tree
 
 ```
-app/
+src/televault/
 ├── main.py                  Entry point: config → MainWindow → Qt event loop
 │
 ├── config/
@@ -78,19 +78,19 @@ From this slice onward, the "god modules" with a wide public API (`DbRepo`,
 `TgDeleter`, UI dialogs, explorer models, text editor) are split into `name/`
 subpackages with a thin facade in `__init__.py` and private `_part.py` files
 inside — the same technique as in `tg/upload`/`tg/download`/`ui/panels`. The
-public import path (`from app.db.repo import DbRepo`, etc.) does not change.
+public import path (`from televault.db.repo import DbRepo`, etc.) does not change.
 
 ---
 
 ## The large-class pattern: mixins
 Large classes are split into mixin modules, and a composition class inherits
-them. This is already used in the project for `MainWindow` (`app/ui/panels/`) and
+them. This is already used in the project for `MainWindow` (`src/televault/ui/panels/`) and
 applied to `TgUploader` and `TgDownloader`. All constants and `__init__` live on
 the composition class; mixins contain only methods (`self.*`/`cls.*` resolve via
 the MRO). Pure-functional helpers without `self` are extracted into separate
 modules (`compression.py`, `partition.py`, `*/merge.py`, `*/_common.py`).
 
-### `app/tg/upload/` — upload
+### `src/televault/tg/upload/` — upload
 | Module | Role |
 |---|---|
 | `__init__.py` | re-export `TgUploader`, `_AdaptiveUploadController` |
@@ -104,7 +104,7 @@ modules (`compression.py`, `partition.py`, `*/merge.py`, `*/_common.py`).
 | `records.py` | `_UploadRecordBuffer` — batch buffer for writing parts to `DbRepo` (`add()`/`flush()`, DB work outside locks) |
 | `_common.py` | `_is_retryable_error` (retry predicate) |
 
-### `app/tg/download/` — download
+### `src/televault/tg/download/` — download
 | Module | Role |
 |---|---|
 | `__init__.py` | re-export `TgDownloader`, `_AdaptiveDownloadController` |
@@ -115,7 +115,7 @@ modules (`compression.py`, `partition.py`, `*/merge.py`, `*/_common.py`).
 | `analytics.py` | `_DownloadAnalyticsMixin._build_download_analytics` — single builder for the `analytics` block for `chunked_download` and `_download_batch_member` |
 | `_common.py` | `_is_retryable_error`, `_SHA_PREFIX_RE`, `_preallocate_file`, `_sha256_file_sync` |
 
-### `app/db/repo/` — local index
+### `src/televault/db/repo/` — local index
 | Module | Role |
 |---|---|
 | `__init__.py` | facade `DbRepo(_IndexMixin, _ObjectsMixin, _TrashShareSyncMixin, _JobsMixin, _BatchMixin, _TailMixin)` |
@@ -127,7 +127,7 @@ modules (`compression.py`, `partition.py`, `*/merge.py`, `*/_common.py`).
 | `_tail.py` | `_TailMixin` — object rename/delete, accounts |
 | `_sql.py` | SQL constants shared by several mixins |
 
-### `app/tg/delete/` — delete/rename in Telegram
+### `src/televault/tg/delete/` — delete/rename in Telegram
 | Module | Role |
 |---|---|
 | `__init__.py` | facade `TgDeleter(_OpsMixin, _RetryMixin, _RoutesMixin)` — `__init__`, per-chat route registration |
@@ -136,7 +136,7 @@ modules (`compression.py`, `partition.py`, `*/merge.py`, `*/_common.py`).
 | `_routes.py` | `_RoutesMixin` — build/pick a route (`client`, `chat`) by `chat_id` |
 | `_helpers.py` | shared functional helpers without `self` |
 
-### `app/ui/dialogs/` — dialogs (all classes are `QDialog`)
+### `src/televault/ui/dialogs/` — dialogs (all classes are `QDialog`)
 | Module | Role |
 |---|---|
 | `__init__.py` | `SetupDialog`, `SettingsDialog`, `CreateFolderDialog`, `RenameDialog`, `ConfirmDialog` |
@@ -145,13 +145,13 @@ modules (`compression.py`, `partition.py`, `*/merge.py`, `*/_common.py`).
 | `_add_account.py` | `AddAccountDialog` + `_AuthWorker` — add and authorize a new account right in the GUI (phone → code → 2FA) |
 | `_style.py` | `_DIALOG_STYLESHEET` — shared style, used by `__init__.py` and `_properties.py` |
 
-### `app/ui/models_qt/` — Qt explorer models
+### `src/televault/ui/models_qt/` — Qt explorer models
 | Module | Role |
 |---|---|
 | `__init__.py` | `FolderTreeModel`, `ExplorerGridModel`, `ExplorerFileItem`, `ExplorerFolderItem`, etc. |
 | `_icons.py` | icon render layer (type icons/badges/thumbnails), file-type detectors (`is_video_name`, `is_pdf_name`, …) |
 
-### `app/ui/text_editor/` — built-in text editor
+### `src/televault/ui/text_editor/` — built-in text editor
 | Module | Role |
 |---|---|
 | `__init__.py` | `TextEditorWindow`, `CodeEditor`, `open_text_editor` |
@@ -178,7 +178,7 @@ assembles the file, decrypts it (AES-GCM) and verifies sha256 → the file lands
 `_AdaptiveUploadController` / `_AdaptiveDownloadController` (`adaptive.py`).
 
 **Reliability (closed gaps):**
-- **Upload resume** (`app/tg/upload/resume.py`): on restart, already-uploaded
+- **Upload resume** (`src/televault/tg/upload/resume.py`): on restart, already-uploaded
   parts (present in `msg_index` with the same `parts_total` + payload sha256 from
   the caption) are skipped. For a random `file_key`, it is recovered from the
   sidecar in `cache_dir/.upload_resume/`. Symmetric with download resume.
@@ -186,7 +186,7 @@ assembles the file, decrypts it (AES-GCM) and verifies sha256 → the file lands
   `proxy_backup`; on connect it goes primary→backup→direct
   (`utils.select_working_proxy_from_chain`), and on the fly via
   `AccountManager.escalate_proxy` through Telethon `set_proxy`.
-- **Object state** (`app/core/object_state.py` `classify_object_state`):
+- **Object state** (`src/televault/core/object_state.py` `classify_object_state`):
   complete / incomplete (not fully uploaded) / offline (the part's account is not
   connected) / damaged (`msg_index.lost_ts` is set and the account is online =
   the message is gone). Loss is marked by `repo.mark_messages_lost_refs`
@@ -214,5 +214,5 @@ assembles the file, decrypts it (AES-GCM) and verifies sha256 → the file lands
 
 ## Tests and quality
 - Run: `QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -o addopts= -p no:warnings -q`
-- Linter: `ruff check app/ tests/ scripts/` (enforced via a save hook).
+- Linter: `ruff check src/televault/ tests/ scripts/` (enforced via a save hook).
 - End-to-end upload/download: `tests/integration_mock/test_upload_download_mock.py`.

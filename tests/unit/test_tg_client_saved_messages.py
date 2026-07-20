@@ -7,7 +7,7 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
-from app.tg.client import check_channels_access
+from televault.tg.client import check_channels_access
 
 
 class _ExplodingClient:

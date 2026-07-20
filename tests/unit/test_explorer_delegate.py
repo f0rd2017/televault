@@ -17,9 +17,9 @@ from PySide6.QtWidgets import (
     QStyleOptionViewItem,
 )
 
-from app.core.types import ObjectEntry
-from app.ui.models_qt import ExplorerFileItem, ExplorerFolderItem, ExplorerGridModel
-from app.ui.panels.explorer_delegate import ExplorerIconDelegate
+from televault.core.types import ObjectEntry
+from televault.ui.models_qt import ExplorerFileItem, ExplorerFolderItem, ExplorerGridModel
+from televault.ui.panels.explorer_delegate import ExplorerIconDelegate
 
 
 def _app() -> QApplication:

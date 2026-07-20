@@ -6,7 +6,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication
 
-from app.ui.models_qt import FolderTreeModel
+from televault.ui.models_qt import FolderTreeModel
 
 
 def _app() -> QApplication:

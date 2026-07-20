@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.core.utils import (
+from televault.core.utils import (
     sanitize_filename,
     sha256_file,
     to_human_size,

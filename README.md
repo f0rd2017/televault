@@ -74,12 +74,12 @@ cd televault
 
 # with uv (recommended)
 uv sync
-uv run python run.py
+uv run televault
 
 # or the classic way
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
-python run.py
+televault
 ```
 
 Full installation guide (Linux / macOS / Windows): [SETUP.txt](SETUP.txt).
@@ -172,7 +172,7 @@ Prebuilt Linux and Windows binaries are also published automatically to **Releas
 ## Architecture
 
 ```text
-app/
+src/televault/
   config/   configuration and validation
   core/     worker, jobs, accounts, cache, rate limiter
   db/       SQLite schema and repository

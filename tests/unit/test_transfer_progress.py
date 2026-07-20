@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from app.core.transfer_progress import TransferProgressAggregator
+from televault.core.transfer_progress import TransferProgressAggregator
 
 
 @pytest.mark.asyncio

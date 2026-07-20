@@ -17,17 +17,17 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
 
-from app.api.common import TranscodeResponse
-from app.api.server import ApiContext, ApiServer, dispatch
-from app.core.transcode import (
+from televault.api.common import TranscodeResponse
+from televault.api.server import ApiContext, ApiServer, dispatch
+from televault.core.transcode import (
     build_ffmpeg_args,
     plan_from_probe,
     transcode_available,
 )
-from app.core.types import ApiConfig, PartMeta, PartRecord
-from app.db.database import connect_db
-from app.db.repo import DbRepo
-from app.tg.parser import build_caption
+from televault.core.types import ApiConfig, PartMeta, PartRecord
+from televault.db.database import connect_db
+from televault.db.repo import DbRepo
+from televault.tg.parser import build_caption
 
 # ── Planning (pure) ──────────────────────────────────────────────────────────
 

@@ -7,7 +7,7 @@ import asyncio
 import pytest
 from telethon.errors import RPCError
 
-from app.tg.proxy_escalation import ProxyEscalationMixin
+from televault.tg.proxy_escalation import ProxyEscalationMixin
 
 
 class _Guard(ProxyEscalationMixin):
@@ -51,7 +51,7 @@ async def test_cooldown_limits_escalation_rate(monkeypatch) -> None:
     guard = _Guard()
     client = object()
     fake_now = [1000.0]
-    monkeypatch.setattr("app.tg.proxy_escalation.time.monotonic", lambda: fake_now[0])
+    monkeypatch.setattr("televault.tg.proxy_escalation.time.monotonic", lambda: fake_now[0])
 
     await guard._on_persistent_connection_failure(client, ConnectionError("x"))
     await guard._on_persistent_connection_failure(client, ConnectionError("x"))
@@ -88,8 +88,8 @@ async def test_escalator_exception_is_swallowed() -> None:
 async def test_send_with_retry_escalates_on_exhausted_connection_errors() -> None:
     """Integration: the _send_with_retry funnel, after retries are exhausted
     on a connection error, calls the escalator and re-raises the original error."""
-    from app.core.types import AppConfig, RetryConfig
-    from app.tg.upload.uploader import TgUploader
+    from televault.core.types import AppConfig, RetryConfig
+    from televault.tg.upload.uploader import TgUploader
 
     class _DeadClient:
         async def send_file(self, *a, **k):

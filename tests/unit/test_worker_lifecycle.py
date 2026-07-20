@@ -4,10 +4,10 @@ import asyncio
 import time
 from pathlib import Path
 
-from app.core.types import AppConfig, CryptoConfig, RetryConfig
-from app.core.worker import TelegramWorker
-from app.db.database import connect_db
-from app.db.repo import DbRepo
+from televault.core.types import AppConfig, CryptoConfig, RetryConfig
+from televault.core.worker import TelegramWorker
+from televault.db.database import connect_db
+from televault.db.repo import DbRepo
 
 
 class _RunningLoop:

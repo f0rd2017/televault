@@ -17,17 +17,17 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
 
-from app.api.server import ApiContext, ApiServer, StreamResponse, dispatch
-from app.core.stream import (
+from televault.api.server import ApiContext, ApiServer, StreamResponse, dispatch
+from televault.core.stream import (
     GCM_OVERHEAD,
     LayoutError,
     build_layout,
     iter_range_bytes,
 )
-from app.core.types import ApiConfig, PartMeta, PartRecord
-from app.db.database import connect_db
-from app.db.repo import DbRepo
-from app.tg.parser import build_caption
+from televault.core.types import ApiConfig, PartMeta, PartRecord
+from televault.db.database import connect_db
+from televault.db.repo import DbRepo
+from televault.tg.parser import build_caption
 
 
 # ── Part-building helpers ────────────────────────────────────────────────────
@@ -348,7 +348,7 @@ def test_stream_falls_back_to_full_when_no_parts(tmp_path):
         share_dir=str(tmp_path / "share"),
     )
     result = dispatch(ctx, "GET", "/share/np", {}, {}, b"")
-    from app.api.server import FileResponse
+    from televault.api.server import FileResponse
 
     assert isinstance(result, FileResponse)
     assert worker.assembled is True

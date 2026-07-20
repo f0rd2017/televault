@@ -18,8 +18,8 @@ from PySide6.QtCore import QEventLoop, QTimer
 from PySide6.QtMultimedia import QMediaPlayer
 from PySide6.QtWidgets import QApplication
 
-from app.core.utils import ffmpeg_available
-from app.ui.media_viewer import VideoViewerWindow, _format_time
+from televault.core.utils import ffmpeg_available
+from televault.ui.media_viewer import VideoViewerWindow, _format_time
 
 
 def _app() -> QApplication:
@@ -242,7 +242,7 @@ def test_video_player_logs_error_on_invalid_source(tmp_path, caplog):
     try:
         port = httpd.server_address[1]
         url = f"http://127.0.0.1:{port}/broken.mp4"
-        with caplog.at_level("WARNING", logger="app.ui.media_viewer"):
+        with caplog.at_level("WARNING", logger="televault.ui.media_viewer"):
             win = VideoViewerWindow(url, "broken.mp4")
             win.show()
             _pump_until(lambda: win._fallback_btn.isVisible(), timeout_ms=10000)

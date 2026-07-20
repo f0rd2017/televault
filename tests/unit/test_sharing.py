@@ -10,15 +10,15 @@ from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from app.api.server import ApiContext, ApiServer, FileResponse, dispatch
-from app.core.sharing import (
+from televault.api.server import ApiContext, ApiServer, FileResponse, dispatch
+from televault.core.sharing import (
     hash_share_password,
     new_share_token,
     verify_share_password,
 )
-from app.core.types import ApiConfig
-from app.db.database import connect_db
-from app.db.repo import DbRepo
+from televault.core.types import ApiConfig
+from televault.db.database import connect_db
+from televault.db.repo import DbRepo
 
 CONTENT = b"hello-share-content-0123456789-abcdefghij"
 
@@ -245,8 +245,8 @@ def test_real_http_share_download_and_range(tmp_path):
 def test_share_link_dialog_creates_share(tmp_path):
     from PySide6.QtWidgets import QApplication
 
-    from app.core.types import ObjectEntry
-    from app.ui.dialogs._properties import ShareLinkDialog
+    from televault.core.types import ObjectEntry
+    from televault.ui.dialogs._properties import ShareLinkDialog
 
     QApplication.instance() or QApplication([])
     repo = _repo(tmp_path)

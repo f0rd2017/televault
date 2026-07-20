@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from app.core.rate_limiter import AdaptiveRateLimiter
+from televault.core.rate_limiter import AdaptiveRateLimiter
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,6 @@
 # Local REST API
 
-A thin HTTP server on top of the core (`app/api/`). Built on the stdlib
+A thin HTTP server on top of the core (`src/televault/api/`). Built on the stdlib
 `http.server` — **no extra dependencies**. **Disabled by default.**
 
 ## Enabling

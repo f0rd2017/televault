@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.core.types import PartMeta, PartRecord
-from app.tg.parser import build_caption
-from app.tg.upload.resume import (
+from televault.core.types import PartMeta, PartRecord
+from televault.tg.parser import build_caption
+from televault.tg.upload.resume import (
     clear_resume_file,
     existing_completed_parts,
     load_resume_file_key,

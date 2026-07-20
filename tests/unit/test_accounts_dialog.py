@@ -12,11 +12,11 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QDialog, QMessageBox
 
-from app.core.types import TelegramAccount
-from app.db.database import connect_db
-from app.db.repo import DbRepo
-from app.ui.dialogs import ConfirmDialog
-from app.ui.dialogs._accounts import AccountsDialog, _StatusProbe
+from televault.core.types import TelegramAccount
+from televault.db.database import connect_db
+from televault.db.repo import DbRepo
+from televault.ui.dialogs import ConfirmDialog
+from televault.ui.dialogs._accounts import AccountsDialog, _StatusProbe
 
 
 def _make_repo(tmp_path) -> DbRepo:

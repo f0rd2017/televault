@@ -1,7 +1,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-from app.api.shares import (
+from televault.api.shares import (
     _NON_STREAMABLE_EXT,
     _is_non_streamable_container,
     _mp4_needs_full_assembly,

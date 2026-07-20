@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from app.core.types import PartRecord
-from app.db.database import connect_db
-from app.db.repo import DbRepo
+from televault.core.types import PartRecord
+from televault.db.database import connect_db
+from televault.db.repo import DbRepo
 
 
 def test_mark_messages_deleted_is_scoped_by_chat_id(tmp_path) -> None:

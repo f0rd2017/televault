@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import time
 
-from app.core.rate_limiter import BandwidthLimiter
+from televault.core.rate_limiter import BandwidthLimiter
 
 _MB = 1024 * 1024
 

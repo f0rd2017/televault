@@ -1,7 +1,7 @@
 import pytest
 
-from app.core import proxy as proxy_mod
-from app.core.utils import (
+from televault.core import proxy as proxy_mod
+from televault.core.utils import (
     build_telethon_proxy,
     build_safe_output_path,
     decrypt_bytes,

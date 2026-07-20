@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.tg.partition import (
+from televault.tg.partition import (
     base_logical_parts,
     build_even_part_sizes,
     plan_logical_parts,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import time
 
-from app.core.cache import CacheManager
+from televault.core.cache import CacheManager
 
 
 def test_cleanup_keeps_fresh_parts_dirs(tmp_path) -> None:

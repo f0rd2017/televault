@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.core.accounts import AccountManager, ConnectedAccount
-from app.core.types import TelegramAccount
+from televault.core.accounts import AccountManager, ConnectedAccount
+from televault.core.types import TelegramAccount
 
 
 def _make_account(
@@ -85,7 +85,7 @@ async def test_connect_account_success(tmp_path) -> None:
 
     acc = _make_account(account_id=1, session_path=str(tmp_path / "s.session"))
 
-    with patch("app.core.accounts.TelegramClient", return_value=client):
+    with patch("televault.core.accounts.TelegramClient", return_value=client):
         ca = await mgr.connect_account(acc)
 
     assert ca is not None
@@ -105,7 +105,7 @@ async def test_connect_account_chat_resolve_fails_returns_ca(tmp_path) -> None:
 
     acc = _make_account(account_id=1, session_path=str(tmp_path / "s.session"))
 
-    with patch("app.core.accounts.TelegramClient", return_value=client):
+    with patch("televault.core.accounts.TelegramClient", return_value=client):
         ca = await mgr.connect_account(acc)
 
     # Account IS returned even if chat unresolved
@@ -128,7 +128,7 @@ async def test_connect_account_not_authorized_still_returns_ca(tmp_path) -> None
 
     acc = _make_account(account_id=1, session_path=str(tmp_path / "s.session"))
 
-    with patch("app.core.accounts.TelegramClient", return_value=client):
+    with patch("televault.core.accounts.TelegramClient", return_value=client):
         ca = await mgr.connect_account(acc)
 
     # Account IS returned but not authorized
@@ -151,7 +151,7 @@ async def test_connect_account_connect_fails_returns_none(tmp_path) -> None:
 
     acc = _make_account(account_id=1, session_path=str(tmp_path / "s.session"))
 
-    with patch("app.core.accounts.TelegramClient", return_value=client):
+    with patch("televault.core.accounts.TelegramClient", return_value=client):
         ca = await mgr.connect_account(acc)
 
     assert ca is None

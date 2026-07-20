@@ -6,11 +6,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-import app.core.accounts as accounts_mod
-import app.core.utils as utils
-import app.core.proxy as proxy_mod
-from app.core.accounts import AccountManager, ConnectedAccount
-from app.core.types import TelegramAccount
+import televault.core.accounts as accounts_mod
+import televault.core.utils as utils
+import televault.core.proxy as proxy_mod
+from televault.core.accounts import AccountManager, ConnectedAccount
+from televault.core.types import TelegramAccount
 
 _PROXY_TUPLE = ("socks5", "host", 1080, True, None, None)
 
@@ -97,7 +97,7 @@ async def test_connect_account_uses_backup_when_primary_dead(monkeypatch, tmp_pa
         proxy_backup="backup",
         session_path=str(tmp_path / "s.session"),
     )
-    with patch("app.core.accounts.TelegramClient", return_value=_connect_client()):
+    with patch("televault.core.accounts.TelegramClient", return_value=_connect_client()):
         ca = await mgr.connect_account(acc)
     assert ca is not None
     assert ca.proxy_tier == 1
@@ -114,7 +114,7 @@ async def test_connect_account_falls_back_to_direct(monkeypatch, tmp_path):
         proxy_backup="backup",
         session_path=str(tmp_path / "s.session"),
     )
-    with patch("app.core.accounts.TelegramClient", return_value=_connect_client()):
+    with patch("televault.core.accounts.TelegramClient", return_value=_connect_client()):
         ca = await mgr.connect_account(acc)
     assert ca is not None
     assert ca.proxy_tier == 2  # len(chain) => direct

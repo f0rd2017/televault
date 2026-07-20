@@ -6,7 +6,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QWidget
 
-from app.ui.widgets import StartupLoadingOverlay
+from televault.ui.widgets import StartupLoadingOverlay
 
 
 # Keep parent widgets alive so their C++ objects (and child overlays) aren't GC'd.

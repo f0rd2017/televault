@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from app.core.types import AppConfig
-from app.tg.upload.uploader import TgUploader
+from televault.core.types import AppConfig
+from televault.tg.upload.uploader import TgUploader
 
 MB = 1024 * 1024
 

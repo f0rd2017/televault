@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.core.accounts import _parse_invite_hash
+from televault.core.accounts import _parse_invite_hash
 
 
 def test_parses_plus_invite_link():

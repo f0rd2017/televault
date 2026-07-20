@@ -3,11 +3,11 @@ from datetime import datetime
 
 import pytest
 
-from app.core.types import AppConfig, CryptoConfig, PartMeta, RetryConfig
-from app.db.database import connect_db
-from app.db.repo import DbRepo
-from app.tg.parser import build_caption
-from app.tg.scan import TgScanner
+from televault.core.types import AppConfig, CryptoConfig, PartMeta, RetryConfig
+from televault.db.database import connect_db
+from televault.db.repo import DbRepo
+from televault.tg.parser import build_caption
+from televault.tg.scan import TgScanner
 
 
 @dataclass

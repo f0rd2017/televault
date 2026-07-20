@@ -1,5 +1,5 @@
-from app.core.types import PartMeta
-from app.tg.parser import (
+from televault.core.types import PartMeta
+from televault.tg.parser import (
     build_batch_blob_caption,
     build_caption,
     parse_batch_blob_caption,
@@ -76,7 +76,7 @@ def test_parse_caption_invalid_integrity_values() -> None:
 
 
 def test_batch_blob_caption_roundtrip() -> None:
-    from app.core.types import BatchBlobCaption
+    from televault.core.types import BatchBlobCaption
 
     meta = BatchBlobCaption(
         version=2,
@@ -93,7 +93,7 @@ def test_batch_blob_caption_roundtrip() -> None:
 
 
 def test_parse_caption_ignores_batch_blob_kind() -> None:
-    from app.core.types import BatchBlobCaption
+    from televault.core.types import BatchBlobCaption
 
     caption = build_batch_blob_caption(
         BatchBlobCaption(

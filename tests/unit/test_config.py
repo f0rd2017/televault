@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from app.config.config import ConfigError, load_app_config
+from televault.config.config import ConfigError, load_app_config
 
 
 def _write_config(tmp_path, payload: dict) -> str:
@@ -207,7 +207,7 @@ def test_blank_download_dir_falls_back_to_cache(monkeypatch, tmp_path) -> None:
     cfg = load_app_config(config_path=path, dotenv_path=tmp_path / "missing.env")
     # Relative config paths resolve against app_base_dir (portability of
     # frozen builds), so we compare the resolved values.
-    from app.core.paths import resolve_app_path
+    from televault.core.paths import resolve_app_path
 
     assert cfg.download_root == cfg.cache_dir
     assert cfg.cache_dir == str(resolve_app_path("./mycache"))

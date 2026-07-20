@@ -4,8 +4,8 @@ from PySide6.QtWidgets import QApplication
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-import app.ui.text_editor as text_editor_module
-from app.ui.text_editor import TextEditorWindow, CodeEditor, open_text_editor
+import televault.ui.text_editor as text_editor_module
+from televault.ui.text_editor import TextEditorWindow, CodeEditor, open_text_editor
 
 
 @pytest.fixture
@@ -203,7 +203,7 @@ def test_cycle_tab_wraps(editor_window):
 def test_expand_regex_groups_helper():
     from PySide6.QtCore import QRegularExpression
 
-    from app.ui.text_editor import _expand_regex_groups
+    from televault.ui.text_editor import _expand_regex_groups
 
     match = QRegularExpression(r"(\d+)-(\d+)").match("10-20")
     assert _expand_regex_groups(r"$2..$1", match) == "20..10"

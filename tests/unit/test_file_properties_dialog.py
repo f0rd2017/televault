@@ -7,8 +7,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QTableWidget
 
-from app.core.types import PartRecord
-from app.ui.dialogs._properties import FilePropertiesDialog
+from televault.core.types import PartRecord
+from televault.ui.dialogs._properties import FilePropertiesDialog
 
 
 def _entry(parts_total: int = 2):
@@ -77,7 +77,7 @@ def test_properties_dialog_exposes_note():
 
 
 def test_folder_properties_dialog_builds():
-    from app.ui.dialogs._properties import FolderPropertiesDialog
+    from televault.ui.dialogs._properties import FolderPropertiesDialog
 
     QApplication.instance() or QApplication([])
     dlg = FolderPropertiesDialog(
@@ -94,7 +94,7 @@ def test_folder_properties_dialog_builds():
 
 
 def test_folder_properties_dialog_handles_empty_folder():
-    from app.ui.dialogs._properties import FolderPropertiesDialog
+    from televault.ui.dialogs._properties import FolderPropertiesDialog
 
     QApplication.instance() or QApplication([])
     # An empty folder with no files or subfolders must not crash.

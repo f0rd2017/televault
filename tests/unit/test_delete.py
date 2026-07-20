@@ -3,12 +3,12 @@ from __future__ import annotations
 import pytest
 from telethon.errors import MessageDeleteForbiddenError, MessageIdInvalidError
 
-from app.core.types import AppConfig, CryptoConfig, PartRecord, RetryConfig
-from app.db.database import connect_db
-from app.db.repo import DbRepo
-from app.tg.client import TgClientEndpoint
-from app.tg.delete import TgDeleter
-from app.tg.parser import parse_caption
+from televault.core.types import AppConfig, CryptoConfig, PartRecord, RetryConfig
+from televault.db.database import connect_db
+from televault.db.repo import DbRepo
+from televault.tg.client import TgClientEndpoint
+from televault.tg.delete import TgDeleter
+from televault.tg.parser import parse_caption
 
 
 class FakeChat:

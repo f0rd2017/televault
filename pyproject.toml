@@ -30,15 +30,17 @@ dev = [
 ]
 
 [project.scripts]
-televault = "app.main:run"
+televault = "televault.main:run"
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
+pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-q"
 asyncio_mode = "auto"
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["app*"]
-exclude = ["tests*", "src*"]
+where = ["src"]
+include = ["televault*"]
+
+[tool.setuptools.package-data]
+televault = ["assets/*", "i18n/*.qm"]

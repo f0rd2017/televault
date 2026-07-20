@@ -7,7 +7,7 @@ import os
 import time
 from pathlib import Path
 
-from app.core.cache import CacheManager, get_active_download_keys_from_repo
+from televault.core.cache import CacheManager, get_active_download_keys_from_repo
 
 
 class FakeRepo:
